@@ -1,6 +1,6 @@
 """ This script allows the raw ProteinNet files from
 https://github.com/aqlaboratory/proteinnet. """
-
+import itertools
 import os
 from glob import glob
 import multiprocessing
@@ -64,12 +64,12 @@ def read_protein_from_file(file_pointer, include_tertiary):
             return None
 
 
-def process_file(input_filename):
+def process_file(input_filename_torch_dict_dir):
     """
     A parallelizable method for processing one raw ProteinNet file and
     creating a Pytorch-saved python dictionary of the data.
     """
-    global torch_dict_dir
+    input_filename, torch_dict_dir = input_filename_torch_dict_dir
     print("    " + input_filename)
     text_file = open(input_filename + '.ids', "w")
     input_file = open(input_filename, "r")
@@ -95,13 +95,8 @@ def parse_raw_proteinnet(proteinnet_dir, training_set):
     this will acquired from the PDB.
     """
     train_file = f"training_{training_set}.pt"
-    global torch_dict_dir
     # Test for .pt files existance, return ids and exit if already complete
     torch_dict_dir = os.path.join(proteinnet_dir, "torch/")
-    if os.path.exists(os.path.join(torch_dict_dir, train_file)):
-        print("Raw ProteinNet files already preprocessed.")
-        train_ids, valid_ids, test_ids = load_ids_from_text_files(torch_dict_dir.replace("/torch", "/raw"), train_file)
-        return train_ids, valid_ids, test_ids
 
     # If the torch-preprocessed ProteinNet dictionaries don't exist, create them.
     if not os.path.exists(torch_dict_dir):
@@ -111,6 +106,6 @@ def parse_raw_proteinnet(proteinnet_dir, training_set):
     print("Preprocessing raw ProteinNet files...")
 
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        p.map(process_file, input_files)
+        p.map(process_file, zip(input_files, itertools.repeat(torch_dict_dir)))
     print("Done.")
     return parse_raw_proteinnet(proteinnet_dir, train_file)

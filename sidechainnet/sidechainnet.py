@@ -6,6 +6,7 @@ A protein structure prediction data set that includes side chain information. A 
 import os
 
 import argparse
+import itertools
 
 import sidechainnet
 from sidechainnet.parse_raw_proteinnet import parse_raw_proteinnet
@@ -25,10 +26,10 @@ def save_dataset(dataset, path):
 
 
 def main():
-
+    # First, create a Pytorch version of the raw proteinnet files for easier inspection
     proteinnet_dataset = parse_raw_proteinnet(args.proteinnet_dir, args.training_set)
 
-    sidechain_dataset = create_sidechain_dataset()
+    sidechain_dataset = create_sidechain_dataset(proteinnet_dataset.ids)
 
     sidechainnet = combine_datasets(sidechain_dataset, proteinnet_dataset)
 
