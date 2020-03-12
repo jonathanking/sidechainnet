@@ -2,33 +2,46 @@
 sidechainnet.py
 A protein structure prediction data set that includes side chain information. A direct extension of ProteinNet by Mohammed AlQuraishi.
 
-Handles the primary functions
 """
+import os
+
+import argparse
+
+import sidechainnet
+from sidechainnet.parse_raw_proteinnet import parse_raw_proteinnet
 
 
-def canvas(with_attribution=True):
-    """
-    Placeholder function to show example docstring (NumPy format)
+def create_sidechain_dataset():
+    pass
 
-    Replace this function and doc string for your own project
 
-    Parameters
-    ----------
-    with_attribution : bool, Optional, default: True
-        Set whether or not to display who the quote is from
+def combine_datasets(sidechains, proteinnet):
+    pass
 
-    Returns
-    -------
-    quote : str
-        Compiled string including quote and optional attribution
-    """
 
-    quote = "The code is but a canvas to our imagination."
-    if with_attribution:
-        quote += "\n\t- Adapted from Henry David Thoreau"
-    return quote
+def save_dataset(dataset, path):
+    pass
+
+
+
+def main():
+
+    proteinnet_dataset = parse_raw_proteinnet(args.proteinnet_dir, args.training_set)
+
+    sidechain_dataset = create_sidechain_dataset()
+
+    sidechainnet = combine_datasets(sidechain_dataset, proteinnet_dataset)
+
+    save_dataset(sidechainnet, args.out_file)
 
 
 if __name__ == "__main__":
-    # Do something if this file is invoked on its own
-    print(canvas())
+    parser = argparse.ArgumentParser(description="Constructs SidechainNet.")
+    parser.add_argument('proteinnet_dir', type=str, help='Path to ProteinNet raw records directory.')
+    parser.add_argument('-o', '--output_dir', type=str, help='Path to output file (.tch file)', default=os.path.curdir)
+    parser.add_argument('-l', '--limit', type=int, default=None, help='Limit size of training set for debugging.')
+    parser.add_argument("--pdb_dir", default=os.path.expanduser("~/pdb/"), type=str,
+                        help="Location to download PDB files for ProDy.")
+    parser.add_argument('--training_set', type=int, default=100, help='Which \'thinning\' of the ProteinNet training '
+                                                                      'set to parse. {30,50,70,90,95,100}. Default 100.')
+    args = parser.parse_args()
