@@ -64,48 +64,27 @@ def read_protein_from_file(file_pointer, include_tertiary):
             return None
 
 
-def process_file(input_filename_torch_dict_dir):
+def process_file(input_filename_out_dir):
     """
     A parallelizable method for processing one raw ProteinNet file and
     creating a Pytorch-saved python dictionary of the data.
     """
-    input_filename, torch_dict_dir = input_filename_torch_dict_dir
+    input_filename, out_dir = input_filename_out_dir
     print("    " + input_filename)
-    text_file = open(input_filename + '.ids', "w")
+    text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '.ids'), "w")
     input_file = open(input_filename, "r")
     meta_dict = {}
     while True:
-        next_protein = read_protein_from_file(input_file, include_tertiary=False)
+        next_protein = read_protein_from_file(input_file, include_tertiary=True)
         if next_protein is None:
             break
         id_ = next_protein["id"]
         del next_protein["id"]
         meta_dict.update({id_: next_protein})
         text_file.write(f"{id_}\n")
-    torch.save(meta_dict, os.path.join(torch_dict_dir, os.path.basename(input_filename) + ".pt"))
+    torch.save(meta_dict, os.path.join(out_dir, os.path.basename(input_filename) + ".pt"))
     input_file.close()
     text_file.close()
     print(f"{input_filename} finished.")
 
 
-def parse_raw_proteinnet(proteinnet_dir, training_set):
-    """
-    Preprocesses raw ProteinNet records by reading them and transforming them
-    into a Pytorch-saved dictionary. It excludes the tertiary information as
-    this will acquired from the PDB.
-    """
-    train_file = f"training_{training_set}.pt"
-    # Test for .pt files existance, return ids and exit if already complete
-    torch_dict_dir = os.path.join(proteinnet_dir, "torch/")
-
-    # If the torch-preprocessed ProteinNet dictionaries don't exist, create them.
-    if not os.path.exists(torch_dict_dir):
-        os.mkdir(torch_dict_dir)
-
-    input_files = glob(os.path.join(proteinnet_dir, "raw/*[!.ids]"))
-    print("Preprocessing raw ProteinNet files...")
-
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        p.map(process_file, zip(input_files, itertools.repeat(torch_dict_dir)))
-    print("Done.")
-    return parse_raw_proteinnet(proteinnet_dir, train_file)

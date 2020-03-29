@@ -4,7 +4,7 @@ A protein structure prediction data set that includes side chain information. A 
 """
 
 # Add imports here
-from .sidechainnet import *
+from .create_sidechainnet import *
 
 # Handle versioneer
 from ._version import get_versions

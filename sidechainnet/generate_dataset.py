@@ -24,10 +24,10 @@ from protein_transformer.dataset import MAX_SEQ_LEN
 sys.path.append(".")
 from protein_transformer.protein.structure_utils import angle_list_to_sin_cos, get_seq_and_masked_coords_and_angles, \
     no_nans_infs_allzeros, parse_astral_summary_file, get_chain_from_astral_id, GLOBAL_PAD_CHAR
-import proteinnet_parsing
 from protein_transformer.protein.structure_exceptions import  NonStandardAminoAcidError, SequenceError, \
     ContigMultipleMatchingError, ShortStructureError, MissingAtomsError, NoneStructureError
 from proteinnet_errors import ERRORS
+import parse_raw_proteinnet
 
 pr.confProDy(verbosity='error')
 
@@ -353,7 +353,7 @@ def save_data_dict(data):
 def main():
     lim = args.limit
     global PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT
-    train_pdb_ids, valid_ids, test_casp_ids = proteinnet_parsing.parse_raw_proteinnet(args.input_dir, TRAIN_FILE)
+    train_pdb_ids, valid_ids, test_casp_ids = parse_raw_proteinnet.parse_raw_proteinnet(args.input_dir, TRAIN_FILE)
     print("IDs fetched.")
     PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = torch.load(
         os.path.join(args.input_dir, "torch", TRAIN_FILE)), torch.load(
