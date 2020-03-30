@@ -8,15 +8,15 @@ import multiprocessing
 import torch
 
 
-def load_ids_from_text_files(directory, train_file):
+def load_ids_from_text_files(directory, training_set):
     """
     Given a directory where raw ProteinNet records are stored along with .ids
     files, reads and returns the contents of those files. Effectively returns
     a list of IDs associated with the training, validation, and test sets.
     """
-    with open(os.path.join(directory, train_file.replace(".pt", ".ids")), "r") as trainf, \
-            open(os.path.join(directory, "validation.ids"), "r") as validf, \
-            open(os.path.join(directory, "testing.ids"), "r") as testf:
+    with open(os.path.join(directory, f"training_{training_set}_ids.txt"), "r") as trainf, \
+            open(os.path.join(directory, "validation_ids.txt"), "r") as validf, \
+            open(os.path.join(directory, "testing_ids.txt"), "r") as testf:
         train_ids = trainf.read().splitlines()
         valid_ids = validf.read().splitlines()
         test_ids = testf.read().splitlines()
@@ -71,7 +71,7 @@ def process_file(input_filename_out_dir):
     """
     input_filename, out_dir = input_filename_out_dir
     print("    " + input_filename)
-    text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '.ids'), "w")
+    text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '_ids.txt'), "w")
     input_file = open(input_filename, "r")
     meta_dict = {}
     while True:

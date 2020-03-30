@@ -19,17 +19,19 @@ import prody as pr
 import torch
 import tqdm
 
-from protein_transformer.dataset import MAX_SEQ_LEN
 
 sys.path.append(".")
-from protein_transformer.protein.structure_utils import angle_list_to_sin_cos, get_seq_and_masked_coords_and_angles, \
+from .structure_utils import angle_list_to_sin_cos, get_seq_and_masked_coords_and_angles, \
     no_nans_infs_allzeros, parse_astral_summary_file, get_chain_from_astral_id, GLOBAL_PAD_CHAR
 from protein_transformer.protein.structure_exceptions import  NonStandardAminoAcidError, SequenceError, \
     ContigMultipleMatchingError, ShortStructureError, MissingAtomsError, NoneStructureError
-from proteinnet_errors import ERRORS
+from .proteinnet_errors import ERRORS
 import parse_raw_proteinnet
 
 pr.confProDy(verbosity='error')
+
+def get_sidechain_data(proteinnet_ids, proteinnet_dict, mode):
+    pass
 
 
 def get_chain_from_trainid(proteinnet_id):
