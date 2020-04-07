@@ -1,3 +1,7 @@
+# Pytorch saved files and associated ProteinNet files
+*.pt
+*_ids.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
