@@ -71,7 +71,7 @@ prometheus-client==0.7.1
 promise==2.2.1
 prompt-toolkit==2.0.9
 -e git+git@github.com:jonathanking/protein-transformer.git@f67e0ecad6336269a27324f9215dba1762550a0e#egg=protein_transformer
-psutil==5.6.3
+psutil==5.6.6
 ptyprocess==0.6.0
 py==1.8.0
 pycparser==2.19
