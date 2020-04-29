@@ -64,11 +64,12 @@ def read_protein_from_file(file_pointer, include_tertiary):
             return None
 
 
-def process_file(input_filename_out_dir):
+def process_file(input_filename_out_dir, return_ids=True):
     """
     A parallelizable method for processing one raw ProteinNet file and
     creating a Pytorch-saved python dictionary of the data.
     """
+    all_ids = []
     input_filename, out_dir = input_filename_out_dir
     print("    " + input_filename)
     text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '_ids.txt'), "w")
@@ -82,9 +83,13 @@ def process_file(input_filename_out_dir):
         del next_protein["id"]
         meta_dict.update({id_: next_protein})
         text_file.write(f"{id_}\n")
+        if return_ids:
+            all_ids.append(id_)
     torch.save(meta_dict, os.path.join(out_dir, os.path.basename(input_filename) + ".pt"))
     input_file.close()
     text_file.close()
     print(f"{input_filename} finished.")
+    if return_ids:
+        return (input_filename, all_ids)
 
 
