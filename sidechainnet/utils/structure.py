@@ -12,30 +12,6 @@ from protein_transformer.protein.structure_exceptions import \
 
 GLOBAL_PAD_CHAR = np.nan
 
-def get_backbone_from_full_coords(crds, invert=False):
-    """
-    #TODO Implement corresponding function for angles
-    Given a coordinate tensor that may or may not have a batch dimension,
-    this function returns the same coordinate tensor but excludes all the
-    sidechain coordinates.
-    """
-    mask = np.array([1, 1, 1] + [0] * (NUM_PREDICTED_COORDS - 3), dtype=np.bool)
-    if invert:
-        mask = np.invert(mask)
-    if len(crds.shape) == 2:
-        return crds[np.tile(mask, crds.shape[0]//NUM_PREDICTED_COORDS), :]
-    else:
-        return crds[:,np.tile(mask, crds.shape[1]//NUM_PREDICTED_COORDS), :]
-
-
-def get_sidechain_from_full_coords(crds):
-    """
-    Given a coordinate tensor that may or may not have a batch dimension,
-    this function returns the same coordinate tensor but excludes all the
-    backbone coordinates.
-    """
-    return get_backbone_from_full_coords(crds, invert=True)
-
 
 def parse_astral_summary_file(path):
     """
@@ -62,7 +38,7 @@ def get_chain_from_astral_id(astral_id, d):
     pdbid, chain = d[astral_id]
     assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid {pdbid}."
     chain, resnums = chain.split(":")
-    a = pr.parsePDB(pdbid, chain=chain) # TODO maybe change this to CIF?
+    a = pr.parsePDB(pdbid, chain=chain)  # TODO maybe change this to CIF?
     if resnums != "":
         if resnums[0] == "-":
             # Ranges with negative numbers must be escaped with ` character
@@ -110,32 +86,6 @@ def angle_list_to_sin_cos(angs, reshape=True):
     return new_list
 
 
-def seq_to_onehot(seq):
-    """
-    Given an AA sequence, returns a vector of one-hot vectors.
-    """
-    vector_array = []
-    for aa in seq:
-        one_hot = np.zeros(len(AA_MAP), dtype=bool)
-        if aa in AA_MAP.keys():
-            one_hot[AA_MAP[aa]] = 1
-        else:
-            one_hot -= 1
-        vector_array.append(one_hot)
-    return np.asarray(vector_array)
-
-
-def onehot_to_seq(oh):
-    """
-    Given a vector of one-hot vectors, returns its corresponding AA sequence.
-    """
-    seq = ""
-    for aa in oh:
-        idx = aa.argmax()
-        seq += AA_MAP_INV[idx]
-    return seq
-
-
 def check_standard_continuous(residue, prev_res_num):
     """
     Asserts that the residue is standard and that the chain is continuous.
@@ -178,10 +128,10 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
     try:
         if prev_residue:
             cb_dihedral = compute_single_dihedral((prev_residue.select("name C"),
-                                       *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])))
+                                                   *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])))
         else:
             cb_dihedral = compute_single_dihedral((next_res.select("name N"),
-                                       *(residue.select(f"name {an}") for an in ["C", "CA", "CB"])))
+                                                   *(residue.select(f"name {an}") for an in ["C", "CA", "CB"])))
     except AttributeError:
         cb_dihedral = GLOBAL_PAD_CHAR
 
@@ -195,7 +145,9 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
         atom_names = t_name.split("-")
         res_dihedrals.append(compute_single_dihedral([residue.select("name " + an) for an in atom_names]))
 
-    return res_dihedrals + (NUM_PREDICTED_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) - len(res_dihedrals)) * [GLOBAL_PAD_CHAR]
+    return res_dihedrals + (
+                NUM_PREDICTED_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) - len(res_dihedrals)) * [
+               GLOBAL_PAD_CHAR]
 
 
 def get_atom_coords_by_names(residue, atom_names):
@@ -205,7 +157,7 @@ def get_atom_coords_by_names(residue, atom_names):
     pad character in lieu of their coordinates.
     """
     coords = []
-    pad_coord = np.asarray([GLOBAL_PAD_CHAR]*3)
+    pad_coord = np.asarray([GLOBAL_PAD_CHAR] * 3)
     for an in atom_names:
         a = residue.select(f"name {an}")
         if a:
@@ -247,121 +199,33 @@ def empty_ang():
     return dihe_padding
 
 
-def find_contig_locations(contigs, true_seq):
+def is_acceptable_modified_residue(res):
+    """ Returns True if residue is non-standard but considered acceptable.
+
+    Args:
+        res: ProDy residue
+
+    Returns:
+        Returns True if residue is non-standard but considered acceptable.
+
     """
-    Given a list of contigs, returns their positions within true_seq. Raises
-    errors if the matching is ambiguous or if the observed sequence contains
-    residues not found in the true seq.
-    """
-    contig_locs = []
-    search_seq = str(true_seq)
-    for i in range(len(contigs)):
-        loc = search_seq.find(contigs[i])
-        if len(re.findall(contigs[i], search_seq)) > 1:
-            print(f"Multiple matches of {contigs[i]} found in {search_seq}.")
-            raise ContigMultipleMatchingError
-        if loc == -1:
-            print(f"Can't find contig in search_seq.\n{contigs[i]}\n{search_seq}")
-            raise SequenceError
-        search_seq = search_seq[loc + len(contigs[i]):]
-        if len(contig_locs) == 0:
-            contig_locs.append(loc)
-        else:
-            contig_locs.append(contig_locs[-1] + len(contigs[i - 1]) + loc)
-    return contig_locs
+    return False
+    # raise(NotImplementedError)
 
 
-def trim_mask_and_true_seqs(mask_seq, true_seq):
-    """
-    Given a mask and true sequence of the same length, this removes gaps from
-    the ends of both.
-    """
-    mask_seq_no_left = mask_seq.lstrip('-')
-    mask_seq_no_right = mask_seq.rstrip('-')
-    n_removed_left = len(mask_seq) - len(mask_seq_no_left)
-    n_removed_right = len(mask_seq) - len(mask_seq_no_right)
-    n_removed_right = None if n_removed_right == 0 else -n_removed_right
-    true_seq = true_seq[n_removed_left:n_removed_right]
-    mask_seq = mask_seq.strip("-")
-    return mask_seq, true_seq
+def get_seq_coords_and_angles(chain):
+    """Extracts protein sequence, coordinates, and angles from a ProDy chain.
 
+    Args:
+        chain: ProDy chain object
 
-def use_mask_to_pad_coords_dihedrals(mask_seq, coords, dihedrals):
+    Returns:
+        Returns a tuple (angles, coords, sequence) for the protein chain.
+        Returns None if the data fails to parse.
+        Example angles returned:
+            [[phi, psi, omega, ncac, cacn, cnca, chi1, chi2,...chi12],[...] ...]
     """
-    Given a mask sequence ('-' for gap, '+' for present), and python lists of
-    coordinates and dihedrals, this function places gaps in the relevant
-    locations for each before returning. At the end, both should have the
-    same length as the mask_seq.
-    """
-    new_coords = []
-    new_angs = []
-    coords = iter(coords)
-    dihedrals = iter(dihedrals)
-    for m in mask_seq:
-        if m == "+":
-            new_coords.append(next(coords))
-            new_angs.append(next(dihedrals))
-        else:
-            new_coords.append(empty_coord())
-            new_angs.append(empty_ang())
-    return new_coords, new_angs
-
-
-def use_contigs_to_compute_mask(contigs, true_seq, observed_sequence):
-    """
-    Given a list of contigs, aka contiguous sequence portions from a protein
-    structure, along with the true sequence and an obs. sequence that may
-    contain gaps, this function returns the mask and true sequence. The mask
-    has '-' for gaps and '+' for present items w.r.t. the true sequence.
-    """
-    mask_seq = "-" * len(true_seq)
-    # If there are no gaps in the structure, then keep the observed sequence
-    if len(contigs) == 1:
-        true_seq = observed_sequence
-        mask_seq = "+" * len(observed_sequence)
-    else:
-        # Compute the best contig locations
-        contig_locs = find_contig_locations(contigs, true_seq)
-
-        # Use the contig locations to create our mask
-        for contig, c_loc in zip(contigs, contig_locs):
-            mask_seq = mask_seq[:c_loc] + "+" * len(contig) + mask_seq[c_loc + len(contig):]
-
-        # Now that we have our mask sequence, we can trim its ends and fill in pad chars for residues
-        mask_seq, true_seq = trim_mask_and_true_seqs(mask_seq, true_seq)
-    return mask_seq, true_seq
-
-
-def update_contigs(contigs, current_contig, all_residues, res_id):
-    """
-    This function updates the state variables `contigs` and `cur_contigs`
-    while get_seq_and_masked_coords_and_angles processes the protein. These
-    variables are later used to compute the missing residue masks for
-    protein. This works by recording all of the continuous regions of the
-    protein, and then attempting to identify what residues were missing
-    inbetween those contiguous regions.
-    """
-    res = all_residues[res_id]
-    if current_contig == "":
-        current_contig = res.getSequence()[0]
-    if res_id < len(all_residues) - 1 and residues_are_contiguous(res, all_residues[res_id + 1]):
-        # The residues are connected
-        current_contig += all_residues[res_id + 1].getSequence()[0]
-    elif res_id < len(all_residues) - 1 and not residues_are_contiguous(res, all_residues[res_id + 1]):
-        # The residues are not connected
-        contigs.append(current_contig)
-        current_contig = ""
-    return contigs, current_contig
-
-def get_seq_and_masked_coords_and_angles(chain, true_seq):
-    """
-    Given a ProDy Chain object (from a Hierarchical View), return a tuple
-    (angles, coords, sequence). Returns None if the PDB should be ignored due
-    to weird artifacts. Also measures the bond angles along the peptide
-    backbone, since they account for significant variation.
-    i.e. [[phi, psi, omega, ncac, cacn, cnca, chi1, chi2,...chi12],[...] ...]
-    """
-    chain = chain.select("protein and not hetero")
+    chain = chain.select("protein")
     if chain is None:
         raise NoneStructureError
     if chain.nonstdaa:
@@ -372,18 +236,14 @@ def get_seq_and_masked_coords_and_angles(chain, true_seq):
     dihedrals = []
     observed_sequence = ""
     all_residues = list(chain.iterResidues())
-    if len(all_residues) < 2:
-        raise ShortStructureError
     prev_res = None
     next_res = all_residues[1]
 
-    # Mask info
-    current_contig = ""
-    contigs = []  # TODO get rid of contigs, replace with absolutely true seq...Must find ABSOLUTELY TRUE SEQ
-
     for res_id, res in enumerate(all_residues):
-        if not res.stdaa:
+        # TODO Add support for slightly modified amino acids
+        if not (res.stdaa or is_acceptable_modified_residue(res)):
             raise NonStandardAminoAcidError
+
         # Measure basic angles
         bb_angles = measure_phi_psi_omega(res)
         bond_angles = measure_bond_angles(res, res_id, all_residues)
@@ -400,45 +260,15 @@ def get_seq_and_masked_coords_and_angles(chain, true_seq):
         prev_res = res
         observed_sequence += res.getSequence()[0]
 
-        contigs, current_contig = update_contigs(contigs, current_contig, all_residues, res_id)
-
-    if current_contig != "":
-        contigs.append(current_contig)
-
-    mask_seq, true_seq = use_contigs_to_compute_mask(contigs, true_seq, observed_sequence)
-
-    assert mask_seq.count("+") == len(coords), f"The number of coords ({len(coords)}) must match the " \
-        f"number of '+'s in mask_seq {mask_seq.count('+')}, {mask_seq}.\n{observed_sequence}\n{true_seq}"
-    assert mask_seq.count("+") == len(dihedrals), f"The number of dihedrals ({len(dihedrals)}) must match the" \
-        f" number of '+'s in mask_seq {mask_seq.count('+')}, {mask_seq}."
-
-    # Use the mask to fill in missing residues
-    coords, dihedrals = use_mask_to_pad_coords_dihedrals(mask_seq, coords, dihedrals)
-    assert len(coords) == len(true_seq), "True sequence and coordinates must be same size at end of analysis"
-
     dihedrals_np = np.asarray(dihedrals)
     coords_np = np.concatenate(coords)
 
-    if coords_np.shape[0] != len(true_seq) * NUM_PREDICTED_COORDS:
+    if coords_np.shape[0] != len(observed_sequence) * NUM_PREDICTED_COORDS:
         print(f"Coords shape {coords_np.shape} does not match len(seq)*13 = "
-              f"{len(true_seq) * NUM_PREDICTED_COORDS},\nOBS: {observed_sequence}\nTRU: {true_seq}\n{chain}")
+              f"{len(observed_sequence) * NUM_PREDICTED_COORDS},\nOBS: {observed_sequence}\n{chain}")
         raise SequenceError
-    # TODO return true sequence and mask here, should have same string length
-    return dihedrals_np, coords_np, true_seq
 
-
-def residues_are_contiguous(resA, resB):
-    """
-     Returns True if resA is connected to resB.
-     """
-    contiguous_threshold = 2  # The maximum allowed distance for a peptide bond
-    try:
-        cur_coords = resA.select("name C").getCoords()
-        next_coords = resB.select("name N").getCoords()
-    except AttributeError as e:
-        # raise MissingBackboneAtomsError("Residue")
-        return resA.getResnum() + 1 == resB.getResnum()
-    return np.linalg.norm(cur_coords - next_coords) <= contiguous_threshold
+    return dihedrals_np, coords_np, observed_sequence
 
 
 def no_nans_infs_allzeros(matrix):
@@ -489,7 +319,6 @@ def safecalcAngle(a, b, c, radian):
     return angle
 
 
-
 def measure_bond_angles(residue, res_idx, all_res):
     """
     Given a residue, measure the ncac, cacn, and cnca bond angles.
@@ -502,16 +331,23 @@ def measure_bond_angles(residue, res_idx, all_res):
 
 
 def measure_phi_psi_omega(residue, include_OXT=False):
-    """
-    Returns phi, psi, omega for a residue, replacing out-of-bounds angles
-    with GLOBAL_PAD_CHAR.
+    """Measures a residue's primary backbone torsional angles (phi, psi, omega).
+
+    Args:
+        residue: ProDy residue object
+        include_OXT: Boolean describing whether or not to measure an angle to
+                     place the terminal oxygen.
+
+    Returns:
+        Python list of phi, psi, and omega angles for residue.
+
     """
     try:
-        phi = pr.calcPhi(residue, radian=True, dist=None)
+        phi = pr.calcPhi(residue, radian=True)
     except ValueError:
         phi = GLOBAL_PAD_CHAR
     try:
-        psi = pr.calcPsi(residue, radian=True, dist=None)
+        psi = pr.calcPsi(residue, radian=True)
     except ValueError:
         # For the last residue, we can measure a "psi" angle that is actually
         # the placement of the terminal oxygen. Currently, this is not utilized
@@ -528,7 +364,7 @@ def measure_phi_psi_omega(residue, include_OXT=False):
         else:
             psi = GLOBAL_PAD_CHAR
     try:
-        omega = pr.calcOmega(residue, radian=True, dist=None)
+        omega = pr.calcOmega(residue, radian=True)
     except ValueError:
         omega = GLOBAL_PAD_CHAR
     return [phi, psi, omega]

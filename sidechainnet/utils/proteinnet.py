@@ -104,3 +104,52 @@ class ProteinNet(object):
 
     def parse_raw_data(self):
         input_files = glob(os.path.join(self.raw_dir, "raw/*[!.ids]"))
+
+
+def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
+    """Extracts and saves information for a single ProteinNet dataset.
+
+    Preprocesses raw ProteinNet records by reading them and transforming them
+    into PyTorch-saved dictionaries. Files are kept separate due to file size.
+    For ease of inspection, the ProteinNet IDs are extracted and save as `.ids`
+    files.
+    # TODO: assert existence of test/targets files
+
+    Args:
+        proteinnet_in_dir: Directory where all raw ProteinNet files are kept
+        proteinnet_out_dir: Directory to save processed data
+        training_set: Which thinning of ProteinNet is requested
+
+    Returns:
+        relevant_ids: A list of ProteinNet IDs from corresponding training_set
+
+    """
+    train_file = f"training_{training_set}.pt"
+
+    # If the desired ProteinNet dataset has already been processed, load its IDs
+    if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
+        print(f"Raw ProteinNet files already preprocessed ({os.path.join(proteinnet_out_dir, train_file)}).")
+        relevant_ids_file = os.path.join(proteinnet_out_dir, train_file.replace(".pt", "_ids.txt"))
+        with open(relevant_ids_file, "r") as f:
+            relevant_ids = f.read().splitlines()
+        return relevant_ids
+
+    # If the torch-preprocessed ProteinNet dictionaries don't exist, create them.
+    if not os.path.exists(proteinnet_out_dir):
+        os.mkdir(proteinnet_out_dir)
+
+    # Look for the raw ProteinNet files
+    input_files = glob(os.path.join(proteinnet_in_dir, "*[!.ids]"))
+    assert len(input_files) == 8, f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but could not find " \
+                                  f"all 8.\n Please download from Mohammed AlQuraishi's repository: " \
+                                  f"https://github.com/aqlaboratory/proteinnet"
+
+    # Process each ProteinNet file by turning them into PyTorch saved dictionaries
+    print("Preprocessing raw ProteinNet files...")
+    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+        file_pnids = p.map(process_file, zip(input_files, itertools.repeat(proteinnet_out_dir)))
+    print("Done.")
+
+    # Return the ProteinNet IDs associated with the target dataset
+    relevant_ids = next(filter(lambda r: f"training_{training_set}" in r[0], file_pnids))
+    return relevant_ids

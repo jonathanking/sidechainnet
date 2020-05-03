@@ -1,10 +1,17 @@
-SideChainNet
+SidechainNet
 ==============================
 [//]: # (Badges)
-[![Travis Build Status](https://travis-ci.com/REPLACE_WITH_OWNER_ACCOUNT/SideChainNet.svg?branch=master)](https://travis-ci.com/REPLACE_WITH_OWNER_ACCOUNT/SideChainNet)
-[![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/SideChainNet/branch/master/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/SideChainNet/branch/master)
+[![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
 
-A protein structure prediction data set that includes side chain information. A direct extension of ProteinNet by Mohammed AlQuraishi.
+
+A protein structure prediction data set that includes sidechain information. A direct extension of ProteinNet by Mohammed AlQuraishi.
+
+### Todo
+
+1. Upload pre-processed files for downloading:
+    - PyTorch versions of ProteinNet
+    - Raw sidechain data
+    - SidechainNet (ProteinNet + sidechain data) as a Python dictionary
 
 ### Copyright
 
