@@ -1,18 +1,14 @@
-""" Utility functions when generating protein structure. """
-
-import re
+""" Utility functions when parsing protein structures. """
 
 import numpy as np
 import prody as pr
 
 from protein_transformer.protein.SidechainBuildInfo import SC_BUILD_INFO
-from protein_transformer.protein.structure_exceptions import \
-    NonStandardAminoAcidError, IncompleteStructureError, SequenceError, \
-    ContigMultipleMatchingError, ShortStructureError, MissingAtomsError, \
-    NoneStructureError
 from protein_transformer.protein.Structure import NUM_PREDICTED_ANGLES, \
     NUM_BB_TORSION_ANGLES, NUM_BB_OTHER_ANGLES, NUM_PREDICTED_COORDS
-from protein_transformer.protein.Sequence import AA_MAP, AA_MAP_INV
+from protein_transformer.protein.structure_exceptions import \
+    NonStandardAminoAcidError, IncompleteStructureError, SequenceError, \
+    MissingAtomsError, NoneStructureError
 
 GLOBAL_PAD_CHAR = np.nan
 

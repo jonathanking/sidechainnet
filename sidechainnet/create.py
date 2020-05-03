@@ -12,8 +12,8 @@ import torch
 import multiprocessing
 from glob import glob
 
-from sidechainnet.download_sidechain_data import get_sidechain_data
-from sidechainnet.parse_proteinnet import process_file, load_ids_from_text_files
+from sidechainnet.download_and_parse import download_sidechain_data
+from sidechainnet.utils.proteinnet import process_file
 
 
 def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
@@ -84,7 +84,7 @@ def main():
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, args.training_set)
 
     # Then, using the proteinnet IDs as a guide, download the relevant sidechain data
-    download_sidechain_data(pnids, args.sidechainnet_out, args.training_set)
+    download_sidechain_data(pnids, args.sidechainnet_out)
 
     # Finally, unify the sidechain data with ProteinNet
     combine_datasets(args.proteinnet_out, args.sidechainnet_out, args.training_set)

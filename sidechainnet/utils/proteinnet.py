@@ -67,7 +67,7 @@ def read_protein_from_file(file_pointer, include_tertiary):
 def process_file(input_filename_out_dir, return_ids=True):
     """
     A parallelizable method for processing one raw ProteinNet file and
-    creating a Pytorch-saved python dictionary of the data.
+    creating a PyTorch-saved python dictionary of the data.
     """
     all_ids = []
     input_filename, out_dir = input_filename_out_dir
@@ -93,3 +93,14 @@ def process_file(input_filename_out_dir, return_ids=True):
         return (input_filename, all_ids)
 
 
+class ProteinNet(object):
+    """
+    Defines a wrapper for interacting with a ProteinNet dataset.
+    """
+
+    def __init__(self, raw_dir, training_set):
+        self.raw_dir = raw_dir
+        self.training_set = training_set
+
+    def parse_raw_data(self):
+        input_files = glob(os.path.join(self.raw_dir, "raw/*[!.ids]"))
