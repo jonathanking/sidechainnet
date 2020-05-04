@@ -1,5 +1,5 @@
 """
-Hard coded values to use when building and analyzing sidechain structures.
+Hard-coded values to use when building and analyzing sidechain structures.
 """
 
 NUM_PREDICTED_ANGLES = 12

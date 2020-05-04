@@ -12,13 +12,13 @@ from sidechainnet.utils.build_info import SC_BUILD_INFO, NUM_PREDICTED_ANGLES, \
 GLOBAL_PAD_CHAR = np.nan
 
 
-def parse_astral_summary_file(path):
+def parse_astral_summary_file(lines):
     """
     Given a path to the ASTRAL database summary file, this function parses
     that file and returns a dictionary that maps ASTRAL IDs to (pdbid, chain).
     """
     d = {}
-    for line in open(path, "r").readlines():
+    for line in lines:
         if line.startswith("#"):
             continue
         line_items = line.split()
