@@ -19,6 +19,7 @@ import prody as pr
 import torch
 import tqdm
 
+import sidechainnet
 from sidechainnet.utils.sequence import bin_sequence_data
 
 from sidechainnet.utils.structure import angle_list_to_sin_cos, get_seq_coords_and_angles, \
@@ -208,14 +209,12 @@ def get_chain_from_testid(pnid):
 
     category, caspid = pnid.split("#")
     try:
-        # TODO change to pr.parseCIF?
         pdb_hv = pr.parsePDB(os.path.join(args.input_dir, "targets", caspid + ".pdb")).getHierView()
     except AttributeError:
         return pnid, ERRORS["TEST_PARSING_ERRORS"]
     try:
         assert pdb_hv.numChains() == 1
     except:
-        # TODO Raise number of chains assertion when > 1 test pdb chain
         print("Only a single chain should be parsed from the CASP targ PDB.")
         pass
     chain = next(iter(pdb_hv))
@@ -396,7 +395,7 @@ def save_data_dict(data):
 def main():
     lim = args.limit
     global PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT
-    train_pdb_ids, valid_ids, test_casp_ids = parse_raw_proteinnet.parse_raw_proteinnet(args.input_dir, TRAIN_FILE)
+    train_pdb_ids, valid_ids, test_casp_ids = sidechainnet.utils.proteinnet.parse_raw_proteinnet(args.input_dir, TRAIN_FILE)
     print("IDs fetched.")
     PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = torch.load(
         os.path.join(args.input_dir, "torch", TRAIN_FILE)), torch.load(
