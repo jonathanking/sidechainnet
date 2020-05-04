@@ -224,7 +224,7 @@ def get_chain_from_trainid(pnid):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
         struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseCIF(pdbid, chain=chid)
-        if chnum > 1 and struct.numCoordsets() == 1:
+        if struct and chnum > 1 and struct.numCoordsets() == 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
             except:
