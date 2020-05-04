@@ -49,6 +49,11 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
 
+    if os.path.exists("errors"):
+        for file in glob('errors/*.txt'):
+            os.remove(file)
+
+
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
     output_name = f"sidechainnet_{casp_version}_{training_set}.pt"
     torch.save(sc_data, os.path.join(sidechainnet_out_dir, output_name))
