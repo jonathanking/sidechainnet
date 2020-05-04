@@ -48,11 +48,6 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
 
-    if os.path.exists("errors"):
-        for file in glob('errors/*.txt'):
-            os.remove(file)
-
-
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
     output_name = f"sidechainnet_{casp_version}_{training_set}.pt"
     torch.save(sc_data, os.path.join(sidechainnet_out_dir, output_name))
@@ -80,6 +75,11 @@ def report_errors(pnids_errorcodes, total_pnids):
         IDs in .errors/{ERROR_CODE}.txt
 
     """
+    if os.path.exists("errors"):
+        for file in glob('errors/*.txt'):
+            os.remove(file)
+
+
     print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain data.")
     error_summarizer = sidechainnet.utils.errors.ProteinErrors()
     for pnid, errorcode in pnids_errorcodes:
@@ -212,23 +212,28 @@ def get_chain_from_trainid(pnid):
     # Continue loading the chain, given the PDB ID
     try:
         chain = pr.parsePDB(pdbid, chain=chid, model=chnum)
-    except:
+    # If the file is too large, then we can download the CIF instead
+    except OSError:
         try:
             chain = pr.parseCIF(pdbid, chain=chid, model=chnum)
-
-        except AttributeError:
-            return pnid, ERRORS["PARSING_ERROR_ATTRIBUTE"]
-        except pr.proteins.pdbfile.PDBParseError:
-            return pnid, ERRORS["PARSING_ERROR"]
-        except OSError:
-            return pnid, ERRORS["PARSING_ERROR_OSERROR"]
-        except Exception as e:
+        except:
             return pnid, ERRORS["UNKNOWN_EXCEPTIONS"]
-
-    # If we're expecting there to be more that one coordinate set but ProDy
-    # only finds 1, then this is an issue that we must resolve manually.
-    if chnum > 1 and pr.parsePDB(pdbid, chain=chid).numCoordsets() == 1:
-        return pnid, ERRORS["COORDSET_INDEX_ERROR"]
+    except AttributeError:
+        return pnid, ERRORS["PARSING_ERROR_ATTRIBUTE"]
+    except pr.proteins.pdbfile.PDBParseError:
+        # For now, we will use the only available coordinate set even if
+        # a coordinate set > 1 is requested
+        if chnum > 1 and pr.parsePDB(pdbid, chain=chid).numCoordsets() == 1:
+            try:
+                chain = pr.parsePDB(pdbid, chain=chid, model=1)
+            except:
+                return pnid, ERRORS["PARSING_ERROR"]
+        else:
+            return pnid, ERRORS["PARSING_ERROR"]
+    except OSError:
+        return pnid, ERRORS["PARSING_ERROR_OSERROR"]
+    except :
+        return pnid, ERRORS["UNKNOWN_EXCEPTIONS"]
 
     if chain is None:
         return pnid, ERRORS["NONE_CHAINS"]
