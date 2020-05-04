@@ -4,9 +4,11 @@ A direct extension of ProteinNet by Mohammed AlQuraishi.
 
 """
 import os
-
 import argparse
 import re
+
+import prody as pr
+pr.configure(verbosity="error")
 
 from sidechainnet.download_and_parse import download_sidechain_data
 from sidechainnet.utils.proteinnet import parse_raw_proteinnet
