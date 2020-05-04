@@ -104,3 +104,7 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# custom porject ignore
+errors/
+*.cif

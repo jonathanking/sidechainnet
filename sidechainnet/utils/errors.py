@@ -54,19 +54,23 @@ class ProteinErrors(object):
 
         self.counts[ec].append(pnid)
 
-    def summarize(self):
+    def summarize(self, total_processed=None):
         """ Prints a summary of all errors that have been recorded."""
         if not self.counts:
             print("Errors have not been accounted for.")
             return
 
-        print("\nThe following errors occurred:")
+        print("The following errors occurred:")
         self.error_codes_inv = {v: k for k, v in self.name_to_code.items()}
         for error_code, count_list in self.counts.items():
             if len(count_list) > 0:
                 name = self.error_codes_inv[error_code]
                 descr = self.name_to_descr[name]
-                print(f"{name + ':':<25}{len(count_list):^8}{descr}")
+                if total_processed:
+                    percent = f"{'(' + str(int(len(count_list) / total_processed * 100)) + '%)'}"
+                    print(f"{name + ':':<25}{str(len(count_list)):^8} {percent:^6} {descr}")
+                else:
+                    print(f"{name + ':':<25}{len(count_list):^8}{descr}")
         print("")
         self.write_summary_files()
 

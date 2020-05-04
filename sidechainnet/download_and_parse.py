@@ -13,6 +13,7 @@ import multiprocessing
 import os
 import re
 import sys
+from glob import glob
 
 import numpy as np
 import prody as pr
@@ -32,7 +33,7 @@ pr.confProDy(verbosity='error')
 
 MAX_SEQ_LEN = 10_000
 
-def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set):
+def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set, limit):
     """
     Downloads the sidechain data for the corresponding ProteinNet IDs.
 
@@ -46,12 +47,32 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
 
-    sc_data = get_sidechain_data(pnids)
+    sc_data, pnids_errors = get_sidechain_data(pnids, limit)
     output_name = f"sidechainnet_{casp_version}_{training_set}.pt"
     torch.save(sc_data, os.path.join(sidechainnet_out_dir, output_name))
+
+    report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
+
+    # Clean up working directory
+    for file in glob('*.cif'):
+        os.remove(file)
+
     return sc_data
 
-def get_sidechain_data(pnids, limit=10):
+
+
+def report_errors(pnids_errorcodes, total_pnids):
+    print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain data.")
+    error_summarizer = sidechainnet.utils.errors.ProteinErrors()
+    for pnid, errorcode in pnids_errorcodes:
+        error_summarizer.count(errorcode, pnid)
+    error_summarizer.summarize(total_pnids)
+
+    # print(f"{pnid} failed with code {ERRORS.get_error_name_from_code(errorcode)}.")
+
+
+
+def get_sidechain_data(pnids, limit):
     """Acquires sidechain data for specified ProteinNet IDs.
     Args:
         pnids: List of ProteinNet IDs to download data for.
@@ -64,17 +85,20 @@ def get_sidechain_data(pnids, limit=10):
                       "ang": np.ndarray(...),
                         ...
                       }}
+        Also returns a list of tuples of (pnid, error_code) for those pnids
+        that failed to download.
     """
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
         results = list(tqdm.tqdm(p.imap(process_id, pnids[:limit]),
                                  total=len(pnids[:limit]), dynamic_ncols=True))
+    all_errors = []
     all_data = dict()
     for pnid, r in results:
         if type(r) == int:
-            print(f"{pnid} failed with code {ERRORS.get_error_name_from_code(r)}.")
+            all_errors.append((pnid, r))
             continue
         all_data[pnid] = r
-    return all_data
+    return all_data, all_errors
 
 
 
@@ -97,7 +121,7 @@ def process_id(pnid):
         return pnid, ERRORS["NONE_STRUCTURE_ERRORS"]
     elif type(chain) == tuple and type(chain[1]) == int:
         # This indicates there was an issue parsing the chain
-        return chain
+        return pnid, chain[1]
     try:
         dihedrals_coords_sequence = get_seq_coords_and_angles(chain)
     except NonStandardAminoAcidError:
@@ -143,32 +167,32 @@ def determine_pnid_type(pnid):
         return "train" + is_astral
 
 
-def get_chain_from_trainid(proteinnet_id):
+def get_chain_from_trainid(pnid):
     """ Return a ProDy chain object for a ProteinNet ID. Assumes train/valid ID.
 
     Args:
-        proteinnet_id: ProteinNet ID
+        pnid: ProteinNet ID
 
     Returns:
         ProDy chain object corresponding to ProteinNet ID.
     """
     # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
     try:
-        pdbid, chnum, chid = proteinnet_id.split("_")
+        pdbid, chnum, chid = pnid.split("_")
         chnum = int(chnum)
         # If this is a validation set pnid, separate the annotation from the ID
         if "#" in pdbid:
             pdbid = pdbid.split("#")[1]
     except ValueError:
         try:
-            pdbid, astral_id = proteinnet_id.split("_")
+            pdbid, astral_id = pnid.split("_")
             return get_chain_from_astral_id(astral_id.replace("-", "_"), ASTRAL_ID_MAPPING)
         except KeyError:
-            return proteinnet_id, ERRORS["MISSING_ASTRAL_IDS"]
+            return pnid, ERRORS["MISSING_ASTRAL_IDS"]
         except ValueError:
-            return proteinnet_id, ERRORS["FAILED_ASTRAL_IDS"]
+            return pnid, ERRORS["FAILED_ASTRAL_IDS"]
         except:
-            return proteinnet_id, ERRORS["FAILED_ASTRAL_IDS"]
+            return pnid, ERRORS["FAILED_ASTRAL_IDS"]
 
     # Continue loading the chain, given the PDB ID
     try:
@@ -178,21 +202,21 @@ def get_chain_from_trainid(proteinnet_id):
             chain = pr.parseCIF(pdbid, chain=chid, model=chnum)
 
         except AttributeError:
-            return proteinnet_id, ERRORS["PARSING_ERROR_ATTRIBUTE"]
+            return pnid, ERRORS["PARSING_ERROR_ATTRIBUTE"]
         except pr.proteins.pdbfile.PDBParseError:
-            return proteinnet_id, ERRORS["PARSING_ERROR"]
+            return pnid, ERRORS["PARSING_ERROR"]
         except OSError:
-            return proteinnet_id, ERRORS["PARSING_ERROR_OSERROR"]
+            return pnid, ERRORS["PARSING_ERROR_OSERROR"]
         except Exception as e:
-            return proteinnet_id, ERRORS["UNKNOWN_EXCEPTIONS"]
+            return pnid, ERRORS["UNKNOWN_EXCEPTIONS"]
 
     # If we're expecting there to be more that one coordinate set but ProDy
     # only finds 1, then this is an issue that we must resolve manually.
     if chnum > 1 and pr.parsePDB(pdbid, chain=chid).numCoordsets() == 1:
-        return proteinnet_id, ERRORS["COORDSET_INDEX_ERROR"]
+        return pnid, ERRORS["COORDSET_INDEX_ERROR"]
 
     if chain is None:
-        return proteinnet_id, ERRORS["NONE_CHAINS"]
+        return pnid, ERRORS["NONE_CHAINS"]
 
     return chain
 
@@ -216,7 +240,7 @@ def get_chain_from_testid(pnid):
         assert pdb_hv.numChains() == 1
     except:
         print("Only a single chain should be parsed from the CASP targ PDB.")
-        pass
+        return pnid, ERRORS["TEST_PARSING_ERRORS"]
     chain = next(iter(pdb_hv))
     return chain
 
