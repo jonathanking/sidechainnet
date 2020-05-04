@@ -29,7 +29,6 @@ from protein_transformer.protein.structure_exceptions import  NonStandardAminoAc
     ContigMultipleMatchingError, ShortStructureError, MissingAtomsError, NoneStructureError
 from sidechainnet.utils.errors import ERRORS
 
-pr.confProDy(verbosity='error')
 
 MAX_SEQ_LEN = 10_000
 ASTRAL_FILE = "../data/astral_pdb_map.txt"
