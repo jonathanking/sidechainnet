@@ -11,13 +11,13 @@ import argparse
 import datetime
 import multiprocessing
 import os
+import pickle
 import re
 import sys
 from glob import glob
 
 import numpy as np
 import prody as pr
-import torch
 import tqdm
 
 import sidechainnet
@@ -30,7 +30,7 @@ from sidechainnet.utils.errors import NonStandardAminoAcidError, SequenceError, 
 from sidechainnet.utils.errors import ERRORS
 
 MAX_SEQ_LEN = 10_000
-ASTRAL_FILE = "../data/astral_pdb_map.txt"
+ASTRAL_FILE = "utils/astral_summary.txt"
 ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_FILE)
 
 
@@ -51,7 +51,8 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
 
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
     output_name = f"sidechainnet_{casp_version}_{training_set}.pt"
-    torch.save(sc_data, os.path.join(sidechainnet_out_dir, output_name))
+    with open(os.path.join(sidechainnet_out_dir, output_name), "wb") as f:
+        pickle.dump(sc_data, f)
 
     report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
@@ -500,7 +501,7 @@ if __name__ == "__main__":
     VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
     TRAIN_FILE = f"training_{args.training_set}.pt"
     PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = None, None, None
-    ASTRAL_FILE = "../data/astral_pdb_map.txt"  # combined previous versions of dir.des.scope.2.xx-stable.txt into
+    ASTRAL_FILE = "../data/astral_summary.txt"  # combined previous versions of dir.des.scope.2.xx-stable.txt into
     # one big dict
     ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_FILE)
     SUFFIX = str(datetime.datetime.today().strftime("%y%m%d")) + f"_{args.training_set}"
