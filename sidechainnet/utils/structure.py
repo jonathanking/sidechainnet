@@ -264,7 +264,7 @@ def get_seq_coords_and_angles(chain):
     coords_np = np.concatenate(coords)
 
     if coords_np.shape[0] != len(observed_sequence) * NUM_PREDICTED_COORDS:
-        print(f"Coords shape {coords_np.shape} does not match len(seq)*13 = "
+        print(f"Coords shape {coords_np.shape} does not match len(seq)*{NUM_PREDICTED_COORDS} = "
               f"{len(observed_sequence) * NUM_PREDICTED_COORDS},\nOBS: {observed_sequence}\n{chain}")
         raise SequenceError
 

@@ -6,6 +6,7 @@ A direct extension of ProteinNet by Mohammed AlQuraishi.
 import os
 
 import argparse
+import re
 
 from sidechainnet.download_and_parse import download_sidechain_data
 from sidechainnet.utils.proteinnet import parse_raw_proteinnet
@@ -24,7 +25,7 @@ def main():
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, args.training_set)
 
     # Then, using the proteinnet IDs as a guide, download the relevant sidechain data
-    download_sidechain_data(pnids, args.sidechainnet_out)
+    download_sidechain_data(pnids, args.sidechainnet_out, args.casp_version, args.training_set)
 
     # Finally, unify the sidechain data with ProteinNet
     combine_datasets(args.proteinnet_out, args.sidechainnet_out, args.training_set)
@@ -45,5 +46,10 @@ if __name__ == "__main__":
                                                                       'set to parse. {30,50,70,90,95,100}. '
                                                                       'Default 100.')
     args = parser.parse_args()
+
+    match = re.search(r"casp\d+", args.proteinnet_in, re.IGNORECASE)
+    assert match, "The input_dir is not titled with 'caspX'. Please ensure the raw files are enclosed in a path" \
+                  "that contains the CASP version i.e. 'casp12'."
+    args.casp_version = match.group(0)
 
     main()

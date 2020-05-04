@@ -32,12 +32,16 @@ class ProteinErrors(object):
     the user.
     """
     def __init__(self):
+        self.code_to_name = {}
+        self.code_to_descr = {}
         self.name_to_code = {}
         self.name_to_descr = {}
         self.counts = None
         for i, (error_name, error_descr) in enumerate(ERROR_CODES):
             self.name_to_code[error_name] = i
             self.name_to_descr[error_name] = error_descr
+            self.code_to_name[i] = error_name
+            self.code_to_descr[i] = error_descr
 
     def __getitem__(self, error_name):
         """ Returns the error code for a certain error name. """
@@ -82,5 +86,9 @@ class ProteinErrors(object):
             if len(self.get_pnids_with_error_name(e)) > 0:
                 with open(f"errors/{e}.txt", "w") as f:
                     f.write("\n".join(self.get_pnids_with_error_name(e)) + "\n")
+
+    def get_error_name_from_code(self, code):
+        """ Returns the error name for the associated code. """
+        return self.code_to_name[code]
 
 ERRORS = ProteinErrors()

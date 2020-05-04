@@ -29,18 +29,133 @@ from sidechainnet.utils.errors import ERRORS
 
 pr.confProDy(verbosity='error')
 
-def get_sidechain_data(proteinnet_ids, proteinnet_dict, mode):
-    pass
+MAX_SEQ_LEN = 10_000
+
+def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set):
+    """
+    Downloads the sidechain data for the corresponding ProteinNet IDs.
+
+    Args:
+        pnids: List of ProteinNet IDs to download sidechain data for
+        sidechainnet_out_dir: Path to directory for saving sidechain data
+
+    Returns:
+        sc_data: Python dictionary `{pnid: {...}, ...}`
+    """
+    if not os.path.exists(sidechainnet_out_dir):
+        os.mkdir(sidechainnet_out_dir)
+
+    sc_data = get_sidechain_data(pnids)
+    output_name = f"sidechainnet_{casp_version}_{training_set}.pt"
+    torch.save(sc_data, os.path.join(sidechainnet_out_dir, output_name))
+    return sc_data
+
+def get_sidechain_data(pnids, limit=10):
+    """Acquires sidechain data for specified ProteinNet IDs.
+    Args:
+        pnids: List of ProteinNet IDs to download data for.
+        limit: Number of IDs to process (use small value for debugging).
+
+    Returns:
+        Dictionary mapping pnids to sidechain data. For example:
+
+        {"1a9u_A_2": {"seq": "MRYK...",
+                      "ang": np.ndarray(...),
+                        ...
+                      }}
+    """
+    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+        results = list(tqdm.tqdm(p.imap(process_id, pnids[:limit]),
+                                 total=len(pnids[:limit]), dynamic_ncols=True))
+    all_data = dict()
+    for pnid, r in results:
+        if type(r) == int:
+            print(f"{pnid} failed with code {ERRORS.get_error_name_from_code(r)}.")
+            continue
+        all_data[pnid] = r
+    return all_data
+
+
+
+def process_id(pnid):
+    """ Creates dictionary of sidechain data for a single ProteinNet ID.
+
+    For a single ProteinNet ID i.e. ('1A9U_1_A'), fetches that PDB chain
+    from the PDB and extracts its angles, coordinates, and sequence. Missing
+    data is padded with GLOBAL_PAD_CHARs.
+    Args:
+        pnid: A ProteinNet ID, i.e. '1A9U_1_A'.
+
+    Returns:
+        Dictionary of relevant data for that ID.
+
+    """
+    pnid_type = determine_pnid_type(pnid)
+    chain = get_chain_from_proteinnetid(pnid, pnid_type)
+    if not chain:
+        return pnid, ERRORS["NONE_STRUCTURE_ERRORS"]
+    elif type(chain) == tuple and type(chain[1]) == int:
+        # This indicates there was an issue parsing the chain
+        return chain
+    try:
+        dihedrals_coords_sequence = get_seq_coords_and_angles(chain)
+    except NonStandardAminoAcidError:
+        return pnid, ERRORS["NSAA_ERRORS"]
+    except NoneStructureError:
+        return pnid, ERRORS["NONE_STRUCTURE_ERRORS"]
+    except ContigMultipleMatchingError:
+        return pnid, ERRORS["MULTIPLE_CONTIG_ERRORS"]
+    except ShortStructureError:
+        return pnid, ERRORS["SHORT_ERRORS"]
+    except MissingAtomsError:
+        return pnid, ERRORS["MISSING_ATOMS_ERROR"]
+    except SequenceError:
+        print("Not fixed.", pnid)
+        return pnid, ERRORS["SEQUENCE_ERRORS"]
+
+    # If we've made it this far, we can unpack the data and return it
+    dihedrals, coords, sequence = dihedrals_coords_sequence
+
+    return pnid, {"ang":dihedrals, "crd":coords, "seq":sequence}
+
+
+def determine_pnid_type(pnid):
+    """Returns the 'type' of a ProteinNet ID (i.e. train, valid, test, ASTRAL).
+
+    Args:
+        pnid: ProteinNet ID string.
+
+    Returns:
+        The 'type' of ProteinNet ID as a string.
+    """
+    if "TBM#" in pnid or "FM#" in pnid or "TBM-hard" in pnid or "FM-hard" in pnid:
+        return "test"
+
+    if pnid.count("_") == 1:
+        is_astral = "_astral"
+    else:
+        is_astral = ""
+
+    if "#" in pnid:
+        return "valid" + is_astral
+    else:
+        return "train" + is_astral
 
 
 def get_chain_from_trainid(proteinnet_id):
-    """
-    Given a ProteinNet ID of a training or validation set item, this function returns the associated
-    ProDy-parsed chain object. "1A9U_2_A"
+    """ Return a ProDy chain object for a ProteinNet ID. Assumes train/valid ID.
+
+    Args:
+        proteinnet_id: ProteinNet ID
+
+    Returns:
+        ProDy chain object corresponding to ProteinNet ID.
     """
     # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
     try:
-        pdbid, model_id, chid = proteinnet_id.split("_")
+        pdbid, chnum, chid = proteinnet_id.split("_")
+        chnum = int(chnum)
+        # If this is a validation set pnid, separate the annotation from the ID
         if "#" in pdbid:
             pdbid = pdbid.split("#")[1]
     except ValueError:
@@ -48,119 +163,82 @@ def get_chain_from_trainid(proteinnet_id):
             pdbid, astral_id = proteinnet_id.split("_")
             return get_chain_from_astral_id(astral_id.replace("-", "_"), ASTRAL_ID_MAPPING)
         except KeyError:
-            return ERRORS["MISSING_ASTRAL_IDS"]
+            return proteinnet_id, ERRORS["MISSING_ASTRAL_IDS"]
         except ValueError:
-            return ERRORS["FAILED_ASTRAL_IDS"]
+            return proteinnet_id, ERRORS["FAILED_ASTRAL_IDS"]
         except:
-            return ERRORS["FAILED_ASTRAL_IDS"]
+            return proteinnet_id, ERRORS["FAILED_ASTRAL_IDS"]
 
     # Continue loading the chain, given the PDB ID
     try:
-        chain = pr.parsePDB(pdbid, chain=chid)
+        chain = pr.parsePDB(pdbid, chain=chid, model=chnum)
     except:
         try:
-            chain = pr.parseCIF(pdbid, chain=chid) # changed pr.parsePDB to pr.parseCIF, removed heirarchal view
+            chain = pr.parseCIF(pdbid, chain=chid, model=chnum)
+
         except AttributeError:
-            return ERRORS["PARSING_ERROR_ATTRIBUTE"]
+            return proteinnet_id, ERRORS["PARSING_ERROR_ATTRIBUTE"]
         except pr.proteins.pdbfile.PDBParseError:
-            return ERRORS["PARSING_ERROR"]
+            return proteinnet_id, ERRORS["PARSING_ERROR"]
         except OSError:
-            return ERRORS["PARSING_ERROR_OSERROR"]
+            return proteinnet_id, ERRORS["PARSING_ERROR_OSERROR"]
         except Exception as e:
-            return ERRORS["UNKNOWN_EXCEPTIONS"]
+            return proteinnet_id, ERRORS["UNKNOWN_EXCEPTIONS"]
+
+    # If we're expecting there to be more that one coordinate set but ProDy
+    # only finds 1, then this is an issue that we must resolve manually.
+    if chnum > 1 and pr.parsePDB(pdbid, chain=chid).numCoordsets() == 1:
+        return proteinnet_id, ERRORS["COORDSET_INDEX_ERROR"]
 
     if chain is None:
-        print(proteinnet_id)
-        return ERRORS["NONE_CHAINS"]
-    # Attempt to select a coordset
-    try:
-        if chain.numCoordsets() > 1:
-            chain.setACSIndex(int(model_id))
-    except IndexError:
-        return ERRORS["COORDSET_INDEX_ERROR"]
+        return proteinnet_id, ERRORS["NONE_CHAINS"]
 
     return chain
 
 
-def get_chain_from_testid(proteinnet_id):
+def get_chain_from_testid(pnid):
+    """ Returns a ProDy chain object for a test pnid. Requires local file.
+
+    Args:
+        pnid: ProteinNet ID. Must refer to a test-set record.
+
+    Returns:
+        ProDy chain object.
     """
-    Given a ProteinNet ID of a test set item, this function returns the associated
-    ProDy-parsed chain object.
-    """
-    # TODO: assert existence of test/targets at start of script
-    category, caspid = proteinnet_id.split("#")
+
+    category, caspid = pnid.split("#")
     try:
-        pdb_hv = pr.parsePDB(os.path.join(args.input_dir, "targets", caspid + ".pdb")).getHierView() # TODO change to pr.parseCIF?
+        # TODO change to pr.parseCIF?
+        pdb_hv = pr.parsePDB(os.path.join(args.input_dir, "targets", caspid + ".pdb")).getHierView()
     except AttributeError:
-        return ERRORS["TEST_PARSING_ERRORS"]
+        return pnid, ERRORS["TEST_PARSING_ERRORS"]
     try:
         assert pdb_hv.numChains() == 1
     except:
+        # TODO Raise number of chains assertion when > 1 test pdb chain
         print("Only a single chain should be parsed from the CASP targ PDB.")
         pass
     chain = next(iter(pdb_hv))
     return chain
 
 
-def get_chain_from_proteinnetid(pdbid_chain):
-    """
-    Determines whether or not a PN id is a test or training id and calls the corresponding method.
+def get_chain_from_proteinnetid(pnid, pnid_type):
+    """Returns a ProDy chain for a given pnid.
+
+    Args:
+        pnid_type:
+        pnid: ProteinNet ID
+
+    Returns:
+        ProDy chain object.
     """
     # If the ProteinNet ID is from the test set
-    if "TBM#" in pdbid_chain or "FM#" in pdbid_chain or "TBM-hard" in pdbid_chain or "FM-hard" in pdbid_chain:
-        chain = get_chain_from_testid(pdbid_chain)
+    if pnid_type == "test":
+        chain = get_chain_from_testid(pnid)
     # If the ProteinNet ID is from the train or validation set
     else:
-        chain = get_chain_from_trainid(pdbid_chain)
+        chain = get_chain_from_trainid(pnid)
     return chain
-
-
-def get_proteinnet_seq_from_id(pnid):
-    """
-    Given a ProteinNet ID, this method returns the associated primary AA sequence.
-    """
-    if "#" not in pnid:
-        true_seq = PN_TRAIN_DICT[pnid]["primary"]
-    elif "TBM#" in pnid or "FM#" in pnid or "TBM-hard" in pnid:
-        true_seq = PN_TEST_DICT[pnid]["primary"]
-    else:
-        true_seq = PN_VALID_DICT[pnid]["primary"]
-    return true_seq
-
-
-def work(pdbid_chain):
-    """
-    For a single PDB ID with chain, i.e. ('1A9U_1_A'), fetches that PDB chain from the PDB and
-    computes its angles, coordinates, and sequence. The angles and coordinates contain
-    GLOBAL_PAD_CHARs where there was missing data.
-    """
-    true_seq = get_proteinnet_seq_from_id(pdbid_chain) # TODO replace this function that returns chain from file w/ seq
-    chain = get_chain_from_proteinnetid(pdbid_chain)  # Returns ProDy chain object
-    if not chain:
-        return ERRORS["NONE_STRUCTURE_ERRORS"]
-    elif type(chain) == int:
-        # This indicates there was an issue parsing the chain
-        return chain
-    try:
-        dihedrals_coords_sequence = get_seq_and_masked_coords_and_angles(chain, true_seq)
-    except NonStandardAminoAcidError:
-        return ERRORS["NSAA_ERRORS"]
-    except NoneStructureError:
-        return ERRORS["NONE_STRUCTURE_ERRORS"]
-    except ContigMultipleMatchingError:
-        return ERRORS["MULTIPLE_CONTIG_ERRORS"]
-    except ShortStructureError:
-        return ERRORS["SHORT_ERRORS"]
-    except MissingAtomsError:
-        return ERRORS["MISSING_ATOMS_ERROR"]
-    except SequenceError:
-        print("Not fixed.", pdbid_chain)
-        return ERRORS["SEQUENCE_ERRORS"]
-
-    # If we've made it this far, we can unpack the data and return it
-    dihedrals, coords, sequence = dihedrals_coords_sequence
-
-    return dihedrals, coords, sequence, pdbid_chain
 
 
 def unpack_processed_results(results, pnids):
@@ -258,42 +336,6 @@ def compute_angle_means(data):
     return means
 
 
-def bin_sequence_data(seqs, maxlen):
-    """
-    Given a list of sequences and a maximum training length, this function
-    bins the sequences by their lengths (using numpy's 'auto' parameter),
-    and then records the histogram information, as well as some statistics.
-    This information is returned as a dictionary.
-
-    This function allows the user to avoid computing this information at the
-    start of each training run.
-    """
-    lens = list(map(lambda x: len(x) if len(x) <= maxlen else maxlen, seqs))
-    hist_counts, hist_bins = np.histogram(lens, bins="auto")
-    hist_bins = hist_bins[1:]  # make each bin define the rightmost value in each bin, ie '( , ]'.
-    bin_probs = hist_counts / hist_counts.sum()
-    bin_map = {}
-
-    # Compute a mapping from bin number to index in dataset
-    seq_i = 0
-    bin_j = 0
-    while seq_i < len(seqs):
-        if lens[seq_i] <= hist_bins[bin_j]:
-            try:
-                bin_map[bin_j].append(seq_i)
-            except KeyError:
-                bin_map[bin_j] = [seq_i]
-            seq_i += 1
-        else:
-            bin_j += 1
-
-    return {"hist_counts" : hist_counts,
-            "hist_bins": hist_bins,
-            "bin_probs" : bin_probs,
-            "bin_map": bin_map,
-            "bin_max_len": maxlen}
-
-
 def add_proteinnetID_to_idx_mapping(data):
     """
     Given an already processes ProteinNet data dictionary, this function adds
@@ -363,7 +405,7 @@ def main():
     print(len(train_pdb_ids), len(valid_ids), len(test_casp_ids))
     # Download and preprocess all data from PDB IDs
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        train_results = list(tqdm.tqdm(p.imap(work, train_pdb_ids[:lim]), total=len(train_pdb_ids[:lim]), dynamic_ncols=True))
+        train_results = list(tqdm.tqdm(p.imap(process_id, train_pdb_ids[:lim]), total=len(train_pdb_ids[:lim]), dynamic_ncols=True))
     if lim:
         vlim = 1
     else:
@@ -372,11 +414,11 @@ def main():
     for split, vids in group_validation_set(valid_ids).items():
         valid_result_meta[split] = []
         for vid in tqdm.tqdm(vids[:vlim], dynamic_ncols=True):
-            valid_result_meta[split].append(work(vid))
+            valid_result_meta[split].append(process_id(vid))
 
     test_results = []
     for tid in tqdm.tqdm(test_casp_ids[:vlim], dynamic_ncols=True):
-        test_results.append(work(tid))
+        test_results.append(process_id(tid))
 
     print("Structures processed.")
     
@@ -430,3 +472,5 @@ if __name__ == "__main__":
     except Exception as e:
         ERRORS.summarize()
         raise e
+
+
