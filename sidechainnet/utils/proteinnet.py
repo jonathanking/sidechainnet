@@ -2,11 +2,9 @@
 https://github.com/aqlaboratory/proteinnet. """
 import itertools
 import os
+import pickle
 from glob import glob
 import multiprocessing
-
-import torch
-
 
 def load_ids_from_text_files(directory, training_set):
     """
@@ -67,7 +65,7 @@ def read_protein_from_file(file_pointer, include_tertiary):
 def process_file(input_filename_out_dir, return_ids=True):
     """
     A parallelizable method for processing one raw ProteinNet file and
-    creating a PyTorch-saved python dictionary of the data.
+    creating a pickled dictionary of the data.
     """
     all_ids = []
     input_filename, out_dir = input_filename_out_dir
@@ -85,7 +83,8 @@ def process_file(input_filename_out_dir, return_ids=True):
         text_file.write(f"{id_}\n")
         if return_ids:
             all_ids.append(id_)
-    torch.save(meta_dict, os.path.join(out_dir, os.path.basename(input_filename) + ".pt"))
+    with open(os.path.join(out_dir, os.path.basename(input_filename) + ".pt"), "wb") as f:
+        pickle.dump(meta_dict, f)
     input_file.close()
     text_file.close()
     print(f"{input_filename} finished.")

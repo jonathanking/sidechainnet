@@ -32,6 +32,7 @@ from sidechainnet.utils.errors import ERRORS
 
 MAX_SEQ_LEN = 10_000
 ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
+del ASTRAL_SUMMARY
 
 
 def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set, limit):
