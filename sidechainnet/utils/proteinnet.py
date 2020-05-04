@@ -145,14 +145,14 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     if not os.path.exists(proteinnet_out_dir):
         os.mkdir(proteinnet_out_dir)
 
-    # Look for the raw ProteinNet files
+    # Look for the target ProteinNet files
     if not os.path.isdir(os.path.join(proteinnet_in_dir, "targets")):
         print("There must be a subdirectory containing all protein targets with the name 'targets'.\n" 
               "You can download the .tgz file from the following link: " 
               "http://predictioncenter.org/download_area/CASP12/targets/\n" 
               "(replace 'CASP12' with the CASP version of interest and download the most recent, largest" 
               "compressed file in the list.")
-
+    # Look for the raw ProteinNet files
     input_files = [f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]")) if not os.path.isdir(f)]
     assert len(input_files) == 8, f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but could not find " \
                                   f"all 8.\n Please download from Mohammed AlQuraishi's repository: " \
