@@ -208,12 +208,14 @@ def get_chain_from_trainid(pnid):
             return pnid, ERRORS["FAILED_ASTRAL_IDS"]
 
     # Continue loading the chain, given the PDB ID
+    use_pdb = True
     try:
         chain = pr.parsePDB(pdbid, chain=chid, model=chnum)
     # If the file is too large, then we can download the CIF instead
     except OSError:
         try:
             chain = pr.parseCIF(pdbid, chain=chid, model=chnum)
+            use_pdb = False
         except:
             return pnid, ERRORS["PARSING_ERROR_OSERROR"]
     except AttributeError:
@@ -221,7 +223,8 @@ def get_chain_from_trainid(pnid):
     except pr.proteins.pdbfile.PDBParseError:
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
-        if chnum > 1 and pr.parsePDB(pdbid, chain=chid).numCoordsets() == 1:
+        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseCIF(pdbid, chain=chid)
+        if chnum > 1 and struct.numCoordsets() == 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
             except:

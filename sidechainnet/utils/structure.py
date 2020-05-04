@@ -146,7 +146,7 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
         res_dihedrals.append(compute_single_dihedral([residue.select("name " + an) for an in atom_names]))
 
     return res_dihedrals + (
-                NUM_PREDICTED_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) - len(res_dihedrals)) * [
+            NUM_PREDICTED_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) - len(res_dihedrals)) * [
                GLOBAL_PAD_CHAR]
 
 
@@ -199,18 +199,39 @@ def empty_ang():
     return dihe_padding
 
 
-def is_acceptable_modified_residue(res):
-    """ Returns True if residue is non-standard but considered acceptable.
+def replace_nonstdaas(residues):
+    """Replaces the non-standard Amino Acids in a list with their equivalents.
 
     Args:
-        res: ProDy residue
+        residues: List of ProDy residues.
 
     Returns:
-        Returns True if residue is non-standard but considered acceptable.
-
+        A list of residues where any non-standard residues have been replaced
+        with the canonical version (i.e. MSE -> MET, SEP -> SER, etc.)
+        See http://prody.csb.pitt.edu/manual/reference/atomic/flags.html
+        for a complete list of non-standard amino acids supported here.
+        `XAA` is treated as missing.
     """
-    return False
-    # raise(NotImplementedError)
+    replacements = {"ASX": "ASP",
+                    "GLX": "GLU",
+                    "CSO": "CYS",
+                    "HIP": "HIS",
+                    "HSD": "HIS",
+                    "HSE": "HIS",
+                    "HSP": "HIS",
+                    "MSE": "MET",
+                    "SEC": "CYS",
+                    "SEP": "SER",
+                    "TPO": "THR",
+                    "PTR": "TYR",
+                    "XLE": "LEU"}
+
+    for r in residues:
+        rname = r.getResname()
+        if rname in replacements.keys():
+            r.setResname(replacements[rname])
+
+    return residues
 
 
 def get_seq_coords_and_angles(chain):
@@ -228,20 +249,20 @@ def get_seq_coords_and_angles(chain):
     chain = chain.select("protein")
     if chain is None:
         raise NoneStructureError
-    if chain.nonstdaa:
-        raise NonStandardAminoAcidError
     chain = chain.copy()
 
     coords = []
     dihedrals = []
     observed_sequence = ""
     all_residues = list(chain.iterResidues())
+    if chain.nonstdaa:
+        all_residues = replace_nonstdaas(all_residues)
     prev_res = None
     next_res = all_residues[1]
 
     for res_id, res in enumerate(all_residues):
-        # TODO Add support for slightly modified amino acids
-        if not (res.stdaa or is_acceptable_modified_residue(res)):
+        # TODO Treat XAA as missing residue
+        if not res.stdaa:
             raise NonStandardAminoAcidError
 
         # Measure basic angles
