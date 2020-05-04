@@ -128,9 +128,14 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     # If the desired ProteinNet dataset has already been processed, load its IDs
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
         print(f"Raw ProteinNet files already preprocessed ({os.path.join(proteinnet_out_dir, train_file)}).")
-        relevant_ids_file = os.path.join(proteinnet_out_dir, train_file.replace(".pt", "_ids.txt"))
-        with open(relevant_ids_file, "r") as f:
-            relevant_ids = f.read().splitlines()
+        relevant_training_file = os.path.join(proteinnet_out_dir, train_file.replace(".pt", "_ids.txt"))
+        relevant_id_files = [relevant_training_file,  os.path.join(proteinnet_out_dir, "validation_ids.txt"),
+                             os.path.join(proteinnet_out_dir, "testing_ids.txt")]
+        relevant_ids = []
+        for fname in relevant_id_files:
+            with open(fname, "r") as f:
+                relevant_ids += f.read().splitlines()
+
         return relevant_ids
 
     # If the torch-preprocessed ProteinNet dictionaries don't exist, create them.
