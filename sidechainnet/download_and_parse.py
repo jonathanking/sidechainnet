@@ -30,7 +30,7 @@ from sidechainnet.utils.errors import NonStandardAminoAcidError, SequenceError, 
 from sidechainnet.utils.errors import ERRORS
 
 MAX_SEQ_LEN = 10_000
-ASTRAL_FILE = "utils/astral_summary.txt"
+ASTRAL_FILE = "sidechainnet/utils/astral_summary.txt"
 ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_FILE)
 
 
