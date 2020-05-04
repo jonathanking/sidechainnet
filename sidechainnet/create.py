@@ -27,7 +27,7 @@ def main():
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, args.training_set)
 
     # Then, using the ProteinNet IDs as a guide, download the relevant sidechain data
-    download_sidechain_data(pnids, args.sidechainnet_out, args.casp_version, args.training_set, args.limit)
+    download_sidechain_data(pnids, args.sidechainnet_out, args.casp_version, args.training_set, args.limit, args.proteinnet_in)
 
     # Finally, unify the sidechain data with ProteinNet
     combine_datasets(args.proteinnet_out, args.sidechainnet_out, args.training_set)

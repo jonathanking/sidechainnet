@@ -57,7 +57,7 @@ class ProteinErrors(object):
     def summarize(self, total_processed=None):
         """ Prints a summary of all errors that have been recorded."""
         if not self.counts:
-            print("Errors have not been accounted for.")
+            print("No errors recorded.")
             return
 
         print("The following errors occurred:")

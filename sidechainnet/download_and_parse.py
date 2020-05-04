@@ -35,11 +35,12 @@ ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
 del ASTRAL_SUMMARY
 
 
-def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set, limit):
+def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set, limit, proteinnet_in):
     """
     Downloads the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
+        training_set: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
         casp_version: A string that describes the CASP version i.e. 'casp7'
         pnids: List of ProteinNet IDs to download sidechain data for
         sidechainnet_out_dir: Path to directory for saving sidechain data
@@ -47,6 +48,8 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
     """
+    global PROTEINNET_IN_DIR
+    PROTEINNET_IN_DIR = proteinnet_in
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
 
@@ -254,15 +257,14 @@ def get_chain_from_testid(pnid):
 
     category, caspid = pnid.split("#")
     try:
-        pdb_hv = pr.parsePDB(os.path.join(args.input_dir, "targets", caspid + ".pdb")).getHierView()
+        chain = pr.parsePDB(os.path.join(PROTEINNET_IN_DIR, "targets", caspid + ".pdb"))
     except AttributeError:
         return pnid, ERRORS["TEST_PARSING_ERRORS"]
     try:
-        assert pdb_hv.numChains() == 1
+        assert chain.numChains() == 1
     except:
         print("Only a single chain should be parsed from the CASP target PDB.")
         return pnid, ERRORS["TEST_PARSING_ERRORS"]
-    chain = next(iter(pdb_hv))
     return chain
 
 

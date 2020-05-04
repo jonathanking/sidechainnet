@@ -1,10 +1,11 @@
 """ This script allows the raw ProteinNet files from
 https://github.com/aqlaboratory/proteinnet. """
 import itertools
+import multiprocessing
 import os
 import pickle
 from glob import glob
-import multiprocessing
+
 
 def load_ids_from_text_files(directory, training_set):
     """
@@ -97,9 +98,11 @@ class ProteinNet(object):
     Defines a wrapper for interacting with a ProteinNet dataset.
     """
 
+
     def __init__(self, raw_dir, training_set):
         self.raw_dir = raw_dir
         self.training_set = training_set
+
 
     def parse_raw_data(self):
         input_files = glob(os.path.join(self.raw_dir, "raw/*[!.ids]"))
@@ -129,7 +132,7 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
         print(f"Raw ProteinNet files already preprocessed ({os.path.join(proteinnet_out_dir, train_file)}).")
         relevant_training_file = os.path.join(proteinnet_out_dir, train_file.replace(".pt", "_ids.txt"))
-        relevant_id_files = [relevant_training_file,  os.path.join(proteinnet_out_dir, "validation_ids.txt"),
+        relevant_id_files = [relevant_training_file, os.path.join(proteinnet_out_dir, "validation_ids.txt"),
                              os.path.join(proteinnet_out_dir, "testing_ids.txt")]
         relevant_ids = []
         for fname in relevant_id_files:
@@ -143,7 +146,14 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
         os.mkdir(proteinnet_out_dir)
 
     # Look for the raw ProteinNet files
-    input_files = glob(os.path.join(proteinnet_in_dir, "*[!.ids]"))
+    if not os.path.isdir(os.path.join(proteinnet_in_dir, "targets")):
+        print("There must be a subdirectory containing all protein targets with the name 'targets'.\n" 
+              "You can download the .tgz file from the following link: " 
+              "http://predictioncenter.org/download_area/CASP12/targets/\n" 
+              "(replace 'CASP12' with the CASP version of interest and download the most recent, largest" 
+              "compressed file in the list.")
+
+    input_files = [f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]")) if not os.path.isdir(f)]
     assert len(input_files) == 8, f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but could not find " \
                                   f"all 8.\n Please download from Mohammed AlQuraishi's repository: " \
                                   f"https://github.com/aqlaboratory/proteinnet"
