@@ -17,6 +17,7 @@ from glob import glob
 
 import numpy as np
 import prody as pr
+pr.confProDy(verbosity="warning")
 import torch
 import tqdm
 
