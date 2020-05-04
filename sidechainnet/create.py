@@ -8,7 +8,7 @@ import argparse
 import re
 
 import prody as pr
-pr.confProDy(verbosity="error")
+pr.confProDy(verbosity="warning")
 
 from sidechainnet.download_and_parse import download_sidechain_data
 from sidechainnet.utils.proteinnet import parse_raw_proteinnet
