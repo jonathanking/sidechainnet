@@ -38,7 +38,7 @@ def get_chain_from_astral_id(astral_id, d):
     pdbid, chain = d[astral_id]
     assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid {pdbid}."
     chain, resnums = chain.split(":")
-    a = pr.parsePDB(pdbid, chain=chain)  # TODO maybe change this to CIF?
+    a = pr.parsePDB(pdbid, chain=chain)
     if resnums != "":
         if resnums[0] == "-":
             # Ranges with negative numbers must be escaped with ` character

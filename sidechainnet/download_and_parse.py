@@ -32,6 +32,8 @@ from sidechainnet.utils.errors import ERRORS
 pr.confProDy(verbosity='error')
 
 MAX_SEQ_LEN = 10_000
+ASTRAL_FILE = "../data/astral_pdb_map.txt"
+ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_FILE)
 
 def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set, limit):
     """
@@ -62,14 +64,23 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
 
 
 def report_errors(pnids_errorcodes, total_pnids):
+    """ Provides a summary of errors after parsing SidechainNet data.
+
+    Args:
+        pnids_errorcodes: A list of tuples (pnid, error_code) of ProteinNet IDs
+            that could not be parsed completely.
+        total_pnids: Total number of pnids processed.
+
+    Returns:
+        None. Prints summary to stdout and generates files containing failed
+        IDs in .errors/{ERROR_CODE}.txt
+
+    """
     print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain data.")
     error_summarizer = sidechainnet.utils.errors.ProteinErrors()
     for pnid, errorcode in pnids_errorcodes:
         error_summarizer.count(errorcode, pnid)
     error_summarizer.summarize(total_pnids)
-
-    # print(f"{pnid} failed with code {ERRORS.get_error_name_from_code(errorcode)}.")
-
 
 
 def get_sidechain_data(pnids, limit):
