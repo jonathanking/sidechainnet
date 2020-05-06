@@ -50,21 +50,24 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
     """
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
+    output_name = f"sidechain-only_{casp_version}_{training_set}.pt"
+    output_path = os.path.join(sidechainnet_out_dir, output_name)
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
 
-    sc_data, pnids_errors = get_sidechain_data(pnids, limit)
-    output_name = f"sidechainnet_{casp_version}_{training_set}.pt"
-    with open(os.path.join(sidechainnet_out_dir, output_name), "wb") as f:
-        pickle.dump(sc_data, f)
+    if os.path.exists(output_path):
+        print(f"Sidechain information already preprocessed ({output_path}).")
+        return load_data(output_path), output_path
 
+    sc_data, pnids_errors = get_sidechain_data(pnids, limit)
+    save_data(sc_data, output_path)
     report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
     # Clean up working directory
     for file in glob('*.cif'):
         os.remove(file)
 
-    return sc_data
+    return sc_data, output_path
 
 
 def report_errors(pnids_errorcodes, total_pnids):
@@ -521,3 +524,13 @@ if __name__ == "__main__":
     except Exception as e:
         ERRORS.summarize()
         raise e
+
+
+def load_data(path):
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
+def save_data(data, path):
+    with open(path, "wb") as f:
+        return pickle.dump(data, f)

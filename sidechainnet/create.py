@@ -10,7 +10,7 @@ import re
 import prody as pr
 pr.confProDy(verbosity="none")
 
-from sidechainnet.download_and_parse import download_sidechain_data
+from sidechainnet.download_and_parse import download_sidechain_data, load_data, save_data
 from sidechainnet.utils.proteinnet import parse_raw_proteinnet
 
 
@@ -23,11 +23,16 @@ def save_full_dataset(train, valid, test, path):
 
 
 def main():
-    # First, create PyTorch versions of the raw proteinnet files for easier inspection
-    pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, args.training_set)
+    # First, create PyTorch versions of  raw proteinnet files for convenience
+    pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
+                                 args.training_set)
 
-    # Then, using the ProteinNet IDs as a guide, download the relevant sidechain data
-    download_sidechain_data(pnids, args.sidechainnet_out, args.casp_version, args.training_set, args.limit, args.proteinnet_in)
+    # Using the ProteinNet IDs as a guide, download the relevant sidechain data
+    sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
+                                                   args.casp_version,
+                                                   args.training_set,
+                                                   args.limit,
+                                                   args.proteinnet_in)
 
     # Finally, unify the sidechain data with ProteinNet
     combine_datasets(args.proteinnet_out, args.sidechainnet_out, args.training_set)
