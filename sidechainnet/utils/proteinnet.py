@@ -131,14 +131,7 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     # If the desired ProteinNet dataset has already been processed, load its IDs
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
         print(f"Raw ProteinNet files already preprocessed ({os.path.join(proteinnet_out_dir, train_file)}).")
-        relevant_training_file = os.path.join(proteinnet_out_dir, train_file.replace(".pt", "_ids.txt"))
-        relevant_id_files = [relevant_training_file, os.path.join(proteinnet_out_dir, "validation_ids.txt"),
-                             os.path.join(proteinnet_out_dir, "testing_ids.txt")]
-        relevant_ids = []
-        for fname in relevant_id_files:
-            with open(fname, "r") as f:
-                relevant_ids += f.read().splitlines()
-
+        relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
         return relevant_ids
 
     # If the torch-preprocessed ProteinNet dictionaries don't exist, create them.
@@ -161,9 +154,31 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     # Process each ProteinNet file by turning them into PyTorch saved dictionaries
     print("Preprocessing raw ProteinNet files...")
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        file_pnids = p.map(process_file, zip(input_files, itertools.repeat(proteinnet_out_dir)))
+        p.map(process_file, zip(input_files, itertools.repeat(proteinnet_out_dir)))
     print("Done.")
 
     # Return the ProteinNet IDs associated with the target dataset
-    relevant_ids = next(filter(lambda r: f"training_{training_set}" in r[0], file_pnids))
+    relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
+    return relevant_ids
+
+
+def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set):
+    """Returns a list of ProteinNet IDs relevant for a particular training set.
+
+    Args:
+        proteinnet_out_dir: Directory containing preprocessed ProteinNet files.
+        training_set: Which training set thinning of CASP to use.
+
+    Returns:
+        A list of ProteinNet IDs (training, validation, and test set).
+    """
+    train_file = f"training_{training_set}.pt"
+    relevant_training_file = os.path.join(proteinnet_out_dir, train_file.replace(".pt", "_ids.txt"))
+    relevant_id_files = [relevant_training_file, os.path.join(proteinnet_out_dir, "validation_ids.txt"),
+                         os.path.join(proteinnet_out_dir, "testing_ids.txt")]
+    relevant_ids = []
+    for fname in relevant_id_files:
+        with open(fname, "r") as f:
+            relevant_ids += f.read().splitlines()
+
     return relevant_ids
