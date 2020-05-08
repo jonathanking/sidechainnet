@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import pickle
 from glob import glob
+import numpy as np
 
 
 def load_ids_from_text_files(directory, training_set):
@@ -44,9 +45,9 @@ def read_protein_from_file(file_pointer, include_tertiary):
             evolutionary = []
             for residue in range(21): evolutionary.append(
                 [float(step) for step in file_pointer.readline().split()])
+            evolutionary = np.asarray(evolutionary).T
             dict_.update({'evolutionary': evolutionary})
         elif next_line == '[SECONDARY]\n':
-            # TODO save secondary info as numpy array, L x 21
             secondary = list([_dssp_dict[dssp] for dssp in file_pointer.readline()[:-1]])
             dict_.update({'secondary': secondary})
         elif next_line == '[TERTIARY]\n' and include_tertiary:

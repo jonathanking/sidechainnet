@@ -33,6 +33,10 @@ def combine(pn_entry, sc_entry, aligner):
     Returns:
         A dictionary that has unified the two sets of information.
     """
+    if "secondary" in pn_entry:
+        print("WARNING: secondary structure information is not yet supported. "
+              "As of May 2020, it is not included in ProteinNet.")
+
     can_be_merged, mask, alignment = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
                                                             sc_entry["seq"],
@@ -42,14 +46,10 @@ def combine(pn_entry, sc_entry, aligner):
     if can_be_merged:
         # Update ProteinNet and Sidechain info to match the mask (add padding)
         for pn_info in pn_entry.keys():
-            if pn_info not in ["tertiary", "primary", "mask"]:
-                if pn_info == "evolutionary":
-                    data = np.asarray(pn_entry[pn_info]).T
-                else:
-                    data = pn_entry[pn_info]
-                pn_entry[pn_info] = expand_data_with_mask(data, mask)
+            if pn_info == "evolutionary":
+                pn_entry[pn_info] = expand_data_with_mask(pn_entry[pn_info], mask)
         for sc_info in sc_entry.keys():
-            if sc_info != "seq":
+            if sc_info in ["ang", "crd"]:
                 sc_entry[sc_info] = expand_data_with_mask(sc_entry[sc_info], mask)
 
         # Create new SidechainNet entry containing all information
@@ -58,8 +58,6 @@ def combine(pn_entry, sc_entry, aligner):
         new_entry["evo"] = pn_entry["evolutionary"]
         new_entry["crd"] = sc_entry["crd"]
         new_entry["msk"] = mask
-        if "secondary" in pn_entry.keys():
-            new_entry["sec"] = pn_entry["secondary"]
 
     return new_entry
 
