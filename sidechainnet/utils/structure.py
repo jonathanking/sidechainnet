@@ -262,7 +262,7 @@ def get_seq_coords_and_angles(chain):
     for res_id, res in enumerate(all_residues):
         if res.getResname() == "XAA":  # Treat unknown amino acid as missing
             continue
-        elif res.stdaa:
+        elif not res.stdaa:
             raise NonStandardAminoAcidError
 
         # Measure basic angles

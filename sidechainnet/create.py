@@ -114,30 +114,40 @@ def main():
                                                    args.proteinnet_in)
 
     # Finally, unify the sidechain data with ProteinNet
-    sidechainnet = combine_datasets(args.proteinnet_out, sc_data, args.training_set)
+    sidechainnet = combine_datasets(args.proteinnet_out, sc_data,
+                                    args.training_set)
 
     save_data(sidechainnet, os.path.join(args.sidechainnet_out,
-                                         f"sidechainnet_{args.casp_version}_{args.training_set}.pt"))
+                                         f"sidechainnet_{args.casp_version}"
+                                         f"_{args.training_set}.pt"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Constructs SidechainNet.")
-    parser.add_argument('proteinnet_in', type=str, help='Path to ProteinNet raw records directory.')
-    parser.add_argument('--proteinnet_out', '-po', type=str, help='Where to save parsed, raw ProteinNet.',
+    parser.add_argument('proteinnet_in', type=str,
+                        help='Path to ProteinNet raw records directory.')
+    parser.add_argument('--proteinnet_out', '-po', type=str,
+                        help='Where to save parsed, raw ProteinNet.',
                         default="../data/proteinnet/")
-    parser.add_argument('--sidechainnet_out', '-so', type=str, help='Where to save SidechainNet.',
+    parser.add_argument('--sidechainnet_out', '-so', type=str,
+                        help='Where to save SidechainNet.',
                         default="../data/sidechainnet/")
-    parser.add_argument('-l', '--limit', type=int, default=None, help='Limit size of training set for debugging.')
-    parser.add_argument("--pdb_dir", default=os.path.expanduser("~/pdb/"), type=str,
+    parser.add_argument('-l', '--limit', type=int, default=None,
+                        help='Limit size of training set for debugging.')
+    parser.add_argument("--pdb_dir", default=os.path.expanduser("~/pdb/"),
+                        type=str,
                         help="Location to download PDB files for ProDy.")
-    parser.add_argument('--training_set', type=int, default=100, help='Which \'thinning\' of the ProteinNet training '
-                                                                      'set to parse. {30,50,70,90,95,100}. '
-                                                                      'Default 100.')
+    parser.add_argument('--training_set', type=int, default=100,
+                        help='Which \'thinning\' of the ProteinNet training '
+                        'set to parse. {30,50,70,90,95,100}. Default 100.')
     args = parser.parse_args()
 
     match = re.search(r"casp\d+", args.proteinnet_in, re.IGNORECASE)
-    assert match, "The input_dir is not titled with 'caspX'. Please ensure the raw files are enclosed in a path" \
-                  "that contains the CASP version i.e. 'casp12'."
+    if not match:
+        raise argparse.ArgumentError("The input_dir does not contain 'caspX'. "
+                                     "Please ensure the raw files are enclosed "
+                                     "in a path that contains the CASP version"
+                                     " i.e. 'casp12'.")
     args.casp_version = match.group(0)
 
     main()
