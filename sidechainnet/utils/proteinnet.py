@@ -31,7 +31,16 @@ def read_protein_from_file(file_pointer, include_tertiary):
     Hallgren.
     """
     dict_ = {}
-    _dssp_dict = {'L': 0, 'H': 1, 'B': 2, 'E': 3, 'G': 4, 'I': 5, 'T': 6, 'S': 7}
+    _dssp_dict = {
+        'L': 0,
+        'H': 1,
+        'B': 2,
+        'E': 3,
+        'G': 4,
+        'I': 5,
+        'T': 6,
+        'S': 7
+    }
     _mask_dict = {'-': 0, '+': 1}
 
     while True:
@@ -44,18 +53,21 @@ def read_protein_from_file(file_pointer, include_tertiary):
             dict_.update({'primary': primary})
         elif next_line == '[EVOLUTIONARY]\n':
             evolutionary = []
-            for residue in range(21): evolutionary.append(
-                [float(step) for step in file_pointer.readline().split()])
+            for residue in range(21):
+                evolutionary.append(
+                    [float(step) for step in file_pointer.readline().split()])
             evolutionary = np.asarray(evolutionary).T
             dict_.update({'evolutionary': evolutionary})
         elif next_line == '[SECONDARY]\n':
-            secondary = list([_dssp_dict[dssp] for dssp in file_pointer.readline()[:-1]])
+            secondary = list(
+                [_dssp_dict[dssp] for dssp in file_pointer.readline()[:-1]])
             dict_.update({'secondary': secondary})
         elif next_line == '[TERTIARY]\n' and include_tertiary:
             tertiary = []
             # 3 dimension
-            for axis in range(3): tertiary.append(
-                [float(coord) for coord in file_pointer.readline().split()])
+            for axis in range(3):
+                tertiary.append(
+                    [float(coord) for coord in file_pointer.readline().split()])
             dict_.update({'tertiary': tertiary})
         elif next_line == '[MASK]\n':
             mask = list([_mask_dict[aa] for aa in file_pointer.readline()[:-1]])
@@ -74,7 +86,9 @@ def process_file(input_filename_out_dir, return_ids=False):
     all_ids = []
     input_filename, out_dir = input_filename_out_dir
     print("    " + input_filename)
-    text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '_ids.txt'), "w")
+    text_file = open(
+        os.path.join(out_dir,
+                     os.path.basename(input_filename) + '_ids.txt'), "w")
     input_file = open(input_filename, "r")
     meta_dict = {}
     while True:
@@ -87,7 +101,9 @@ def process_file(input_filename_out_dir, return_ids=False):
         text_file.write(f"{id_}\n")
         if return_ids:
             all_ids.append(id_)
-    with open(os.path.join(out_dir, os.path.basename(input_filename) + ".pt"), "wb") as f:
+    with open(os.path.join(out_dir,
+                           os.path.basename(input_filename) + ".pt"),
+              "wb") as f:
         pickle.dump(meta_dict, f)
     input_file.close()
     text_file.close()
@@ -101,11 +117,9 @@ class ProteinNet(object):
     Defines a wrapper for interacting with a ProteinNet dataset.
     """
 
-
     def __init__(self, raw_dir, training_set):
         self.raw_dir = raw_dir
         self.training_set = training_set
-
 
     def parse_raw_data(self):
         input_files = glob(os.path.join(self.raw_dir, "raw/*[!.ids]"))
@@ -133,8 +147,11 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
 
     # If the desired ProteinNet dataset has already been processed, load its IDs
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
-        print(f"Raw ProteinNet files already preprocessed ({os.path.join(proteinnet_out_dir, train_file)}).")
-        relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
+        print(
+            f"Raw ProteinNet files already preprocessed ({os.path.join(proteinnet_out_dir, train_file)})."
+        )
+        relevant_ids = retrieve_relevant_proteinnetids_from_files(
+            proteinnet_out_dir, training_set)
         return relevant_ids
 
     # If the torch-preprocessed ProteinNet dictionaries don't exist, create them.
@@ -143,29 +160,38 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
 
     # Look for the target ProteinNet files
     if not os.path.isdir(os.path.join(proteinnet_in_dir, "targets")):
-        print("There must be a subdirectory containing all protein targets with the name 'targets'.\n"
-              "You can download the .tgz file from the following link: "
-              "http://predictioncenter.org/download_area/CASP12/targets/\n"
-              "(replace 'CASP12' with the CASP version of interest and download the most recent, largest"
-              "compressed file in the list.")
+        print(
+            "There must be a subdirectory containing all protein targets with "
+            "the name 'targets'.\nYou can download the .tgz file from the "
+            "following link: http://predictioncenter.org/download_area/CASP12/targets/\n"
+            "(replace 'CASP12' with the CASP version of interest and download "
+            "the most recent, largest compressed file in the list.")
     # Look for the raw ProteinNet files
-    input_files = [f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]")) if not os.path.isdir(f)]
-    assert len(input_files) == 8, f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but could not find " \
-                                  f"all 8.\n Please download from Mohammed AlQuraishi's repository: " \
+    input_files = [
+        f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]"))
+        if not os.path.isdir(f)
+    ]
+    assert len(input_files) == 8, f"Looking for raw ProteinNet files in " \
+                                  f"'{proteinnet_in_dir}', but could not find" \
+                                  f" all 8.\n Please download from Mohammed " \
+                                  f"AlQuraishi's repository: " \
                                   f"https://github.com/aqlaboratory/proteinnet"
 
     # Process each ProteinNet file by turning them into PyTorch saved dictionaries
     print("Preprocessing raw ProteinNet files...")
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        p.map(process_file, zip(input_files, itertools.repeat(proteinnet_out_dir)))
+        p.map(process_file,
+              zip(input_files, itertools.repeat(proteinnet_out_dir)))
     print(f"Done. Processed ProteinNet files saved to {proteinnet_out_dir}.")
 
     # Return the ProteinNet IDs associated with the target dataset
-    relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
+    relevant_ids = retrieve_relevant_proteinnetids_from_files(
+        proteinnet_out_dir, training_set)
     return relevant_ids
 
 
-def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set):
+def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
+                                               training_set):
     """Returns a list of ProteinNet IDs relevant for a particular training set.
 
     Args:
