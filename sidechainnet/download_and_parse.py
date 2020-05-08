@@ -255,6 +255,9 @@ def get_chain_from_trainid(pnid):
             except Exception as e:
                 print(e)
                 return pnid, ERRORS["PARSING_ERROR_OSERROR"]
+        except Exception as e:
+            print(e)
+            return pnid, ERRORS["PARSING_ERROR_OSERROR"]
     except AttributeError:
         return pnid, ERRORS["PARSING_ERROR_ATTRIBUTE"]
     except (pr.proteins.pdbfile.PDBParseError, IndexError):
