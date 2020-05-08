@@ -255,7 +255,7 @@ def get_chain_from_trainid(pnid):
             except Exception as e:
                 print(e)
                 return pnid, ERRORS["PARSING_ERROR_OSERROR"]
-        except Exception as e:
+        except Exception as e: # EOFERROR
             print(e)
             return pnid, ERRORS["PARSING_ERROR_OSERROR"]
     except AttributeError:
