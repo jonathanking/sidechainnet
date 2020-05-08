@@ -13,6 +13,9 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
+
+
 def init_aligner():
     """
     Creates an aligner whose weights penalize excessive gaps, make gaps
@@ -39,6 +42,7 @@ def init_aligner():
 
     return a
 
+
 def get_mask_from_alignment(al):
     """ For a single alignment, return the mask as a string of '+' and '-'s. """
     alignment_str = str(al).split("\n")[1]
@@ -52,15 +56,21 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
     matches with ProteinNet
     """
     a = aligner.align(pn_seq, my_seq)
+    pn_mask = binary_mask_to_str(pn_mask)
+
+    def masks_match(pn, new):
+        return pn == new or new.count("-") > pn.count("-")
+
     if len(a) == 0:
         return None, None, None
 
     elif len(a) == 1:
         a0 = a[0]
         computed_mask = get_mask_from_alignment(a0)
-        return computed_mask == pn_mask, computed_mask, a0
+        return masks_match(pn_mask, computed_mask), computed_mask, a0
 
     elif len(a) > 1:
+        # TODO raise warning when they have identical scores
         best_mask = None
         found_a_match = False
         best_alignment = None
@@ -70,7 +80,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
                 best_mask = computed_mask
             if not best_alignment:
                 best_alignment = a0
-            if computed_mask == pn_mask:
+            if masks_match(pn_mask, computed_mask):
                 found_a_match = True
                 best_mask = computed_mask
                 best_alignment = a0
@@ -137,3 +147,59 @@ def unmask_seq(ang, seq):
 
 if __name__ == '__main__':
     find_how_many_entries_can_be_directly_merged()
+
+
+def coordinate_iterator(coords, atoms_per_res):
+    """Iterates over coordinates in a numpy array grouped by residue.
+
+    Args:
+        coords: Numpy array of coordinates. (L x atoms_per_res) x 3.
+        atoms_per_res: Number of atomic coordinates per residue.
+
+    Returns:
+        An iterator where every next call returns the next atoms_per_res
+            coordinates.
+    """
+    assert len(coords) % atoms_per_res == 0, f"There must be {atoms_per_res}" \
+                                               f" atoms for every residue.\n" \
+                                             f"len(coords) = {len(coords)}"
+    i = 0
+    while i + atoms_per_res <= len(coords):
+        yield coords[i:i+atoms_per_res]
+        i += atoms_per_res
+
+
+def expand_data_with_mask(data, mask):
+    """Uses mask to expand data as necessary.
+
+    Args:
+        data: May be evolutionary (numpy array, Lx21), secondary (unsupported),
+            angles (2D numpy array, Lx12), coordinates (2D numpy array,
+             (Lx13)x3).
+        mask: String of '+'s and '-'s representing if data is present with
+            respect to protein primary sequence.
+
+    Returns:
+        Data in the same format, possibly extending L to match the length of
+        the mask, that now contains padding.
+    """
+    if mask.count("-") == 0:
+        return data
+
+    size = data.shape[-1]
+    if size == 3:
+        data = coordinate_iterator(data, NUM_PREDICTED_COORDS)
+        blank = np.empty((NUM_PREDICTED_COORDS,3))
+    else:
+        blank = np.empty((size,))
+
+    blank[:] = np.nan
+
+    new_data = []
+    for i, (m, d) in enumerate(zip(mask, data)):
+        if m == "+":
+            new_data.append(d)
+        elif m == "-":
+            new_data.append(blank.copy())
+
+    return np.vstack(new_data)

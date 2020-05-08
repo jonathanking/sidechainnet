@@ -46,6 +46,7 @@ def read_protein_from_file(file_pointer, include_tertiary):
                 [float(step) for step in file_pointer.readline().split()])
             dict_.update({'evolutionary': evolutionary})
         elif next_line == '[SECONDARY]\n':
+            # TODO save secondary info as numpy array, L x 21
             secondary = list([_dssp_dict[dssp] for dssp in file_pointer.readline()[:-1]])
             dict_.update({'secondary': secondary})
         elif next_line == '[TERTIARY]\n' and include_tertiary:
@@ -63,7 +64,7 @@ def read_protein_from_file(file_pointer, include_tertiary):
             return None
 
 
-def process_file(input_filename_out_dir, return_ids=True):
+def process_file(input_filename_out_dir, return_ids=False):
     """
     A parallelizable method for processing one raw ProteinNet file and
     creating a pickled dictionary of the data.
@@ -155,7 +156,7 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     print("Preprocessing raw ProteinNet files...")
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
         p.map(process_file, zip(input_files, itertools.repeat(proteinnet_out_dir)))
-    print("Done.")
+    print(f"Done. Processed ProteinNet files saved to {proteinnet_out_dir}.")
 
     # Return the ProteinNet IDs associated with the target dataset
     relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
