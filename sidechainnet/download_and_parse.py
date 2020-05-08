@@ -23,8 +23,7 @@ import tqdm
 import sidechainnet
 from sidechainnet.utils.astral import ASTRAL_SUMMARY
 from sidechainnet.utils.errors import ERRORS
-from sidechainnet.utils.errors import NonStandardAminoAcidError, SequenceError, \
-    ContigMultipleMatchingError, ShortStructureError, MissingAtomsError, NoneStructureError
+from sidechainnet.utils.errors import *
 from sidechainnet.utils.sequence import bin_sequence_data
 from sidechainnet.utils.structure import angle_list_to_sin_cos, get_seq_coords_and_angles, \
     no_nans_infs_allzeros, parse_astral_summary_file, get_chain_from_astral_id, GLOBAL_PAD_CHAR
@@ -84,7 +83,7 @@ def report_errors(pnids_errorcodes, total_pnids):
 
     """
     if os.path.exists("errors"):
-        for file in glob('errors/*.txt'):
+        for file in glob('errors/*!(WARNING).txt'):
             os.remove(file)
 
     print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain "
@@ -93,6 +92,13 @@ def report_errors(pnids_errorcodes, total_pnids):
     for pnid, error_code in pnids_errorcodes:
         error_summarizer.count(error_code, pnid)
     error_summarizer.summarize(total_pnids)
+    if os.path.exists("errors/MODIFIED_MODEL_WARNING.txt"):
+        with open("errors/MODIFIED_MODEL_WARNING.txt", "r") as f:
+            model_number_errors = len(f.readlines())
+            print(f"Be aware that {model_number_errors} files may be using a "
+                  f"different model number than the one specified by "
+                  f"ProteinNet. See errors/MODIFIED_MODEL_WARNING.txt for"
+                  f"a list of these proteins.")
 
 
 def get_sidechain_data(pnids, limit):
@@ -116,11 +122,15 @@ def get_sidechain_data(pnids, limit):
                                  total=len(pnids[:limit]), dynamic_ncols=True))
     all_errors = []
     all_data = dict()
-    for pnid, r in results:
-        if type(r) == int:
-            all_errors.append((pnid, r))
-            continue
-        all_data[pnid] = r
+    with open("errors/MODIFIED_MODEL_WARNING.txt", "a") as model_warning_file:
+        for pnid, r in results:
+            if type(r) == int:
+                all_errors.append((pnid, r))
+                continue
+            if "msg" in r and r["msg"] == "MODIFIED_MODEL":
+                model_warning_file.write(f"{pnid}\n")
+                del r["msg"]
+            all_data[pnid] = r
     return all_data, all_errors
 
 
@@ -137,6 +147,7 @@ def process_id(pnid):
         Dictionary of relevant data for that ID.
 
     """
+    message = None
     pnid_type = determine_pnid_type(pnid)
     chain = get_chain_from_proteinnetid(pnid, pnid_type)
     if not chain:
@@ -144,6 +155,9 @@ def process_id(pnid):
     elif type(chain) == tuple and type(chain[1]) == int:
         # This indicates there was an issue parsing the chain
         return pnid, chain[1]
+    elif type(chain) == tuple and chain[1] == "MODIFIED_MODEL":
+        message = "MODIFIED_MODEL"
+        chain = chain[0]
     try:
         dihedrals_coords_sequence = get_seq_coords_and_angles(chain)
     except NonStandardAminoAcidError:
@@ -162,8 +176,10 @@ def process_id(pnid):
 
     # If we've made it this far, we can unpack the data and return it
     dihedrals, coords, sequence = dihedrals_coords_sequence
-
-    return pnid, {"ang": dihedrals, "crd": coords, "seq": sequence}
+    data = {"ang": dihedrals, "crd": coords, "seq": sequence}
+    if message:
+        data["msg"] = message
+    return pnid, data
 
 
 def determine_pnid_type(pnid):
@@ -198,6 +214,7 @@ def get_chain_from_trainid(pnid):
     Returns:
         ProDy chain object corresponding to ProteinNet ID.
     """
+    modified_model_number = False
     # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
     try:
         pdbid, chnum, chid = pnid.split("_")
@@ -229,8 +246,14 @@ def get_chain_from_trainid(pnid):
         try:
             chain = pr.parseCIF(pdbid, chain=chid, model=chnum)
             use_pdb = False
-        except:
-            return pnid, ERRORS["PARSING_ERROR_OSERROR"]
+        except IndexError:
+            try:
+                chain = pr.parseCIF(pdbid, chain=chid, model=1)
+                use_pdb = False
+                modified_model_number = True
+            except Exception as e:
+                print(e)
+                return pnid, ERRORS["PARSING_ERROR_OSERROR"]
     except AttributeError:
         return pnid, ERRORS["PARSING_ERROR_ATTRIBUTE"]
     except (pr.proteins.pdbfile.PDBParseError, IndexError):
@@ -241,6 +264,7 @@ def get_chain_from_trainid(pnid):
         if struct and chnum > 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
+                modified_model_number = True
             except:
                 return pnid, ERRORS["PARSING_ERROR"]
         else:
@@ -251,6 +275,9 @@ def get_chain_from_trainid(pnid):
 
     if chain is None:
         return pnid, ERRORS["NONE_CHAINS"]
+
+    if modified_model_number:
+        return chain, "MODIFIED_MODEL"
 
     return chain
 

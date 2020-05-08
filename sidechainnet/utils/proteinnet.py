@@ -201,18 +201,17 @@ def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
     Returns:
         A list of ProteinNet IDs (training, validation, and test set).
     """
-    return ["1JX2_2_B", "1OHH_4_H", "3JCK_6_F", "1N6J_3_A", "1U0D_3_A", "2AP2_2_B", "3JCK_8_H", "3JCK_7_G", "1KTR_3_H", "1KTR_2_M", "2XGE_2_B", "1N6J_4_G", "1WTE_3_A", "1ZBL_3_A", ]
-    # train_file = f"training_{training_set}.pt"
-    # relevant_training_file = os.path.join(proteinnet_out_dir,
-    #                                       train_file.replace(".pt", "_ids.txt"))
-    # relevant_id_files = [
-    #     relevant_training_file,
-    #     os.path.join(proteinnet_out_dir, "validation_ids.txt"),
-    #     os.path.join(proteinnet_out_dir, "testing_ids.txt")
-    # ]
-    # relevant_ids = []
-    # for fname in relevant_id_files:
-    #     with open(fname, "r") as f:
-    #         relevant_ids += f.read().splitlines()
-    #
-    # return relevant_ids
+    train_file = f"training_{training_set}.pt"
+    relevant_training_file = os.path.join(proteinnet_out_dir,
+                                          train_file.replace(".pt", "_ids.txt"))
+    relevant_id_files = [
+        relevant_training_file,
+        os.path.join(proteinnet_out_dir, "validation_ids.txt"),
+        os.path.join(proteinnet_out_dir, "testing_ids.txt")
+    ]
+    relevant_ids = []
+    for fname in relevant_id_files:
+        with open(fname, "r") as f:
+            relevant_ids += f.read().splitlines()
+
+    return relevant_ids
