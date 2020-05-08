@@ -3,11 +3,11 @@
 import numpy as np
 import prody as pr
 
+from sidechainnet.utils.build_info import SC_BUILD_INFO, NUM_PREDICTED_ANGLES, \
+    NUM_BB_TORSION_ANGLES, NUM_BB_OTHER_ANGLES, NUM_PREDICTED_COORDS
 from sidechainnet.utils.errors import \
     NonStandardAminoAcidError, IncompleteStructureError, SequenceError, \
     MissingAtomsError, NoneStructureError
-from sidechainnet.utils.build_info import SC_BUILD_INFO, NUM_PREDICTED_ANGLES, \
-    NUM_BB_TORSION_ANGLES, NUM_BB_OTHER_ANGLES, NUM_PREDICTED_COORDS
 
 GLOBAL_PAD_CHAR = np.nan
 

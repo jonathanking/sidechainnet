@@ -8,9 +8,9 @@ Author: Jonathan King
 Date : 3/09/2020
 """
 
-from Bio import Align
 import numpy as np
 import torch
+from Bio import Align
 from tqdm import tqdm
 
 from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
@@ -58,8 +58,10 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
     a = aligner.align(pn_seq, my_seq)
     pn_mask = binary_mask_to_str(pn_mask)
 
+
     def masks_match(pn, new):
         return pn == new or new.count("-") > pn.count("-")
+
 
     if len(a) == 0:
         return None, None, None
@@ -125,7 +127,7 @@ def find_how_many_entries_can_be_directly_merged():
                 f.write(f"{my_id}: (PN {size_comparison} Obs)\n{str(alignment)}")
                 f.write(f"PN Mask:\n{pn_mask}\n\n")
             total += 1
-        print(f"{successful} out of {total} ({successful/total}) sequences can be merged successfully.")
+        print(f"{successful} out of {total} ({successful / total}) sequences can be merged successfully.")
 
 
 def unmask_seq(ang, seq):
@@ -145,6 +147,7 @@ def unmask_seq(ang, seq):
 
     return new_seq
 
+
 if __name__ == '__main__':
     find_how_many_entries_can_be_directly_merged()
 
@@ -161,11 +164,11 @@ def coordinate_iterator(coords, atoms_per_res):
             coordinates.
     """
     assert len(coords) % atoms_per_res == 0, f"There must be {atoms_per_res}" \
-                                               f" atoms for every residue.\n" \
+                                             f" atoms for every residue.\n" \
                                              f"len(coords) = {len(coords)}"
     i = 0
     while i + atoms_per_res <= len(coords):
-        yield coords[i:i+atoms_per_res]
+        yield coords[i:i + atoms_per_res]
         i += atoms_per_res
 
 
@@ -189,7 +192,7 @@ def expand_data_with_mask(data, mask):
     size = data.shape[-1]
     if size == 3:
         data = coordinate_iterator(data, NUM_PREDICTED_COORDS)
-        blank = np.empty((NUM_PREDICTED_COORDS,3))
+        blank = np.empty((NUM_PREDICTED_COORDS, 3))
     else:
         blank = np.empty((size,))
 

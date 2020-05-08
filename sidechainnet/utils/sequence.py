@@ -68,8 +68,8 @@ def bin_sequence_data(seqs, maxlen):
         else:
             bin_j += 1
 
-    return {"hist_counts" : hist_counts,
-            "hist_bins": hist_bins,
-            "bin_probs" : bin_probs,
-            "bin_map": bin_map,
+    return {"hist_counts": hist_counts,
+            "hist_bins"  : hist_bins,
+            "bin_probs"  : bin_probs,
+            "bin_map"    : bin_map,
             "bin_max_len": maxlen}

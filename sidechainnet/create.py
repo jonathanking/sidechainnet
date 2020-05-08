@@ -3,12 +3,11 @@ A protein structure prediction data set that includes sidechain information.
 A direct extension of ProteinNet by Mohammed AlQuraishi.
 
 """
-import os
 import argparse
+import os
 import re
 
 import prody as pr
-import numpy as np
 
 from sidechainnet.utils.alignment import can_be_directly_merged, expand_data_with_mask
 

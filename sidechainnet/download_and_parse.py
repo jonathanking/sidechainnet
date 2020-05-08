@@ -21,14 +21,13 @@ import prody as pr
 import tqdm
 
 import sidechainnet
-from sidechainnet.utils.sequence import bin_sequence_data
 from sidechainnet.utils.astral import ASTRAL_SUMMARY
-
-from sidechainnet.utils.structure import angle_list_to_sin_cos, get_seq_coords_and_angles, \
-    no_nans_infs_allzeros, parse_astral_summary_file, get_chain_from_astral_id, GLOBAL_PAD_CHAR
+from sidechainnet.utils.errors import ERRORS
 from sidechainnet.utils.errors import NonStandardAminoAcidError, SequenceError, \
     ContigMultipleMatchingError, ShortStructureError, MissingAtomsError, NoneStructureError
-from sidechainnet.utils.errors import ERRORS
+from sidechainnet.utils.sequence import bin_sequence_data
+from sidechainnet.utils.structure import angle_list_to_sin_cos, get_seq_coords_and_angles, \
+    no_nans_infs_allzeros, parse_astral_summary_file, get_chain_from_astral_id, GLOBAL_PAD_CHAR
 
 MAX_SEQ_LEN = 10_000
 ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
