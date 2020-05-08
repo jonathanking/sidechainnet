@@ -37,6 +37,10 @@ def get_chain_from_astral_id(astral_id, d):
     pdbid, chain = d[astral_id]
     assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid {pdbid}."
     chain, resnums = chain.split(":")
+
+    if astral_id == "d4qrye_":
+        chain = "A"
+
     a = pr.parsePDB(pdbid, chain=chain)
     if resnums != "":
         if resnums[0] == "-":

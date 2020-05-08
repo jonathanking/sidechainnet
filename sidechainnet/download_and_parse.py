@@ -58,7 +58,12 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version,
         print(f"Sidechain information already preprocessed ({output_path}).")
         return load_data(output_path), output_path
 
+    if os.path.exists("errors"):
+        for file in glob('errors/*.txt'):
+            os.remove(file)
+
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
+
     save_data(sc_data, output_path)
     report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
@@ -82,10 +87,6 @@ def report_errors(pnids_errorcodes, total_pnids):
         IDs in .errors/{ERROR_CODE}.txt
 
     """
-    if os.path.exists("errors"):
-        for file in glob('errors/*!(WARNING).txt'):
-            os.remove(file)
-
     print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain "
           f"data.")
     error_summarizer = sidechainnet.utils.errors.ProteinErrors()
@@ -97,7 +98,7 @@ def report_errors(pnids_errorcodes, total_pnids):
             model_number_errors = len(f.readlines())
             print(f"Be aware that {model_number_errors} files may be using a "
                   f"different model number than the one specified by "
-                  f"ProteinNet. See errors/MODIFIED_MODEL_WARNING.txt for"
+                  f"ProteinNet. See errors/MODIFIED_MODEL_WARNING.txt for "
                   f"a list of these proteins.")
 
 
