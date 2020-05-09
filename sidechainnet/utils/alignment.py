@@ -194,14 +194,15 @@ def expand_data_with_mask(data, mask):
         data = coordinate_iterator(data, NUM_PREDICTED_COORDS)
         blank = np.empty((NUM_PREDICTED_COORDS, 3))
     else:
+        data = iter(data)
         blank = np.empty((size,))
 
     blank[:] = np.nan
 
     new_data = []
-    for i, (m, d) in enumerate(zip(mask, data)):
+    for m in mask:
         if m == "+":
-            new_data.append(d)
+            new_data.append(next(data))
         elif m == "-":
             new_data.append(blank.copy())
 
