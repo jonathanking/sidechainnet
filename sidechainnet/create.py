@@ -78,7 +78,7 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
                 os.path.join(proteinnet_out, f"testing.pt")]
 
     pn_data = {}
-    for f in [pn_files[0]]:
+    for f in pn_files:
         d = load_data(f)
         pn_data.update(d)
     del d
