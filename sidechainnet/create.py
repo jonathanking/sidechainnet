@@ -8,6 +8,7 @@ import os
 import re
 
 import prody as pr
+from tqdm import tqdm
 
 from sidechainnet.utils.alignment import can_be_directly_merged, expand_data_with_mask
 
@@ -73,6 +74,7 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         SidechainNet as a dictionary mapping ProteinNet IDs to all data relevant
         for sidechain prediction.
     """
+    print("Preparing to merge ProteinNet data with downloaded sidechain data.")
     pn_files = [os.path.join(proteinnet_out, f"training_{training_set}.pt"),
                 os.path.join(proteinnet_out, f"validation.pt"),
                 os.path.join(proteinnet_out, f"testing.pt")]
@@ -85,7 +87,7 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
 
     failed = []
     aligner = init_aligner()
-    for pnid in sc_data.keys():
+    for pnid in tqdm(sc_data.keys(), dynamic_ncols=True):
         combined_result = combine(pn_data[pnid], sc_data[pnid], aligner)
         if combined_result:
             pn_data[pnid] = combined_result
