@@ -92,6 +92,7 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         if combined_result:
             pn_data[pnid] = combined_result
         else:
+            del pn_data[pnid]
             failed.append(pnid)
 
     # Record ProteinNet IDs that could not be combined
