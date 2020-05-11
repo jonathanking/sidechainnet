@@ -36,29 +36,29 @@ def combine(pn_entry, sc_entry, aligner):
         print("WARNING: secondary structure information is not yet supported. "
               "As of May 2020, it is not included in ProteinNet.")
 
-    can_be_merged, mask, alignment = can_be_directly_merged(aligner,
+    can_be_merged, mask, alignment, warning = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
+                                                            # sc_entry,
                                                             sc_entry["seq"],
                                                             pn_entry["mask"])
     new_entry = {}
 
-    if can_be_merged:
-        # Update ProteinNet and Sidechain info to match the mask (add padding)
-        for pn_info in pn_entry.keys():
-            if pn_info == "evolutionary":
-                pn_entry[pn_info] = expand_data_with_mask(pn_entry[pn_info], mask)
-        for sc_info in sc_entry.keys():
-            if sc_info in ["ang", "crd"]:
-                sc_entry[sc_info] = expand_data_with_mask(sc_entry[sc_info], mask)
-
+    if alignment:
         # Create new SidechainNet entry containing all information
         new_entry["seq"] = pn_entry["primary"]
-        new_entry["ang"] = sc_entry["ang"]
         new_entry["evo"] = pn_entry["evolutionary"]
-        new_entry["crd"] = sc_entry["crd"]
+
+        # We may need to add padding where specified by the mask
+        new_entry["ang"] = expand_data_with_mask(sc_entry["ang"], mask)
+        new_entry["crd"] = expand_data_with_mask(sc_entry["crd"], mask)
         new_entry["msk"] = mask
 
-    return new_entry
+    l = len(pn_entry["primary"])
+    for k, v in new_entry.items():
+        assert len(v) == l
+
+
+    return new_entry, warning
 
 
 def combine_datasets(proteinnet_out, sc_data, training_set):
@@ -83,21 +83,49 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         pn_data.update(d)
     del d
 
-    failed = []
+    # For debugging errors
+    # error_file = "/Users/jonathanking/Downloads/errorssidechain/COMBINED.txt"
+    # with open(error_file, "r") as f:
+    #     error_ids = f.read().splitlines(keepends=False)
+
+    errors = {"failed": [],
+              "single alignment, mask mismatch": [],
+              "multiple alignments, mask mismatch": [],
+              "multiple alignments, mask mismatch, identical scores": [],
+              "multiple alignments, found matching mask": [],
+              "multiple alignments, found matching mask, identical scores": []}
+
     aligner = init_aligner()
+    # for pnid in error_ids:
     for pnid in sc_data.keys():
-        combined_result = combine(pn_data[pnid], sc_data[pnid], aligner)
+        combined_result, warning = combine(pn_data[pnid], sc_data[pnid], aligner)
         if combined_result:
             pn_data[pnid] = combined_result
-        else:
-            failed.append(pnid)
+        if warning:
+            errors[warning].append(pnid)
 
-    # Record ProteinNet IDs that could not be combined
-    with open("errors/COMBINED.txt", "w") as f:
-        for failed_id in failed:
+    # Record ProteinNet IDs that could not be combined or exhibited warnings
+    with open("errors/COMBINED_ERRORS.txt", "w") as f:
+        for failed_id in errors["failed"]:
             f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_1ALN_MISMATCH.txt", "w") as f:
+        for failed_id in errors["single alignment, mask mismatch"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH.txt", "w") as f:
+        for failed_id in errors["multiple alignments, mask mismatch"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MATCH.txt", "w") as f:
+        for failed_id in errors["multiple alignments, found matching mask"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH_IDENTICAL_SCORES.txt", "w") as f:
+        for failed_id in errors["multiple alignments, mask mismatch, identical scores"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MATCH_IDENTICAL_SCORES.txt", "w") as f:
+        for failed_id in errors["multiple alignments, found matching mask, identical scores"]:
+            f.write(f"{failed_id}\n")
+
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
-          f"{len(failed)} IDs failed to combine successfully.")
+          f"{len(errors['failed'])} IDs failed to combine successfully.")
     return pn_data
 
 
@@ -112,6 +140,9 @@ def main():
                                                    args.training_set,
                                                    args.limit,
                                                    args.proteinnet_in)
+
+    # For debugging errors
+    # sc_data = load_data("../data/sidechainnet/seq-only_casp12_100.pt")
 
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet = combine_datasets(args.proteinnet_out, sc_data,

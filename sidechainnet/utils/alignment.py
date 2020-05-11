@@ -57,37 +57,80 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
     """
     a = aligner.align(pn_seq, my_seq)
     pn_mask = binary_mask_to_str(pn_mask)
-
+    warning = None
 
     def masks_match(pn, new):
-        return pn == new or new.count("-") > pn.count("-")
-
+        return pn == new
 
     if len(a) == 0:
-        return None, None, None
+        warning = "failed"
+        return False, None, warning
 
     elif len(a) == 1:
         a0 = a[0]
         computed_mask = get_mask_from_alignment(a0)
-        return masks_match(pn_mask, computed_mask), computed_mask, a0
+        if not masks_match(pn_mask, computed_mask):
+            warning = "single alignment, mask mismatch"
+        return True, computed_mask, a0, warning
 
     elif len(a) > 1:
-        # TODO raise warning when they have identical scores
         best_mask = None
         found_a_match = False
         best_alignment = None
-        for a0 in a:
+        best_idx = 0
+        for i, a0 in enumerate(a):
             computed_mask = get_mask_from_alignment(a0)
             if not best_mask:
                 best_mask = computed_mask
+                best_idx = i
             if not best_alignment:
                 best_alignment = a0
             if masks_match(pn_mask, computed_mask):
                 found_a_match = True
                 best_mask = computed_mask
                 best_alignment = a0
+                best_idx = i
                 break
-        return found_a_match, best_mask, best_alignment
+        if found_a_match:
+            warning = "multiple alignments, found matching mask"
+            identical_scores = other_alignments_with_same_score(
+                a, best_idx, best_alignment.score)
+            if identical_scores:
+                warning += ", identical scores"
+            return True, best_mask, best_alignment, warning
+        else:
+            mask = get_mask_from_alignment(a[0])
+            warning = "multiple alignments, mask mismatch"
+            identical_scores = other_alignments_with_same_score(
+                a, best_idx, best_alignment.score)
+            if identical_scores:
+                warning += ", identical scores"
+            return True, mask, a[0], warning
+
+
+def other_alignments_with_same_score(all_alignments, cur_alignment_idx,
+                                     cur_alignment_score):
+    """Returns True if there are other alignments with identical scores.
+
+    Args:
+        all_alignments: PairwiseAlignment iterable object from BioPython.Align
+        cur_alignment_idx: The index of the desired alignment
+        cur_alignment_score: The score of the desired alignment
+
+    Returns:
+        True if any alignments other than the one specified have scores that
+        are identical to the specified alignment.
+    """
+    if len(all_alignments) <= 1:
+        return False
+
+    for i, a0 in enumerate(all_alignments):
+        if i == cur_alignment_idx:
+            continue
+        elif a0.score == cur_alignment_score:
+            return True
+
+    return False
 
 
 def binary_mask_to_str(m):
@@ -104,16 +147,20 @@ def find_how_many_entries_can_be_directly_merged():
     Counts the number of entries that can be successfully aligned between the
     sidechain dataset and the protein dataset.
     """
-    d = torch.load("/home/jok120/protein-transformer/data/proteinnet/casp12_200218_30.pt")
+    d = torch.load(
+        "/home/jok120/protein-transformer/data/proteinnet/casp12_200218_30.pt")
     pn = torch.load("/home/jok120/proteinnet/data/casp12/torch/training_30.pt")
     aligner = init_aligner()
     total = 0
     successful = 0
-    with open("merging_problems.csv", "w") as f, open("merging_success.csv", "w") as sf:
+    with open("merging_problems.csv", "w") as f, open("merging_success.csv",
+                                                      "w") as sf:
         for i, my_id in enumerate(tqdm(d["train"]["ids"])):
-            my_seq, pn_seq, pn_mask = d["train"]["seq"][i], pn[my_id]["primary"], binary_mask_to_str(pn[my_id]["mask"])
+            my_seq, pn_seq, pn_mask = d["train"]["seq"][i], pn[my_id][
+                "primary"], binary_mask_to_str(pn[my_id]["mask"])
             my_seq = unmask_seq(d["train"]["ang"][i], my_seq)
-            result, computed_mask, alignment = can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask)
+            result, computed_mask, alignment = can_be_directly_merged(
+                aligner, pn_seq, my_seq, pn_mask)
             if result:
                 successful += 1
                 sf.write(",".join([my_id, my_seq, computed_mask]) + "\n")
@@ -124,10 +171,13 @@ def find_how_many_entries_can_be_directly_merged():
                     size_comparison = ">"
                 else:
                     size_comparison = "=="
-                f.write(f"{my_id}: (PN {size_comparison} Obs)\n{str(alignment)}")
+                f.write(
+                    f"{my_id}: (PN {size_comparison} Obs)\n{str(alignment)}")
                 f.write(f"PN Mask:\n{pn_mask}\n\n")
             total += 1
-        print(f"{successful} out of {total} ({successful / total}) sequences can be merged successfully.")
+        print(
+            f"{successful} out of {total} ({successful / total}) sequences can be merged successfully."
+        )
 
 
 def unmask_seq(ang, seq):
@@ -194,15 +244,36 @@ def expand_data_with_mask(data, mask):
         data = coordinate_iterator(data, NUM_PREDICTED_COORDS)
         blank = np.empty((NUM_PREDICTED_COORDS, 3))
     else:
+        data = iter(data)
         blank = np.empty((size,))
 
     blank[:] = np.nan
 
     new_data = []
-    for i, (m, d) in enumerate(zip(mask, data)):
+    for m in mask:
         if m == "+":
-            new_data.append(d)
+            new_data.append(next(data))
         elif m == "-":
             new_data.append(blank.copy())
 
     return np.vstack(new_data)
+
+
+def pad_seq_with_mask(seq, mask):
+    """Given a shorter sequence, expands it to match the padding in mask.
+
+    Args:
+        seq: String with length smaller than mask.
+        mask: String of '+'s and '-'s used to expand seq.
+
+    Returns:
+        New string of seq but with added '-'s where indicated by mask.
+    """
+    seq_iter = iter(seq)
+    new_seq = ""
+    for m in mask:
+        if m == "+":
+            new_seq += next(seq_iter)
+        elif m == "-":
+            new_seq += "-"
+    return new_seq
