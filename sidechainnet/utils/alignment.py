@@ -78,12 +78,9 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
         found_a_match = False
         best_alignment = None
         best_idx = 0
-        if len(a) >= 50:
-            many_alignments = True
-        else:
-            many_alignments = False
+        has_many_alignments = len(a) >= 50
         for i, a0 in enumerate(a):
-            if many_alignments and i >= 50:
+            if has_many_alignments and i >= 50:
                 break
             computed_mask = get_mask_from_alignment(a0)
             if not best_mask:
@@ -99,13 +96,13 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
                 break
         if found_a_match:
             warning = "multiple alignments, found matching mask"
-            if many_alignments:
+            if has_many_alignments:
                 warning += ", many alignments"
             return True, best_mask, best_alignment, warning
         else:
             mask = get_mask_from_alignment(a[0])
             warning = "multiple alignments, mask mismatch"
-            if many_alignments:
+            if has_many_alignments:
                 warning += ", many alignments"
             return True, mask, a[0], warning
 
