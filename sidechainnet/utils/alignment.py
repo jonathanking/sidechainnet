@@ -64,7 +64,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
 
     if len(a) == 0:
         warning = "failed"
-        return False, None, warning
+        return False, None, None, warning
 
     elif len(a) == 1:
         a0 = a[0]
