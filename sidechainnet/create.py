@@ -97,9 +97,9 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     errors = {"failed": [],
               "single alignment, mask mismatch": [],
               "multiple alignments, mask mismatch": [],
-              "multiple alignments, mask mismatch, identical scores": [],
+              "multiple alignments, mask mismatch, many alignments": [],
               "multiple alignments, found matching mask": [],
-              "multiple alignments, found matching mask, identical scores": []}
+              "multiple alignments, found matching mask, many alignments": []}
 
     aligner = init_aligner()
     # for pnid in error_ids:
