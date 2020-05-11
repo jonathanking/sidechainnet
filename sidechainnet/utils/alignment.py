@@ -80,10 +80,11 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
         best_idx = 0
         if len(a) >= 50:
             many_alignments = True
-            a = list(a)[:50]
         else:
             many_alignments = False
         for i, a0 in enumerate(a):
+            if many_alignments and i >= 50:
+                break
             computed_mask = get_mask_from_alignment(a0)
             if not best_mask:
                 best_mask = computed_mask
