@@ -9,6 +9,7 @@ import re
 
 import prody as pr
 from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
 
 from sidechainnet.utils.alignment import can_be_directly_merged, expand_data_with_mask
 
@@ -103,8 +104,12 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
 
     aligner = init_aligner()
     # for pnid in error_ids:
-    for pnid in tqdm(sc_data.keys(), dynamic_ncols=True):
-        combined_result, warning = combine(pn_data[pnid], sc_data[pnid], aligner)
+    with Pool(cpu_count()) as p:
+        tuples = (get_tuple(pn_data, sc_data, aligner, pnid) for pnid in sc_data.keys())
+        results_warnings = list(tqdm(p.imap(combine_wrapper, tuples, timeout=10), total=len(sc_data.keys()), dynamic_ncols=True))
+
+    # for pnid in tqdm(sc_data.keys(), dynamic_ncols=True):
+    for (combined_result, warning), pnid in zip(results_warnings, sc_data.keys()):
         if combined_result:
             pn_data[pnid] = combined_result
         else:
@@ -135,6 +140,13 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
           f"{len(errors['failed'])} IDs failed to combine successfully.")
     return pn_data
+
+def get_tuple(pndata, scdata, aligner, pnid):
+    return pndata[pnid], scdata[pnid], aligner
+
+def combine_wrapper(pndata_scdata_aligner):
+    pn_data, sc_data, aligner = pndata_scdata_aligner
+    return combine(pn_data, sc_data, aligner)
 
 
 def main():
