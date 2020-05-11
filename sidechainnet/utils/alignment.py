@@ -80,7 +80,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
         best_idx = 0
         if len(a) >= 50:
             many_alignments = True
-            a = a[:50]
+            a = list(a)[:50]
         else:
             many_alignments = False
         for i, a0 in enumerate(a):
