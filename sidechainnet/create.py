@@ -105,8 +105,8 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     aligner = init_aligner()
     # for pnid in error_ids:
     with Pool(cpu_count()) as p:
-        tuples = (get_tuple(pn_data, sc_data, aligner, pnid) for pnid in sc_data.keys())
-        results_warnings = list(tqdm(p.imap(combine_wrapper, tuples, timeout=10), total=len(sc_data.keys()), dynamic_ncols=True))
+        tuples = (get_tuple(pn_data, sc_data, pnid) for pnid in sc_data.keys())
+        results_warnings = list(tqdm(p.imap(combine_wrapper, tuples), total=len(sc_data.keys()), dynamic_ncols=True))
 
     # for pnid in tqdm(sc_data.keys(), dynamic_ncols=True):
     for (combined_result, warning), pnid in zip(results_warnings, sc_data.keys()):
@@ -141,11 +141,12 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
           f"{len(errors['failed'])} IDs failed to combine successfully.")
     return pn_data
 
-def get_tuple(pndata, scdata, aligner, pnid):
-    return pndata[pnid], scdata[pnid], aligner
+def get_tuple(pndata, scdata, pnid):
+    return pndata[pnid], scdata[pnid]
 
-def combine_wrapper(pndata_scdata_aligner):
-    pn_data, sc_data, aligner = pndata_scdata_aligner
+def combine_wrapper(pndata_scdata):
+    pn_data, sc_data = pndata_scdata
+    aligner = init_aligner()
     return combine(pn_data, sc_data, aligner)
 
 
