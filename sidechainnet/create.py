@@ -17,6 +17,7 @@ pr.confProDy(verbosity="none")
 from sidechainnet.download_and_parse import download_sidechain_data, load_data, save_data
 from sidechainnet.utils.proteinnet import parse_raw_proteinnet
 from sidechainnet.utils.alignment import init_aligner
+from sidechainnet.utils.structure import NUM_PREDICTED_COORDS
 
 
 def combine(pn_entry, sc_entry, aligner):
@@ -56,7 +57,10 @@ def combine(pn_entry, sc_entry, aligner):
 
         l = len(pn_entry["primary"])
         for k, v in new_entry.items():
-            assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
+            if k == "crd":
+                assert len(v) // NUM_PREDICTED_COORDS == l, f"{k} does not have correct length {l} (is {len(v)//NUM_PREDICTED_COORDS})."
+            else:
+                assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
 
 
     return new_entry, warning
