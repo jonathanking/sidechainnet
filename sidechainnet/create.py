@@ -54,9 +54,9 @@ def combine(pn_entry, sc_entry, aligner):
         new_entry["crd"] = expand_data_with_mask(sc_entry["crd"], mask)
         new_entry["msk"] = mask
 
-    l = len(pn_entry["primary"])
-    for k, v in new_entry.items():
-        assert len(v) == l
+        l = len(pn_entry["primary"])
+        for k, v in new_entry.items():
+            assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
 
 
     return new_entry, warning
