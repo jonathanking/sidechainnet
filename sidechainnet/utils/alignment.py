@@ -78,6 +78,11 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
         found_a_match = False
         best_alignment = None
         best_idx = 0
+        if len(a) >= 50:
+            many_alignments = True
+            a = a[:50]
+        else:
+            many_alignments = False
         for i, a0 in enumerate(a):
             computed_mask = get_mask_from_alignment(a0)
             if not best_mask:
@@ -93,18 +98,14 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
                 break
         if found_a_match:
             warning = "multiple alignments, found matching mask"
-            identical_scores = other_alignments_with_same_score(
-                a, best_idx, best_alignment.score)
-            if identical_scores:
-                warning += ", identical scores"
+            if many_alignments:
+                warning += ", many alignments"
             return True, best_mask, best_alignment, warning
         else:
             mask = get_mask_from_alignment(a[0])
             warning = "multiple alignments, mask mismatch"
-            identical_scores = other_alignments_with_same_score(
-                a, best_idx, best_alignment.score)
-            if identical_scores:
-                warning += ", identical scores"
+            if many_alignments:
+                warning += ", many alignments"
             return True, mask, a[0], warning
 
 
@@ -125,6 +126,8 @@ def other_alignments_with_same_score(all_alignments, cur_alignment_idx,
         return False
 
     for i, a0 in enumerate(all_alignments):
+        if i > 0 and a0.score < cur_alignment_score:
+            break
         if i == cur_alignment_idx:
             continue
         elif a0.score == cur_alignment_score:
