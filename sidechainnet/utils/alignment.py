@@ -9,7 +9,6 @@ Date : 3/09/2020
 """
 
 import numpy as np
-import torch
 from Bio import Align
 from tqdm import tqdm
 
@@ -143,44 +142,6 @@ def binary_mask_to_str(m):
     return "".join(m)
 
 
-def find_how_many_entries_can_be_directly_merged():
-    """
-    Counts the number of entries that can be successfully aligned between the
-    sidechain dataset and the protein dataset.
-    """
-    d = torch.load(
-        "/home/jok120/protein-transformer/data/proteinnet/casp12_200218_30.pt")
-    pn = torch.load("/home/jok120/proteinnet/data/casp12/torch/training_30.pt")
-    aligner = init_aligner()
-    total = 0
-    successful = 0
-    with open("merging_problems.csv", "w") as f, open("merging_success.csv",
-                                                      "w") as sf:
-        for i, my_id in enumerate(tqdm(d["train"]["ids"])):
-            my_seq, pn_seq, pn_mask = d["train"]["seq"][i], pn[my_id][
-                "primary"], binary_mask_to_str(pn[my_id]["mask"])
-            my_seq = unmask_seq(d["train"]["ang"][i], my_seq)
-            result, computed_mask, alignment = can_be_directly_merged(
-                aligner, pn_seq, my_seq, pn_mask)
-            if result:
-                successful += 1
-                sf.write(",".join([my_id, my_seq, computed_mask]) + "\n")
-            else:
-                if pn_mask.count("+") < len(my_seq):
-                    size_comparison = "<"
-                elif pn_mask.count("+") > len(my_seq):
-                    size_comparison = ">"
-                else:
-                    size_comparison = "=="
-                f.write(
-                    f"{my_id}: (PN {size_comparison} Obs)\n{str(alignment)}")
-                f.write(f"PN Mask:\n{pn_mask}\n\n")
-            total += 1
-        print(
-            f"{successful} out of {total} ({successful / total}) sequences can be merged successfully."
-        )
-
-
 def unmask_seq(ang, seq):
     """
     Given an angle array that is padded with np.nans, applies this padding to
@@ -197,10 +158,6 @@ def unmask_seq(ang, seq):
             continue
 
     return new_seq
-
-
-if __name__ == '__main__':
-    find_how_many_entries_can_be_directly_merged()
 
 
 def coordinate_iterator(coords, atoms_per_res):
