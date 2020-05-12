@@ -58,8 +58,23 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
     pn_mask = binary_mask_to_str(pn_mask)
     warning = None
 
+
+    def locate_char(c, s):
+        return [i for i, l in enumerate(s) if l == c]
+
     def masks_match(pn, new):
-        return pn == new
+        if pn == new:
+            return True
+        elif new.count("-") > pn.count("-"):
+            # If all of the gaps specified by ProteinNet are found by our
+            # alignment, but there are some additional gaps, this is acceptable.
+            new_gap_locs = locate_char("-", new)
+            pn_gap_locs = locate_char("-", pn)
+            pn_gaps_still_present = all([pn_gap in new_gap_locs for pn_gap in pn_gap_locs])
+            return pn_gaps_still_present
+        else:
+            return False
+
 
     if len(a) == 0:
         warning = "failed"
