@@ -16,7 +16,7 @@ from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
 from sidechainnet.download_and_parse import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
-def init_aligner():
+def init_aligner(allow_target_gaps=False):
     """
     Creates an aligner whose weights penalize excessive gaps, make gaps
     in the ProteinNet sequence impossible, and prefer gaps at the tail ends
@@ -25,12 +25,16 @@ def init_aligner():
     a = Align.PairwiseAligner()
 
     # Don't allow for gaps or mismatches with the target sequence
-    a.target_gap_score = -np.inf
+    if not allow_target_gaps:
+        a.target_gap_score = -np.inf
     a.mismatch = -np.inf
     a.mismatch_score = -np.inf
 
     # Do not let matching items overwhelm determining where gaps should go
-    a.match = 10
+    if not allow_target_gaps:
+        a.match = 10
+    else:
+        a.match = 200
 
     # Generally, prefer to extend gaps than to create them
     a.query_extend_gap_score = 99
@@ -49,32 +53,68 @@ def get_mask_from_alignment(al):
     return alignment_str.replace("|", "+")
 
 
+def locate_char(c, s):
+    """ Returns a list of indices of character c in string s."""
+    return [i for i, l in enumerate(s) if l == c]
+
+
+def masks_match(pn, new):
+    """ Returns true if the two masks match, of if pn is a subset of new."""
+    if pn == new:
+        return True
+    elif new.count("-") > pn.count("-"):
+        # If all of the gaps specified by ProteinNet are found by our
+        # alignment, but there are some additional gaps, this is acceptable.
+        new_gap_locs = locate_char("-", new)
+        pn_gap_locs = locate_char("-", pn)
+        pn_gaps_still_present = all([pn_gap in new_gap_locs for pn_gap in pn_gap_locs])
+        return pn_gaps_still_present
+    else:
+        return False
+
+
+def shorten_ends(s1, s2):
+    """Shortens s1 by removing characters at either end that don't match s2.
+
+    Args:
+        s1: String, longer than s2
+        s2: String
+
+    Returns:
+        A possibly shortened version of s1, with non-matching start and end
+        characters trimmed off.
+    """
+    assert len(s1) > len(s2)
+    aligner = init_aligner(allow_target_gaps=True)
+    a = aligner.align(s1, s2)
+    mask = get_mask_from_alignment(a[0])
+    i = len(mask) - 1
+    while mask[i] == "-":
+        s1 = s1[:-1]
+        mask = mask[:-1]
+        i -= 1
+    i = 0
+    while mask[i] == "-":
+        s1 = s1[1:]
+        mask = mask[1:]
+        i += 1
+    return s1
+
+
 def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
     matches with ProteinNet
     """
+    if len(my_seq) > len(pn_seq):
+        # If our observed sequence is longer than ProteinNet, we can safely
+        # trim the edges to match. If it still cannot align, it must be handled
+        my_seq = shorten_ends(my_seq, pn_seq)
+
     a = aligner.align(pn_seq, my_seq)
     pn_mask = binary_mask_to_str(pn_mask)
     warning = None
-
-
-    def locate_char(c, s):
-        return [i for i, l in enumerate(s) if l == c]
-
-    def masks_match(pn, new):
-        if pn == new:
-            return True
-        elif new.count("-") > pn.count("-"):
-            # If all of the gaps specified by ProteinNet are found by our
-            # alignment, but there are some additional gaps, this is acceptable.
-            new_gap_locs = locate_char("-", new)
-            pn_gap_locs = locate_char("-", pn)
-            pn_gaps_still_present = all([pn_gap in new_gap_locs for pn_gap in pn_gap_locs])
-            return pn_gaps_still_present
-        else:
-            return False
 
     try:
         n_alignments = len(a)
