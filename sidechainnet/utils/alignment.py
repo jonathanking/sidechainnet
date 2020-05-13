@@ -118,10 +118,6 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
     pn_mask = binary_mask_to_str(pn_mask)
     warning = None
 
-    a = aligner.align(pn_seq, my_seq)
-    pn_mask = binary_mask_to_str(pn_mask)
-    warning = None
-
     try:
         n_alignments = len(a)
     except OverflowError:
