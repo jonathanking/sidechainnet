@@ -41,8 +41,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     can_be_merged, mask, alignment, warning = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
-                                                            sc_entry,
-                                                            # sc_entry["seq"],
+                                                            # sc_entry,
+                                                            sc_entry["seq"],
                                                             pn_entry["mask"],
                                                                      pnid)
     new_entry = {}

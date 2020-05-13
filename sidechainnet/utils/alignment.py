@@ -76,12 +76,16 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
         else:
             return False
 
+    try:
+        n_alignments = len(a)
+    except OverflowError:
+        n_alignments = 50
 
-    if len(a) == 0:
+    if n_alignments == 0:
         warning = "failed"
         return False, None, None, warning
 
-    elif len(a) == 1:
+    elif n_alignments == 1:
         a0 = a[0]
         computed_mask = get_mask_from_alignment(a0)
         if not masks_match(pn_mask, computed_mask):
@@ -100,12 +104,12 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
                 warning = "single alignment, mask mismatch"
         return True, computed_mask, a0, warning
 
-    elif len(a) > 1:
+    elif n_alignments > 1:
         best_mask = None
         found_a_match = False
         best_alignment = None
         best_idx = 0
-        has_many_alignments = len(a) >= 50
+        has_many_alignments = n_alignments >= 50
         for i, a0 in enumerate(a):
             if has_many_alignments and i >= 50:
                 break
