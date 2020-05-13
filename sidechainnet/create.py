@@ -21,7 +21,7 @@ from sidechainnet.utils.alignment import init_aligner
 from sidechainnet.utils.structure import NUM_PREDICTED_COORDS
 
 
-def combine(pn_entry, sc_entry, aligner):
+def combine(pn_entry, sc_entry, aligner, pnid):
     """ Supplements one entry in ProteinNet with sidechain information.
 
     Args:
@@ -41,9 +41,10 @@ def combine(pn_entry, sc_entry, aligner):
 
     can_be_merged, mask, alignment, warning = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
-                                                            # sc_entry,
-                                                            sc_entry["seq"],
-                                                            pn_entry["mask"])
+                                                            sc_entry,
+                                                            # sc_entry["seq"],
+                                                            pn_entry["mask"],
+                                                                     pnid)
     new_entry = {}
 
     if alignment:
@@ -142,12 +143,12 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     return pn_data
 
 def get_tuple(pndata, scdata, pnid):
-    return pndata[pnid], scdata[pnid]
+    return pndata[pnid], scdata[pnid], pnid
 
-def combine_wrapper(pndata_scdata):
-    pn_data, sc_data = pndata_scdata
+def combine_wrapper(pndata_scdata_pnid):
+    pn_data, sc_data, pnid = pndata_scdata_pnid
     aligner = init_aligner()
-    return combine(pn_data, sc_data, aligner)
+    return combine(pn_data, sc_data, aligner, pnid)
 
 
 def main():

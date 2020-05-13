@@ -13,6 +13,7 @@ from Bio import Align
 from tqdm import tqdm
 
 from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
+from sidechainnet.download_and_parse import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
 def init_aligner():
@@ -48,7 +49,7 @@ def get_mask_from_alignment(al):
     return alignment_str.replace("|", "+")
 
 
-def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
+def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
@@ -84,7 +85,19 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask):
         a0 = a[0]
         computed_mask = get_mask_from_alignment(a0)
         if not masks_match(pn_mask, computed_mask):
-            warning = "single alignment, mask mismatch"
+            if "astral" in determine_pnid_type(pnid):
+                pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace("-", "_")]
+                if "A" not in chain:
+                    # This suggests that ProteinNet made a mistake and parsed
+                    # chain A when they should have parsed the correct chain.
+                    # This is therefore not an alignment error.
+                    pass
+                else:
+                    # If the above case is not True, then we should still expect
+                    # the mask we compute to match the one computed by ProteinNet
+                    warning = "single alignment, mask mismatch"
+            else:
+                warning = "single alignment, mask mismatch"
         return True, computed_mask, a0, warning
 
     elif len(a) > 1:
