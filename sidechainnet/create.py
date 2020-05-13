@@ -57,7 +57,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["crd"] = expand_data_with_mask(sc_entry["crd"], mask)
         new_entry["msk"] = mask
 
-        l = len(pn_entry["primary"])
+        l = len(seq)
         for k, v in new_entry.items():
             if k == "crd":
                 assert len(v) // NUM_PREDICTED_COORDS == l, f"{k} does not have correct length {l} (is {len(v)//NUM_PREDICTED_COORDS})."

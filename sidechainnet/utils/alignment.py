@@ -53,6 +53,12 @@ def get_mask_from_alignment(al):
     return alignment_str.replace("|", "+")
 
 
+def get_padded_second_seq_from_alignment(al):
+    """ For a single alignment, return the second padded string. """
+    alignment_str = str(al).split("\n")[2]
+    return alignment_str
+
+
 def locate_char(c, s):
     """ Returns a list of indices of character c in string s."""
     return [i for i, l in enumerate(s) if l == c]
@@ -87,7 +93,7 @@ def shorten_ends(s1, s2):
     assert len(s1) > len(s2)
     aligner = init_aligner(allow_target_gaps=True)
     a = aligner.align(s1, s2)
-    mask = get_mask_from_alignment(a[0])
+    mask = get_padded_second_seq_from_alignment(a[0])
     i = len(mask) - 1
     while mask[i] == "-":
         s1 = s1[:-1]
