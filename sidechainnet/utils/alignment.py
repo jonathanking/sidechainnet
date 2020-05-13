@@ -317,7 +317,7 @@ def expand_data_with_mask(data, mask):
         Data in the same format, possibly extending L to match the length of
         the mask, that now contains padding.
     """
-    if mask.count("-") == 0:
+    if mask.count("-") == 0 and data.shape[0] == len(mask):
         return data
 
     size = data.shape[-1]
