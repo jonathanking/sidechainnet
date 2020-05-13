@@ -35,6 +35,7 @@ def init_aligner(allow_target_gaps=False):
         a.match = 10
     else:
         a.match = 200
+        # a.mismatch = 1
 
     # Generally, prefer to extend gaps than to create them
     a.query_extend_gap_score = 99
@@ -173,7 +174,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
 
     if n_alignments == 0:
         warning = "failed"
-        return False, None, None, warning, my_seq
+        return False, None, None, warning
 
     elif n_alignments == 1:
         a0 = a[0]
@@ -192,7 +193,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
                     warning = "single alignment, mask mismatch"
             else:
                 warning = "single alignment, mask mismatch"
-        return True, computed_mask, a0, warning, my_seq
+        return True, computed_mask, a0, warning
 
     elif n_alignments > 1:
         best_mask = None
@@ -219,13 +220,13 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
             warning = "multiple alignments, found matching mask"
             if has_many_alignments:
                 warning += ", many alignments"
-            return True, best_mask, best_alignment, warning, my_seq
+            return True, best_mask, best_alignment, warning
         else:
             mask = get_mask_from_alignment(a[0])
             warning = "multiple alignments, mask mismatch"
             if has_many_alignments:
                 warning += ", many alignments"
-            return True, mask, a[0], warning, my_seq
+            return True, mask, a[0], warning
 
 
 def other_alignments_with_same_score(all_alignments, cur_alignment_idx,

@@ -39,7 +39,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         print("WARNING: secondary structure information is not yet supported. "
               "As of May 2020, it is not included in ProteinNet.")
 
-    can_be_merged, mask, alignment, warning, seq = can_be_directly_merged(aligner,
+    can_be_merged, mask, alignment, warning = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
                                                             # sc_entry,
                                                             sc_entry["seq"],
@@ -49,7 +49,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     if alignment:
         # Create new SidechainNet entry containing all information
-        new_entry["seq"] = seq
+        new_entry["seq"] = pn_entry["primary"]
         new_entry["evo"] = pn_entry["evolutionary"]
 
         # We may need to add padding where specified by the mask
@@ -57,7 +57,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["crd"] = expand_data_with_mask(sc_entry["crd"], mask)
         new_entry["msk"] = mask
 
-        l = len(seq)
+        l = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
                 assert len(v) // NUM_PREDICTED_COORDS == l, f"{k} does not have correct length {l} (is {len(v)//NUM_PREDICTED_COORDS})."
