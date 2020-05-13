@@ -93,7 +93,7 @@ def shorten_ends(s1, s2):
     assert len(s1) > len(s2)
     aligner = init_aligner(allow_target_gaps=True)
     a = aligner.align(s1, s2)
-    mask = get_mask_from_alignment(a[0])
+    mask = get_padded_second_seq_from_alignment(a[0])
     i = len(mask) - 1
     while mask[i] == "-":
         s1 = s1[:-1]
