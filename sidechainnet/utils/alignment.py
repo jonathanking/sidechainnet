@@ -91,7 +91,6 @@ def shorten_ends(s1, s2):
         A possibly shortened version of s1, with non-matching start and end
         characters trimmed off.
     """
-    assert len(s1) > len(s2)
     aligner = init_aligner(allow_target_gaps=True)
     a = aligner.align(s1, s2)
     mask = get_padded_second_seq_from_alignment(a[0])
@@ -108,17 +107,13 @@ def shorten_ends(s1, s2):
     return s1
 
 
-def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
+def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
+                           second_try=False):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
     matches with ProteinNet
     """
-    if len(my_seq) > len(pn_seq):
-        # If our observed sequence is longer than ProteinNet, we can safely
-        # trim the edges to match. If it still cannot align, it must be handled
-        my_seq = shorten_ends(my_seq, pn_seq)
-
     a = aligner.align(pn_seq, my_seq)
     pn_mask = binary_mask_to_str(pn_mask)
     warning = None
@@ -172,7 +167,16 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid):
     except OverflowError:
         n_alignments = 50
 
-    if n_alignments == 0:
+    if n_alignments == 0 and not second_try:
+        # If there appear to be no alignments, it may be the case that there
+        # were residues observed that were not present in the ProteinNet
+        # sequence. If this occurs at the edges, we can safely trim the
+        # observed sequence and try alignment once again
+        my_seq = shorten_ends(my_seq, pn_seq)
+        return can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
+                                      second_try=True)
+
+    elif n_alignments == 0 and second_try:
         warning = "failed"
         return False, None, None, warning
 
