@@ -128,15 +128,15 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     with open("errors/COMBINED_M-ALN_MISMATCH.txt", "w") as f:
         for failed_id in errors["multiple alignments, mask mismatch"]:
             f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MATCH.txt", "w") as f:
-        for failed_id in errors["multiple alignments, found matching mask"]:
-            f.write(f"{failed_id}\n")
+    # with open("errors/COMBINED_M-ALN_MATCH.txt", "w") as f:
+    #     for failed_id in errors["multiple alignments, found matching mask"]:
+    #         f.write(f"{failed_id}\n")
     with open("errors/COMBINED_M-ALN_MISMATCH_MANY.txt", "w") as f:
         for failed_id in errors["multiple alignments, mask mismatch, many alignments"]:
             f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MATCH_MANY.txt", "w") as f:
-        for failed_id in errors["multiple alignments, found matching mask, many alignments"]:
-            f.write(f"{failed_id}\n")
+    # with open("errors/COMBINED_M-ALN_MATCH_MANY.txt", "w") as f:
+    #     for failed_id in errors["multiple alignments, found matching mask, many alignments"]:
+    #         f.write(f"{failed_id}\n")
 
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
           f"{len(errors['failed'])} IDs failed to combine successfully.")
