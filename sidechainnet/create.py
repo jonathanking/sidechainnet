@@ -62,6 +62,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
             if k == "crd":
                 assert len(v) // NUM_PREDICTED_COORDS == l, f"{k} does not have correct length {l} (is {len(v)//NUM_PREDICTED_COORDS})."
             else:
+                if len(v) != l: return {}, "failed"
                 assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
 
 
@@ -101,7 +102,14 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
               "multiple alignments, mask mismatch": [],
               "multiple alignments, mask mismatch, many alignments": [],
               "multiple alignments, found matching mask": [],
-              "multiple alignments, found matching mask, many alignments": []}
+              "multiple alignments, found matching mask, many alignments": [],
+              "single alignment, mask mismatch, mismatch used in alignment": [],
+              "multiple alignments, mask mismatch, mismatch used in alignment": [],
+              "multiple alignments, mask mismatch, many alignments, mismatch used in alignment": [],
+              "single alignment, found matching mask, mismatch used in alignment": [],
+              "multiple alignments, found matching mask, mismatch used in alignment": [],
+              "multiple alignments, found matching mask, many alignments, mismatch used in alignment": [],
+              }
 
     aligner = init_aligner()
     # for pnid in error_ids:
@@ -128,15 +136,28 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     with open("errors/COMBINED_M-ALN_MISMATCH.txt", "w") as f:
         for failed_id in errors["multiple alignments, mask mismatch"]:
             f.write(f"{failed_id}\n")
-    # with open("errors/COMBINED_M-ALN_MATCH.txt", "w") as f:
-    #     for failed_id in errors["multiple alignments, found matching mask"]:
-    #         f.write(f"{failed_id}\n")
     with open("errors/COMBINED_M-ALN_MISMATCH_MANY.txt", "w") as f:
         for failed_id in errors["multiple alignments, mask mismatch, many alignments"]:
             f.write(f"{failed_id}\n")
-    # with open("errors/COMBINED_M-ALN_MATCH_MANY.txt", "w") as f:
-    #     for failed_id in errors["multiple alignments, found matching mask, many alignments"]:
-    #         f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_1ALN_MISMATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors["single alignment, mask mismatch, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors["multiple alignments, mask mismatch, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH_MANY_WRONGAA.txt", "w") as f:
+        for failed_id in errors["multiple alignments, mask mismatch, many alignments, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_1ALN_MATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors["single alignment, found matching mask, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors["multiple alignments, found matching mask, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MATCH_MANY_WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+            "multiple alignments, found matching mask, many alignments, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
 
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
           f"{len(errors['failed'])} IDs failed to combine successfully.")

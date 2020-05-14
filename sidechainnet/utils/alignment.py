@@ -16,7 +16,7 @@ from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
 from sidechainnet.download_and_parse import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
-def init_aligner(allow_target_gaps=False):
+def init_aligner(allow_target_gaps=False, allow_target_mismatches=False):
     """
     Creates an aligner whose weights penalize excessive gaps, make gaps
     in the ProteinNet sequence impossible, and prefer gaps at the tail ends
@@ -35,7 +35,9 @@ def init_aligner(allow_target_gaps=False):
         a.match = 10
     else:
         a.match = 200
-        # a.mismatch = 1
+
+    if allow_target_mismatches:
+        a.mismatch = 200
 
     # Generally, prefer to extend gaps than to create them
     a.query_extend_gap_score = 99
@@ -108,7 +110,7 @@ def shorten_ends(s1, s2):
 
 
 def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
-                           second_try=False):
+                           second_try=False, third_try=False):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
@@ -123,7 +125,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
     except OverflowError:
         n_alignments = 50
 
-    if n_alignments == 0 and not second_try:
+    if n_alignments == 0 and not second_try and not third_try:
         # If there appear to be no alignments, it may be the case that there
         # were residues observed that were not present in the ProteinNet
         # sequence. If this occurs at the edges, we can safely trim the
@@ -133,6 +135,13 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                                       second_try=True)
 
     elif n_alignments == 0 and second_try:
+        aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
+        result, mask, a0, warning = can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
+                                      third_try=True)
+        warning += ", mismatch used in alignment"
+        return result, mask, a0, warning
+
+    elif n_alignments == 0 and third_try:
         warning = "failed"
         return False, None, None, warning
 
