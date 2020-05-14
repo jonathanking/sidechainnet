@@ -60,6 +60,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         l = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
+                if len(v) // NUM_PREDICTED_COORDS == l: return {}, "failed"
                 assert len(v) // NUM_PREDICTED_COORDS == l, f"{k} does not have correct length {l} (is {len(v)//NUM_PREDICTED_COORDS})."
             else:
                 if len(v) != l: return {}, "failed"
