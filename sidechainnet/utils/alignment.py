@@ -101,11 +101,9 @@ def shorten_ends(s1, s2):
         s1 = s1[:-1]
         mask = mask[:-1]
         i -= 1
-    i = 0
-    while mask[i] == "-":
+    while mask[0] == "-":
         s1 = s1[1:]
         mask = mask[1:]
-        i += 1
     return s1
 
 
