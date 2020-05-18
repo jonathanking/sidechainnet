@@ -119,8 +119,8 @@ def get_sidechain_data(pnids, limit):
         that failed to download.
     """
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        results = tqdm.tqdm(p.imap(process_id, pnids[:limit]),
-                                 total=len(pnids[:limit]), dynamic_ncols=True)
+        results = list(tqdm.tqdm(p.imap(process_id, pnids[:limit]),
+                                 total=len(pnids[:limit]), dynamic_ncols=True))
     all_errors = []
     all_data = dict()
     with open("errors/MODIFIED_MODEL_WARNING.txt", "a") as model_warning_file:
