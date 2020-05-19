@@ -5,7 +5,7 @@ SidechainNet
 
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
-Specifically, SidechainNet adds measurements for protein angles and coordinates that describe the complete, all-atom (excluding hydrogen) protein structure instead of the protein [backbone](https://foldit.fandom.com/wiki/Protein_backbone) alone.
+Specifically, SidechainNet adds measurements for protein angles and coordinates that describe the complete, all-atom (excluding hydrogen) protein structure (backbone *and* sidechain) instead of the protein [backbone](https://foldit.fandom.com/wiki/Protein_backbone) alone.
 
 **This repository provides the following:**
 1. SidechainNet datasets stored as pickled Python dictionaries.
@@ -138,6 +138,7 @@ I (Jonathan King) am a predoctoral trainee supported by NIH T32 training grant T
 Project structure (continuous integration, docs, testing) based on the 
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
 
+## References
 1. [End-to-End Differentiable Learning of Protein Structure](https://doi.org/10.1016/j.cels.2019.03.006). AlQuraishi, Mohammed. Cell Systems, Volume 8, Issue 4, 292 - 301. (2019).
 2. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). AlQuraishi, Mohammed. BMC Bioinformatics 20, 311 (2019).
  
