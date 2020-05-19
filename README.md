@@ -71,7 +71,7 @@ data = {"train": {"seq": [seq1, seq2, ...],
 
 ### Using SidechainNet to train an all-atom protein structure prediction model 
 
-For a complete example of model training, please see [sidechainnet/examples/train.py](./sidechainnet/examples/train.py). Below is an outline of how to use this repository to load SidechainNet data and train a model.
+For a complete example of model training, please see [sidechainnet/examples/train.py](./sidechainnet/examples/train.py). Below is an outline of how to use this repository to load SidechainNet data with our custom DataLoaders and train a model.
 
 ```python
 import sidechainnet
