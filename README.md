@@ -8,8 +8,8 @@ A protein structure prediction data set that includes sidechain information. A d
 
 | ProteinNet | Sidechainnet | Entry | Dimensionality |
 | --- | --- | --- | --- |
-| X | X | Primary sequence | **L x 1** |
-| X | X | Secondary Structure | ** L x 8 ** |
+| X | X | Primary sequence | *L x 1* |
+| X | X | Secondary Structure | *L x 8* |
 
 
 ## Examples
@@ -41,10 +41,19 @@ data = {"train": {"seq": [seq1, seq2, ...],
 
 ```python
 import sidechainnet
-train, train_eval, validation, test = sidechainnet.get_dataloaders(data)
+from sidechainnet.examples.models import RGN as model
+from sidechainnet.utils.structure import angles_to_coords
+from sidechainnet.utils.losses import drmsd
+
+train, train_eval, validation, test = sidechainnet.get_dataloaders("../data/sidechainnet/casp12_100.pt")
 
 for epoch in range(10):
-    for t in train:
+    for seq, tgt_angles, tgt_coords in train:
+        pred_angles = model(seq)
+        pred_coords = angles_to_coords(pred_angles)
+        loss = drmsd(pred_coords, tgt_coords)
+        loss.backwards()
+        ...
 ```
 
 
@@ -65,6 +74,8 @@ tar -xvf targets/targets.gz
 
 ### Generate SidechainNet
 ```shell script
+git clone https://github.com/jonathanking/sidechainnet.git
+cd sidechainnet/sidechainnet
 python create.py $PN_PATH
 # SidechainNet files are now created in ../data/sidechainnet/sidechainnet_casp12_100.pt
 ```
