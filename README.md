@@ -15,7 +15,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
  **Summary of SidechainNet data**
  
 | ProteinNet | SidechainNet | Entry | Dimensionality | Label in SidechainNet data |
-| --- | --- | --- | --- |  --- |
+| :---: | :---: | :---: | :---: |  :---: |
 | X | X | Primary sequence | *L x 1* | `seq` |
 | X | X | Secondary Structure<sup>⸸</sup> | *L x 8* |  `sec` |
 | X | X | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` |
@@ -68,45 +68,43 @@ data = {"train": {"seq": [seq1, seq2, ...],
 
 ### Using SidechainNet to train an all-atom protein structure prediction model 
 
+For a complete, working example of training a model, please see [sidechainnet/examples/train.py](./sidechainnet/examples/train.py). Below is an outline of the procedure.  
+
 ```python
 import sidechainnet
 from sidechainnet.examples.models import RGN
-from sidechainnet.utils.structure import angles_to_coords
 from sidechainnet.utils.losses import drmsd
 
 
-def compute_loss(model, seq, tgt_coords):
-    """Computes model loss when predicting protein coordinates from amino acid sequence."""
-    pred_angles = model(seq)
-    pred_coords = angles_to_coords(pred_angles)
-    loss = drmsd(pred_coords, tgt_coords)
-    return loss
-
 train, train_eval, validations, test = sidechainnet.get_dataloaders("casp12_100.pkl")
-
 model = RGN()
 
 for epoch in range(10):
+
     # Training epoch
     for seq, tgt_angles, tgt_coords in train:
-        loss = compute_loss(model, seq, tgt_coords)
+        pred_coords = model(seq)
+        loss = drmsd(pred_coords, tgt_coords)
         loss.backwards()
         ...
     
     # Evaluate performance on downsampled training set
     for seq, tgt_angles, tgt_coords in train_eval:
-        train_loss = compute_loss(model, seq, tgt_coords)
+        pred_coords = model(seq)
+        train_loss = drmsd(pred_coords, tgt_coords)
         ...
 
     # Evaluate performance on each of the 7 validation sets
     for validation_set in validations:
         for seq, tgt_angles, tgt_coords in validations:
-            val_loss = compute_loss(model, seq, tgt_coords)
+            pred_coords = model(seq)
+            val_loss = drmsd(pred_coords, tgt_coords)
             ...
 
 # Evaluate performance on test set
 for seq, tgt_angles, tgt_coords in test:
-    test_loss = compute_loss(model, seq, tgt_coords)
+        pred_coords = model(seq)
+        test_loss = drmsd(pred_coords, tgt_coords)
     ...
 ```
 
@@ -120,7 +118,6 @@ In addition to the data itself, this repository also provides several utilities:
     - Also enables the creation of 3D-object files (`.gltf`) in order to log this data using Weights and Biases ([example](https://app.wandb.ai/koes-group/protein-transformer/reports/Evaluating-the-Impact-of-Sequence-Convolutions-and-Embeddings-on-Protein-Structure-Prediction--Vmlldzo2OTg4Nw)).
 - Miscelaneous utilities for training protein structure prediction models
     - batch parallelized DRMSD computation
-    - wandb
 
 ## Directions to Reproduce SidechainNet
 
@@ -129,20 +126,14 @@ If you are only interested in using and interacting with SidechainNet data, plea
 [How to reproduce and generate SidechainNet](./how_to_reproduce.md)
  
 
-
-## Todo
-
-1. Upload pre-processed files for downloading:
-    - PyTorch versions of ProteinNet
-    - Raw sidechain data
-    - SidechainNet (ProteinNet + sidechain data) as a Python dictionary
-
 ### Copyright
 
 Copyright (c) 2020, Jonathan King
 
 
 #### Acknowledgements
+ 
+ I (Jonathan King) am a predoctoral trainee supported by NIH T32 training grant T32 EB009403 as part of the HHMI-NIBIB Interfaces Initiative.
  
 Project based on the 
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
