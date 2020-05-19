@@ -29,7 +29,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 *[Currently unsupported](https://github.com/aqlaboratory/proteinnet/issues/5) in ProteinNet and, therefore, unsupported in SidechainNet.
 
-<sup>⸸</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data.
+<sup>⸸</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
 ## Downloading SidechainNet
 
