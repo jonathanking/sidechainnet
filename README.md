@@ -135,13 +135,12 @@ Many thanks to Mohammed AlQuraishi for his inspiring work on protein structure p
 
 I (Jonathan King) am a predoctoral trainee supported by NIH T32 training grant T32 EB009403 as part of the HHMI-NIBIB Interfaces Initiative.
 
+Project structure (continuous integration, docs, testing) based on the 
+[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
+
 1. [End-to-End Differentiable Learning of Protein Structure](https://doi.org/10.1016/j.cels.2019.03.006). AlQuraishi, Mohammed. Cell Systems, Volume 8, Issue 4, 292 - 301. (2019).
 2. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). AlQuraishi, Mohammed. BMC Bioinformatics 20, 311 (2019).
  
- 
- 
-Project structure (continuous integration, docs, testing) based on the 
-[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
 
 ## Copyright
 
