@@ -31,7 +31,9 @@ def read_protein_from_file(file_pointer, include_tertiary):
     slight modifications. The most recent version is available here:
     https://github.com/biolib/openprotein/blob/master/preprocessing.py
     Because Mr. Hallgren's software caries an MIT license, I have included his
-    copyright notice which describes the method below.
+    copyright notice which describes the method below. All other portions of
+    this software are licensed according to the LICENSE file in this
+    repository's home directory.
 
     MIT License
 
