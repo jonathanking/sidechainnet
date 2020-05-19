@@ -8,17 +8,17 @@ SidechainNet is a protein structure prediction dataset that directly extends [Pr
 Specifically, SidechainNet adds measurements for protein angles and coordinates that describe the complete, all-atom (excluding hydrogen) protein structure instead of the protein [backbone](https://foldit.fandom.com/wiki/Protein_backbone) alone.
 
 **This repository provides the following:**
-1. SidechainNet datasets stored as a pickled Python dictionaries.
+1. SidechainNet datasets stored as pickled Python dictionaries.
 2. Methods for loading and batching SidechainNet data efficiently. 
 3. Methods for generating structure files (`.pdb`, `.gltf`) from model predictions.
 4. A modified implementation of AlQuraishi's "Recurrent Geometric Network"<sup>2</sup> capable of predicting all-atom protein strucutres. 
  
  **Summary of SidechainNet data**
  
-| ProteinNet | SidechainNet | Entry | Dimensionality | Label in SidechainNet data |
+| ProteinNet | SidechainNet | Entry | Dimensionality* | Label in SidechainNet data |
 | :---: | :---: | :---: | :---: |  :---: |
 | X | X | Primary sequence | *L x 1* | `seq` |
-| X | X | Secondary Structure* | *L x 8* |  `sec` |
+| X | X | Secondary Structure^ | *L x 8* |  `sec` |
 | X | X | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` |
 | X | X | Missing residue mask | *L x 1* |  `msk` |
 | X | X | Backbone coordinates | *L x 4<sup>⸸</sup> x 3* |  `crd`, subset `[0:4]` |
@@ -27,7 +27,9 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 |  | X | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |
 |  | X | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |
 
-*[Currently unsupported](https://github.com/aqlaboratory/proteinnet/issues/5) in ProteinNet and, therefore, unsupported in SidechainNet.
+**L* reperesents the length of any given protein in the dataset.
+
+^[Currently unsupported](https://github.com/aqlaboratory/proteinnet/issues/5) in ProteinNet and, therefore, unsupported in SidechainNet.
 
 <sup>⸸</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
