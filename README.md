@@ -9,9 +9,9 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 **This repository provides the following:**
 1. SidechainNet datasets stored as pickled Python dictionaries.
-2. Methods for loading and batching SidechainNet data efficiently. 
+2. Methods for loading and batching SidechainNet data efficiently in PyTorch. 
 3. Methods for generating structure files (`.pdb`, `.gltf`) from model predictions.
-4. A modified implementation of AlQuraishi's "Recurrent Geometric Network"<sup>2</sup> capable of predicting all-atom protein strucutres. 
+4. A PyTorch implementation of AlQuraishi's "Recurrent Geometric Network"<sup>2</sup> modified to be capable of predicting all-atom protein structures. 
  
  **Summary of SidechainNet data**
  
@@ -35,7 +35,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 ## Downloading SidechainNet
 
-For every existing ProteinNet dataset, a corresponding SidechainNet dataset has been created and can be downloaded on Box [here](https://www.youtube.com/watch?v=dQw4w9WgXcQ). 
+For every existing ProteinNet dataset, a corresponding SidechainNet dataset has been created and can be downloaded via [Box](https://www.youtube.com/watch?v=dQw4w9WgXcQ). 
 
 There are separate datasets for each available CASP competition (CASP 7-12) as well as each "thinning" of the data as described by ProteinNet (`30, 50, 70, 90, 95, 100%`). A thinning represents the same dataset but has been clustered and downsampled to reduce its size. Thinnings marked as `100` contain the complete dataset.
 
@@ -71,7 +71,7 @@ data = {"train": {"seq": [seq1, seq2, ...],
 
 ### Using SidechainNet to train an all-atom protein structure prediction model 
 
-For a complete, working example of training a model, please see [sidechainnet/examples/train.py](./sidechainnet/examples/train.py). Below is an outline of the procedure.  
+For a complete example of model training, please see [sidechainnet/examples/train.py](./sidechainnet/examples/train.py). Below is an outline of how to use this repository to load SidechainNet data and train a model.
 
 ```python
 import sidechainnet
@@ -115,26 +115,21 @@ for seq, tgt_angles, tgt_coords in test:
 In addition to the data itself, this repository also provides several utilities:
 - `sidechainnet.get_dataloaders` (uses `sidechainnet.utils.dataset.BinnedProteinDataset` and `sidechainnet.utils.dataset.SimilarLengthBatchSampler`)
     - By using these together to create a PyTorch Dataloader, we can handle the batching of SidechainNet data intelligently and increase training speed.
-     - Each batch contains proteins of similar lengths but the average length for a batch is chosen at random from a bin 
+     - Each batch contains proteins of similar lengths but the average length for a batch is chosen at random from a bin. Using batches of similar lengths allows the computation of DRMSD to be parallelized effectively and improves performance.
 - `PDB_Creator`
-    - Generates structure files (`.pdb`) from model predictions
+    - Generates structure files (`.pdb`) from model predictions.
     - Also enables the creation of 3D-object files (`.gltf`) in order to log this data using Weights and Biases ([example](https://app.wandb.ai/koes-group/protein-transformer/reports/Evaluating-the-Impact-of-Sequence-Convolutions-and-Embeddings-on-Protein-Structure-Prediction--Vmlldzo2OTg4Nw)).
 - Miscelaneous utilities for training protein structure prediction models
-    - batch parallelized DRMSD computation
+    - Batch parallelized DRMSD computation.
 
 ## Directions to Reproduce SidechainNet
 
 If you are only interested in using and interacting with SidechainNet data, please see the above examples. However, if you would like to reproduce our work or if you would like to make modifications to the dataset, please follow the directions below to generate SidechainNet from scratch.
 
 [How to reproduce and generate SidechainNet](./how_to_reproduce.md)
- 
-
-### Copyright
-
-Copyright (c) 2020, Jonathan King
 
 
-#### Acknowledgements
+## Acknowledgements
 
 1. [End-to-End Differentiable Learning of Protein Structure](https://doi.org/10.1016/j.cels.2019.03.006). AlQuraishi, Mohammed. Cell Systems, Volume 8, Issue 4, 292 - 301. (2019).
 2. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). AlQuraishi, Mohammed. BMC Bioinformatics 20, 311 (2019).
@@ -143,3 +138,7 @@ Copyright (c) 2020, Jonathan King
  
 Project based on the 
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
+
+## Copyright
+
+Copyright (c) 2020, Jonathan King
