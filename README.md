@@ -3,7 +3,7 @@ SidechainNet
 [//]: # (Badges)
 [![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
 
-SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet) by Mohammed AlQuraishi.
+SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
 Specifically, SidechainNet adds measurements for protein angles and coordinates that describe the complete, all-atom (excluding hydrogen) protein structure instead of the protein [backbone](https://foldit.fandom.com/wiki/Protein_backbone) alone.
 
@@ -11,24 +11,25 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 1. SidechainNet datasets stored as a pickled Python dictionaries.
 2. Methods for loading and batching SidechainNet data efficiently. 
 3. Methods for generating structure files (`.pdb`, `.gltf`) from model predictions.
+4. A modified implementation of AlQuraishi's "Recurrent Geometric Network"<sup>2</sup> capable of predicting all-atom protein strucutres. 
  
  **Summary of SidechainNet data**
  
 | ProteinNet | SidechainNet | Entry | Dimensionality | Label in SidechainNet data |
 | :---: | :---: | :---: | :---: |  :---: |
 | X | X | Primary sequence | *L x 1* | `seq` |
-| X | X | Secondary Structure<sup>⸸</sup> | *L x 8* |  `sec` |
+| X | X | Secondary Structure* | *L x 8* |  `sec` |
 | X | X | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` |
 | X | X | Missing residue mask | *L x 1* |  `msk` |
-| X | X | Backbone coordinates | *L x 4\* x 3* |  `crd`, subset `[0:4]` |
+| X | X | Backbone coordinates | *L x 4<sup>⸸</sup> x 3* |  `crd`, subset `[0:4]` |
 |  | X | Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` |
 |  | X | Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` |
 |  | X | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |
 |  | X | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |
 
-<sup>⸸</sup>[Currently unsupported](https://github.com/aqlaboratory/proteinnet/issues/5) in ProteinNet and, therefore, unsupported in SidechainNet.
+*[Currently unsupported](https://github.com/aqlaboratory/proteinnet/issues/5) in ProteinNet and, therefore, unsupported in SidechainNet.
 
-*SidechainNet explicitly includes Oxygen atoms as part of the backbone coordinate data.
+<sup>⸸</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data.
 
 ## Downloading SidechainNet
 
@@ -121,7 +122,7 @@ In addition to the data itself, this repository also provides several utilities:
 
 ## Directions to Reproduce SidechainNet
 
-If you are only interested in using and interacting with SidechainNet data, please see the above examples. However, if you would like to reproduce our work and generate SidechainNet, or if you would like to make modifications to the dataset, please follow the directions below to generate SidechainNet from scratch.
+If you are only interested in using and interacting with SidechainNet data, please see the above examples. However, if you would like to reproduce our work or if you would like to make modifications to the dataset, please follow the directions below to generate SidechainNet from scratch.
 
 [How to reproduce and generate SidechainNet](./how_to_reproduce.md)
  
@@ -132,6 +133,9 @@ Copyright (c) 2020, Jonathan King
 
 
 #### Acknowledgements
+
+1. [End-to-End Differentiable Learning of Protein Structure](https://doi.org/10.1016/j.cels.2019.03.006). AlQuraishi, Mohammed. Cell Systems, Volume 8, Issue 4, 292 - 301. (2019).
+2. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). AlQuraishi, Mohammed. BMC Bioinformatics 20, 311 (2019).
  
  I (Jonathan King) am a predoctoral trainee supported by NIH T32 training grant T32 EB009403 as part of the HHMI-NIBIB Interfaces Initiative.
  
