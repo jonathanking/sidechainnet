@@ -12,7 +12,8 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 2. Methods for loading and batching SidechainNet data efficiently. 
 3. Methods for generating structure files (`.pdb`, `.gltf`) from model predictions.
  
- ##### Summary of SidechainNet data
+ **Summary of SidechainNet data**
+ 
 | ProteinNet | SidechainNet | Entry | Dimensionality | Label in SidechainNet data |
 | --- | --- | --- | --- |  --- |
 | X | X | Primary sequence | *L x 1* | `seq` |
@@ -111,50 +112,23 @@ for seq, tgt_angles, tgt_coords in test:
 
 ### Other included utilities
 In addition to the data itself, this repository also provides several utilities:
-- `BinnedProteinDataset` and `SimilarLengthBatchSampler`
+- `sidechainnet.get_dataloaders` (uses `sidechainnet.utils.dataset.BinnedProteinDataset` and `sidechainnet.utils.dataset.SimilarLengthBatchSampler`)
     - By using these together to create a PyTorch Dataloader, we can handle the batching of SidechainNet data intelligently and increase training speed.
      - Each batch contains proteins of similar lengths but the average length for a batch is chosen at random from a bin 
 - `PDB_Creator`
     - Generates structure files (`.pdb`) from model predictions
     - Also enables the creation of 3D-object files (`.gltf`) in order to log this data using Weights and Biases ([example](https://app.wandb.ai/koes-group/protein-transformer/reports/Evaluating-the-Impact-of-Sequence-Convolutions-and-Embeddings-on-Protein-Structure-Prediction--Vmlldzo2OTg4Nw)).
+- Miscelaneous utilities for training protein structure prediction models
+    - batch parallelized DRMSD computation
+    - wandb
 
 ## Directions to Reproduce SidechainNet
 
 If you are only interested in using and interacting with SidechainNet data, please see the above examples. However, if you would like to reproduce our work and generate SidechainNet, or if you would like to make modifications to the dataset, please follow the directions below to generate SidechainNet from scratch.
+
+[How to reproduce and generate SidechainNet](./how_to_reproduce.md)
  
- For steps 1 and 2, pay careful attention to the subdirectory structure indicated by `cd` and `mkdir` commands when downloading ProteinNet data. After ProteinNet data has been downloaded, you may clone the SidechainNet repository anywhere you wish.
 
-### 1. Download raw ProteinNet data 
-```shell script
-mkdir -p proteinnet/casp12/targets
-cd proteinnet
-
-# Ensure you are downloading the correct CASP version here
-wget https://sharehost.hms.harvard.edu/sysbio/alquraishi/proteinnet/human_readable/casp12.tar.gz casp12/
-cd casp12
-tar -xvf casp12.tar.gz
-
-# Save the path to this directory for generating SidechainNet
-PN_PATH=$(pwd)
-```
-### 2. Download raw CASP target data into `targets` subdirectory
-We must also download the target structure files used in the CASP competitions. For each compeition, you can vist the corresponding target data webpage (replace `CASP12` with the competition of interest). 
-```shell script
-https://predictioncenter.org/download_area/CASP12/targets/
-```
-On this webpage, we can identify a compressed file to download (the largest and most recent file, assumedly) that contains all of the relevant target files. Then, download and unarchive the corresponding file. SidechainNet assumes that that there will be a subdirectory title `targets` within the CASP directory you downloaded from ProteinNet previously.
-```shell script
-wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0.releaseDec022016.tgz targets/
-tar -xvf targets/targets.gz
-```
-
-### 3. Generate SidechainNet
-```shell script
-git clone https://github.com/jonathanking/sidechainnet.git
-cd sidechainnet/sidechainnet
-python create.py $PN_PATH
-```
-SidechainNet files are now created in `../data/sidechainnet/casp12_100.pkl`
 
 ## Todo
 
