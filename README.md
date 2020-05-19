@@ -9,7 +9,7 @@ A protein structure prediction data set that includes sidechain information. A d
 | ProteinNet | SidechainNet | Entry | Dimensionality | Label in SidechainNet data |
 | --- | --- | --- | --- |  --- |
 | X | X | Primary sequence | *L x 1* | `seq` |
-| X | X | Secondary Structure | *L x 8* |  `sec` |
+| X | X | Secondary Structure<sup>⸸</sup> | *L x 8* |  `sec` |
 | X | X | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` |
 | X | X | Missing residue mask | *L x 1* |  `msk` |
 | X | X | Backbone coordinates | *L x 4\* x 3* |  `crd`, subset `[0:4]` |
@@ -18,6 +18,7 @@ A protein structure prediction data set that includes sidechain information. A d
 |  | X | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |
 |  | X | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |
 
+⸸Currently unsupported in ProteinNet raw files and, therefore, unsupported in SidechainNet.
 *SidechainNet explicitly includes Oxygen atoms as part of the backbone coordinate data.
 
 ## Downloading SidechainNet
@@ -35,13 +36,14 @@ import pickle
 with open("casp12_100.pt", "rb") as f:
     data = pickle.load(f)
 ```
-Here, SidechainNet is stored as a simple Python dictionary organized by training, validation, and test sets.
+Here, SidechainNet is stored as a simple Python dictionary organized by training, validation, and test sets. Within each training set is another dictionary mapping data entry types (`seq`, `ang`, etc.) to a list containing this data type for every protein. In the example below, `seq1`, `ang1`, ... all refer to the same protein.
 ```python
 data = {"train": {"seq": [seq1, seq2, ...],
                   "ang": [ang1, ang2, ...],
                   "crd": [crd1, crd2, ...],
-                  "ids": [id1, id2, ...],
-                  "evo": [evo1, evo2, ...]
+                  "evo": [evo1, evo2, ...],
+                  "sec": [sec1, sec2, ...],
+                  "ids": [id1, id2, ...],               # Corresponding ProteinNet IDs
                   },
         "valid-30": {...},
             ...
