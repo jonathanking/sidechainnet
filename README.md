@@ -52,7 +52,7 @@ with open("casp12_100.pkl", "rb") as f:
 ```
 In its most basic form, SidechainNet is stored as a Python dictionary organized by train, validation, and test splits. These splits are identical to those described in ProteinNet (note the existence of multiple validation sets).
  
- Within each train/validation/test split in SidechainNet is another dictionary mapping data entry types (`seq`, `ang`, etc.) to a list containing this data type for every protein. In the example below, `seq1`, `ang1`, ... all refer to the first protein in the dataset.
+ Within each train/validation/test split in SidechainNet is another dictionary mapping data entry types (`seq`, `ang`, etc.) to a list containing this data type for every protein. In the example below, `seq{i}`, `ang{i}`, ... all refer to the `i`<sup>th</sup> protein in the dataset.
 ```python
 data = {"train": {"seq": [seq1, seq2, ...],
                   "ang": [ang1, ang2, ...],
@@ -124,19 +124,23 @@ In addition to the data itself, this repository also provides several utilities:
 
 ## Directions to Reproduce SidechainNet
 
-If you are only interested in using and interacting with SidechainNet data, please see the above examples. However, if you would like to reproduce our work or if you would like to make modifications to the dataset, please follow the directions below to generate SidechainNet from scratch.
+If you are only interested in using and interacting with SidechainNet data, please see the above examples. However, if you would like to reproduce our work or make modifications to the dataset, you may follow the directions below to generate SidechainNet from scratch.
 
 [How to reproduce and generate SidechainNet](./how_to_reproduce.md)
 
 
 ## Acknowledgements
 
+Many thanks to Mohammed AlQuraishi for his inspiring work on protein structure prediction.
+
+I (Jonathan King) am a predoctoral trainee supported by NIH T32 training grant T32 EB009403 as part of the HHMI-NIBIB Interfaces Initiative.
+
 1. [End-to-End Differentiable Learning of Protein Structure](https://doi.org/10.1016/j.cels.2019.03.006). AlQuraishi, Mohammed. Cell Systems, Volume 8, Issue 4, 292 - 301. (2019).
 2. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). AlQuraishi, Mohammed. BMC Bioinformatics 20, 311 (2019).
  
- I (Jonathan King) am a predoctoral trainee supported by NIH T32 training grant T32 EB009403 as part of the HHMI-NIBIB Interfaces Initiative.
  
-Project based on the 
+ 
+Project structure (continuous integration, docs, testing) based on the 
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
 
 ## Copyright
