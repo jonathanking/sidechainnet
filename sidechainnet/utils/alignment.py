@@ -136,7 +136,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
         result, mask, a0, warning = can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                                       third_try=True)
-        warning += ", mismatch used in alignment"
+        warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return result, mask, a0, warning
 
     elif n_alignments == 0 and third_try:
@@ -146,6 +146,10 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
     elif n_alignments == 1:
         a0 = a[0]
         computed_mask = get_mask_from_alignment(a0)
+        if third_try:
+            if computed_mask.count("X") + computed_mask.count(".") > 5:
+                warning = "too many wrong AAs"
+            computed_mask = computed_mask.replace("X", "+").replace(".", "+")
         if not masks_match(pn_mask, computed_mask):
             if "astral" in determine_pnid_type(pnid):
                 pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace("-", "_")]
@@ -173,7 +177,9 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                 break
             computed_mask = get_mask_from_alignment(a0)
             if third_try:
-                computed_mask.replace("X", "+")
+                if computed_mask.count("X") + computed_mask.count(".") > 5:
+                    warning = "too many wrong AAs"
+                computed_mask = computed_mask.replace("X", "+").replace(".", "+")
             if not best_mask:
                 best_mask = computed_mask
                 best_idx = i
@@ -186,13 +192,13 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                 best_idx = i
                 break
         if found_a_match:
-            warning = "multiple alignments, found matching mask"
+            warning = "multiple alignments, found matching mask" if not warning else warning + ", multiple alignments, found matching mask"
             if has_many_alignments:
                 warning += ", many alignments"
             return True, best_mask, best_alignment, warning
         else:
             mask = get_mask_from_alignment(a[0])
-            warning = "multiple alignments, mask mismatch"
+            warning = "multiple alignments, mask mismatch" if not warning else warning + ", multiple alignments, mask mismatch"
             if has_many_alignments:
                 warning += ", many alignments"
             return True, mask, a[0], warning
@@ -305,6 +311,8 @@ def expand_data_with_mask(data, mask):
             new_data.append(next(data))
         elif m == "-":
             new_data.append(blank.copy())
+        else:
+            raise ValueError(f"Unknown mask character '{m}'.")
 
     return np.vstack(new_data)
 

@@ -110,6 +110,9 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
               "single alignment, found matching mask, mismatch used in alignment": [],
               "multiple alignments, found matching mask, mismatch used in alignment": [],
               "multiple alignments, found matching mask, many alignments, mismatch used in alignment": [],
+              "mismatch used in alignment": [],
+              "too many wrong AAs, mismatch used in alignment": [],
+              'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment': [],
               }
 
     aligner = init_aligner()
@@ -158,6 +161,12 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     with open("errors/COMBINED_M-ALN_MATCH_MANY_WRONGAA.txt", "w") as f:
         for failed_id in errors[
             "multiple alignments, found matching mask, many alignments, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_WRONGAA-only.txt", "w") as f:
+        for failed_id in errors["mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_MANY-WRONGAA.txt", "w") as f:
+        for failed_id in errors['too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
             f.write(f"{failed_id}\n")
 
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
