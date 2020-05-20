@@ -25,10 +25,51 @@ def load_ids_from_text_files(directory, training_set):
 
 
 def read_protein_from_file(file_pointer, include_tertiary):
-    """
-    Modified from github.com/OpenProtein/openprotein:preprocessing.py on June
-    20, 2019. Original carries an MIT license. Copyright (c) 2018 Jeppe
-    Hallgren.
+    """Parses a single record from a text-based ProteinNet file as a dictionary.
+
+    This function was originally written by Jeppe Hallgren, though I have made
+    slight modifications. The most recent version is available here:
+    https://github.com/biolib/openprotein/blob/master/preprocessing.py
+    Because Mr. Hallgren's software caries an MIT license, I have included his
+    copyright notice which describes the method below. All other portions of
+    this software are licensed according to the LICENSE file in this
+    repository's home directory.
+
+    MIT License
+
+    Copyright (c) 2018 Jeppe Hallgren
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+    Args:
+        file_pointer: Opened file object that contains ProteinNet text records
+        include_tertiary: boolean, whether or not to parse atomic coordinates
+
+    Returns:
+        A dictionary containing various data entries for a single ProteinNet ID.
+
+                ex:
+                     { "id"          : "1A9U_1_A",
+                       "primary"     : "MRYSKKKNACEWNA",
+                       "evolutionary": np.ndarray(...),
+                        ...
+                       }
     """
     dict_ = {}
     _dssp_dict = {
