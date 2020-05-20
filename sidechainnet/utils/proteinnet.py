@@ -27,7 +27,7 @@ def load_ids_from_text_files(directory, training_set):
 def read_protein_from_file(file_pointer, include_tertiary):
     """Parses a single record from a text-based ProteinNet file as a dictionary.
 
-    This function was originally written by Jeppe Hallgren, though  I have made
+    This function was originally written by Jeppe Hallgren, though I have made
     slight modifications. The most recent version is available here:
     https://github.com/biolib/openprotein/blob/master/preprocessing.py
     Because Mr. Hallgren's software caries an MIT license, I have included his

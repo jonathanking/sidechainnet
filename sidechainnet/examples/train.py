@@ -38,8 +38,7 @@ def train_epoch(model, training_data, validation_datasets, optimizer, device, ar
         src_seq, tgt_ang, tgt_crds = map(lambda x: x.to(device), batch)
 
         pred_ang = model(src_seq, tgt_ang)
-        mse_loss, drmsd_loss = get_losses(pred_ang, tgt_ang, tgt_crds, src_seq, pool=pool)
-        losses = get_losses(args, pred, tgt_ang, tgt_crds, src_seq, pool=pool)
+        losses = get_losses(pred_ang, tgt_ang, tgt_crds, src_seq, pool=pool)
 
         # Clip gradients
         if args.clip:
@@ -51,6 +50,7 @@ def train_epoch(model, training_data, validation_datasets, optimizer, device, ar
         # Record performance metrics
         metrics = do_train_batch_logging(metrics, losses, src_seq, optimizer, args, log_writer, batch_iter, START_TIME,
                                          pred, tgt_crds, step, validation_datasets, model, device)
+        log_metrics(pred_ang, losses, tgt_crds)
 
     metrics = update_metrics_end_of_epoch(metrics, "train")
 
@@ -62,7 +62,7 @@ def log_metrics():
     pass
 
 
-def get_losses(pred, tgt_ang, tgt_crds, src_seq, return_rmsd=False, eval_mode=False):
+def get_losses(pred, tgt_ang, tgt_crds, src_seq, return_rmsd=False, eval_mode=False, pool=None):
     """
     Returns the computed losses/metrics for a batch. The variable 'loss'
     will differ depending on the loss the user requested to train on.
@@ -321,8 +321,8 @@ def create_parser():
 
     # Required args
     required = parser.add_argument_group("Required Args")
-    required.add_argument('--data', help="Path to training data.", default="../data/proteinnet/casp12_200123_30.pt")
-    required.add_argument("--name", type=str, help="The model name.", default=None)
+    required.add_argument('--data', help="Path to SidechainNet.", default="../data/proteinnet/casp12_200123_30.pt")
+    required.add_argument("--name", type=str, help="A descriptive name for this training experiment.", default=None)
 
     # Training parameters
     training = parser.add_argument_group("Training Args")
@@ -340,13 +340,13 @@ def create_parser():
                           help="Number of epochs to wait before reducing LR for plateau scheduler.")
     training.add_argument('--early_stopping_threshold', type=float, default=0.001,
                           help="Threshold for considering improvements during training/lr scheduling.")
-    training.add_argument('--eval_train', type=my_bool, default="False",
-                          help="Perform an evaluation of the entire training set after a training epoch.")
+    training.add_argument('--eval_train', type=my_bool, default="True",
+                          help="Perform an evaluation of the training set after a training epoch. This takes more time "
+                               "but is more precise when comparing training loss versus validation/test set losses.")
     training.add_argument('-opt', '--optimizer', type=str, choices=['adam', 'sgd'], default='sgd',
                           help="Training optimizer.")
-    training.add_argument("-s", "--seed", type=int, default=11_731,
-                          help="The random number generator seed for numpy "
-                               "and torch.")
+    training.add_argument("-s", "--seed", type=int, default=11_731, help="The random number generator seed for numpy "
+                                                                         "and torch.")
     training.add_argument("--combined_drmsd_weight", type=float, default=0.5,
                           help="When combining losses, use weight w for loss = w * drmsd + (1-w) * mse.")
     training.add_argument("--batching_order", type=str, choices=["descending", "ascending", "binned-random"],
@@ -366,7 +366,7 @@ def create_parser():
                             help="Dimension of each sequence item in the model. Each layer uses the same dimension for "
                                  "simplicity.")
     model_args.add_argument('-dih', '--d_inner_hid', type=int, default=2048,
-                            help="Dimmension of the inner layer of the feed-forward layer at the end of every "
+                            help="Dimension of the inner layer of the feed-forward layer at the end of every "
                                  "Transformer"
                                  " block.")
     model_args.add_argument('-nl', '--n_layers', type=int, default=6,
@@ -397,19 +397,11 @@ def main():
     """
     Argument parsing, model loading, and model training.
     """
-    global LOGFILEHEADER
     global START_EPOCH
     global START_TIME
-    global MISSING_COORD_FILLER
-
-    # Fix file descriptor issue: https://github.com/pytorch/pytorch/issues/973
-    import resource
-    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
 
     START_EPOCH = 0
     START_TIME = time.time()
-    MISSING_COORD_FILLER = 0  # Used when teacher forcing with an encoder/decoder model
 
     torch.set_printoptions(precision=5, sci_mode=False)
 
@@ -419,38 +411,14 @@ def main():
     args.cuda = not args.no_cuda
     assert not args.name or "_" not in args.name, "Please do not use a '_' in your model name. " \
                                  "Conflicts with structure files."
-    args.buffering_mode = 1
-    if not args.early_stopping_metric:
-        args.early_stopping_metric = f"train-{args.loss}"
-    args.es_mode, args.es_metric = args.early_stopping_metric.split("-")
-    args.add_sos_eos = args.model == "enc-dec"
-    LOGFILEHEADER = prepare_log_header(args)
-    args.bins = "auto" if args.bins == -1 else args.bins
-    if args.automatically_determine_batch_size:
-        args.batch_size = determine_largest_batch_size(args)
-    if "conv-enc" in args.model:  # This will generate a model architecture based on a supplied name, ie conv-env|3,3,3|2,2,2
-        kernel_sizes, dim_reducs = parse_conv_kernel_info_from_model_name(args.model)
-        assert len(kernel_sizes) <= 3, "Only 3 convolution layers are currently supported."
-        if len(kernel_sizes) >= 1:
-            args.conv1_size = kernel_sizes[0]
-            args.conv1_reduc = dim_reducs[0]
-        if len(kernel_sizes) >=2:
-            args.conv2_size = kernel_sizes[1]
-            args.conv2_reduc = dim_reducs[1]
-        if len(kernel_sizes) == 3:
-            args.conv3_size = kernel_sizes[2]
-            args.conv3_reduc = dim_reducs[2]
-        args.model = "conv-enc"
 
     # Prepare torch
     drmsd_worker_pool = init_worker_pool(args)
-    seed_rngs(args)
 
     # Load dataset
     data = torch.load(args.data)
     args.max_token_seq_len = data['settings']["max_len"]
     angle_means = data["settings"]["angle_means"]
-
 
     # Prepare model
     device = torch.device('cuda' if args.cuda else 'cpu')

@@ -115,7 +115,7 @@ class BinnedProteinDataset(torch.utils.data.Dataset):
                  seqs=None,
                  angs=None,
                  crds=None,
-                 add_sos_eos=True,
+                 add_sos_eos=False,
                  bins="auto"):
 
         assert seqs is not None
@@ -258,12 +258,9 @@ def prepare_dataloaders(data,
     function returns train, validation, and test set dataloaders with 2 workers
     each. Note that there are multiple validation sets in ProteinNet.
     """
-    n_bins = "auto"
     train_dataset = BinnedProteinDataset(seqs=data['train']['seq'],
                                          crds=data['train']['crd'],
-                                         angs=data['train']['ang'],
-                                         add_sos_eos=False,
-                                         bins=n_bins)
+                                         angs=data['train']['ang'])
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -292,8 +289,7 @@ def prepare_dataloaders(data,
         valid_loader = torch.utils.data.DataLoader(ProteinDataset(
             seqs=data[f'valid-{split}']['seq'],
             crds=data[f'valid-{split}']['crd'],
-            angs=data[f'valid-{split}']['ang'],
-            add_sos_eos=False),
+            angs=data[f'valid-{split}']['ang']),
                                                    num_workers=num_workers,
                                                    batch_size=batch_size,
                                                    collate_fn=paired_collate_fn)
@@ -302,8 +298,7 @@ def prepare_dataloaders(data,
     test_loader = torch.utils.data.DataLoader(ProteinDataset(
         seqs=data['test']['seq'],
         crds=data['test']['crd'],
-        angs=data['test']['ang'],
-        add_sos_eos=False),
+        angs=data['test']['ang']),
                                               num_workers=num_workers,
                                               batch_size=batch_size,
                                               collate_fn=paired_collate_fn)
