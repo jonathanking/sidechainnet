@@ -12,7 +12,7 @@ import numpy as np
 from Bio import Align
 from tqdm import tqdm
 
-from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
+from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS, PRODY_CA_DIST
 from sidechainnet.download_and_parse import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
@@ -338,3 +338,53 @@ def manually_adjust_data(pnid, sc_entry):
         sc_entry["crd"] = sc_entry["crd"][:-NUM_PREDICTED_COORDS*2]
 
     return sc_entry
+
+
+def assert_mask_gaps_are_correct(mask, coordinates):
+    """ Returns True if the structure supports the mask.
+
+    Args:
+        mask: string of "+" and "-"s, denoting missing residues
+        coordinates: numpy array (L x 14 x 3) of atomic coordinates
+
+    Returns:
+        True iff the mask is supported by the structure.
+    """
+    CA_IDX = 1
+    if mask.count("-") == 0:
+        return True
+
+    assert mask.count("+") == len(coordinates) // NUM_PREDICTED_COORDS, \
+        "The number of coordinates must match the number of matched residues."
+
+    # First, build a nested list that holds all contiguous regions of the data
+    # according to the mask
+    coord_iter = coordinate_iterator(coordinates, NUM_PREDICTED_COORDS)
+    coord_contigs = []
+    cur_contig = []
+
+    for m in mask:
+        if m == "-":
+            if cur_contig != []:
+                coord_contigs.append(cur_contig.copy())
+                cur_contig = []
+            continue
+        elif m == "+":
+            cur_contig.append(next(coord_iter))
+    if cur_contig != []:
+        coord_contigs.append(cur_contig.copy())
+
+    # Once the contiguous regions are reported, we check that the distance
+    # between all alpha-carbons is less than ProDy's cutoff (4.1 Angstrom)
+    for coord_contig in coord_contigs:
+        if len(coord_contig) == 1:
+            continue
+        prev_ca = coord_contig[0][CA_IDX]
+        for cur_res in coord_contig[1:]:
+            cur_ca = cur_res[CA_IDX]
+            if np.linalg.norm(cur_ca - prev_ca) > PRODY_CA_DIST:
+                return False
+            prev_ca = cur_ca.copy()
+
+    return True
+

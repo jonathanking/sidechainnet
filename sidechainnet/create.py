@@ -55,10 +55,16 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["seq"] = pn_entry["primary"]
         new_entry["evo"] = pn_entry["evolutionary"]
 
+        correct_gaps = assert_mask_gaps_are_correct(mask, crd)
+        if not correct_gaps:
+            return {}, "bad gaps"
+
         # We may need to add padding where specified by the mask
-        new_entry["ang"] = expand_data_with_mask(sc_entry["ang"], mask)
-        new_entry["crd"] = expand_data_with_mask(sc_entry["crd"], mask)
+        new_entry["ang"] = expand_data_with_mask(ang, mask)
+        new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["msk"] = mask
+
+
 
         l = len(pn_entry["primary"])
         for k, v in new_entry.items():
@@ -116,6 +122,7 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
               "mismatch used in alignment": [],
               "too many wrong AAs, mismatch used in alignment": [],
               'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment': [],
+              'bad gaps': []
               }
 
     aligner = init_aligner()
@@ -170,6 +177,9 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
             f.write(f"{failed_id}\n")
     with open("errors/COMBINED_MANY-WRONGAA.txt", "w") as f:
         for failed_id in errors['too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
+            f.write(f"{failed_id}\n")
+    with open("errors/BAD_GAPS.txt", "w") as f:
+        for failed_id in errors['bad gaps']:
             f.write(f"{failed_id}\n")
 
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
