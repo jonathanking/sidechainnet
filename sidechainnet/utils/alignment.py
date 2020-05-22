@@ -335,3 +335,29 @@ def pad_seq_with_mask(seq, mask):
         elif m == "-":
             new_seq += "-"
     return new_seq
+
+
+def manually_adjust_data(pnid, sc_entry):
+    """ Returns a modified version of sc_entry to fix some issues manually.
+
+    Args:
+        pnid: string, ProteinNet ID
+        sc_entry: dictionary containing "seq", "ang", "crd" data
+
+    Returns:
+        If sc_entry must be modified, then it is corrected and returned.
+        Otherwise, it is returned without modifications.
+
+    """
+
+    # In the case of 5FXN, ProDy mistakenly parses two extranneous residues "VK"
+    # from the file due to the file not distinguishing these resides as being
+    # on a different segment. We can manually remove this data here before
+    # proceeding with alignment.
+    # https://github.com/prody/ProDy/issues/1045
+    if "5FXN" in pnid and len(sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
+        sc_entry["seq"] = sc_entry["seq"][:-2]
+        sc_entry["ang"] = sc_entry["ang"][:-2]
+        sc_entry["crd"] = sc_entry["crd"][:-NUM_PREDICTED_COORDS*2]
+
+    return sc_entry
