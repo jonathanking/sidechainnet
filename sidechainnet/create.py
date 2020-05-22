@@ -17,7 +17,7 @@ pr.confProDy(verbosity="none")
 
 from sidechainnet.download_and_parse import download_sidechain_data, load_data, save_data
 from sidechainnet.utils.proteinnet import parse_raw_proteinnet
-from sidechainnet.utils.alignment import init_aligner
+from sidechainnet.utils.alignment import init_aligner, manually_adjust_data
 from sidechainnet.utils.structure import NUM_PREDICTED_COORDS
 
 
@@ -38,6 +38,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if "secondary" in pn_entry:
         print("WARNING: secondary structure information is not yet supported. "
               "As of May 2020, it is not included in ProteinNet.")
+
+    sc_entry = manually_adjust_data(pnid, sc_entry)
 
     can_be_merged, mask, alignment, warning = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
