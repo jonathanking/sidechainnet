@@ -82,7 +82,7 @@ def masks_match(pn, new):
         return False
 
 
-def shorten_ends(s1, s2):
+def shorten_ends(s1, s2, s1_ang, s1_crd):
     """Shortens s1 by removing characters at either end that don't match s2.
 
     Args:
@@ -99,15 +99,19 @@ def shorten_ends(s1, s2):
     i = len(mask) - 1
     while mask[i] == "-":
         s1 = s1[:-1]
+        s1_ang = s1_ang[:-1]
+        s1_crd = s1_crd[:-NUM_PREDICTED_COORDS]
         mask = mask[:-1]
         i -= 1
     while mask[0] == "-":
         s1 = s1[1:]
+        s1_ang = s1_ang[1:]
+        s1_crd = s1_crd[NUM_PREDICTED_COORDS:]
         mask = mask[1:]
-    return s1
+    return s1, s1_ang, s1_crd
 
 
-def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
+def can_be_directly_merged(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
                            second_try=False, third_try=False):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
@@ -128,20 +132,20 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
         # were residues observed that were not present in the ProteinNet
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
-        my_seq = shorten_ends(my_seq, pn_seq)
-        return can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
+        my_seq, ang, crd = shorten_ends(my_seq, pn_seq,  ang, crd)
+        return can_be_directly_merged(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
                                       second_try=True)
 
     elif n_alignments == 0 and second_try and not third_try:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
-        result, mask, a0, warning = can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
+        result, mask, a0, ang, crd, warning = can_be_directly_merged(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
                                       third_try=True)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
-        return result, mask, a0, warning
+        return result, mask, a0, ang, crd, warning
 
     elif n_alignments == 0 and third_try:
         warning = "failed"
-        return False, None, None, warning
+        return False, None, None, ang, crd, warning
 
     elif n_alignments == 1:
         a0 = a[0]
@@ -164,7 +168,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                     warning = "single alignment, mask mismatch"
             else:
                 warning = "single alignment, mask mismatch"
-        return True, computed_mask, a0, warning
+        return True, computed_mask, a0, ang, crd, warning
 
     elif n_alignments > 1:
         best_mask = None
@@ -195,40 +199,13 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
             warning = "multiple alignments, found matching mask" if not warning else warning + ", multiple alignments, found matching mask"
             if has_many_alignments:
                 warning += ", many alignments"
-            return True, best_mask, best_alignment, warning
+            return True, best_mask, best_alignment, ang, crd, warning
         else:
             mask = get_mask_from_alignment(a[0])
             warning = "multiple alignments, mask mismatch" if not warning else warning + ", multiple alignments, mask mismatch"
             if has_many_alignments:
                 warning += ", many alignments"
-            return True, mask, a[0], warning
-
-
-def other_alignments_with_same_score(all_alignments, cur_alignment_idx,
-                                     cur_alignment_score):
-    """Returns True if there are other alignments with identical scores.
-
-    Args:
-        all_alignments: PairwiseAlignment iterable object from BioPython.Align
-        cur_alignment_idx: The index of the desired alignment
-        cur_alignment_score: The score of the desired alignment
-
-    Returns:
-        True if any alignments other than the one specified have scores that
-        are identical to the specified alignment.
-    """
-    if len(all_alignments) <= 1:
-        return False
-
-    for i, a0 in enumerate(all_alignments):
-        if i > 0 and a0.score < cur_alignment_score:
-            break
-        if i == cur_alignment_idx:
-            continue
-        elif a0.score == cur_alignment_score:
-            return True
-
-    return False
+            return True, mask, a[0], ang, crd, warning
 
 
 def binary_mask_to_str(m):

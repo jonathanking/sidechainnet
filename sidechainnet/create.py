@@ -11,7 +11,7 @@ import prody as pr
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
-from sidechainnet.utils.alignment import can_be_directly_merged, expand_data_with_mask
+from sidechainnet.utils.alignment import can_be_directly_merged, expand_data_with_mask, assert_mask_gaps_are_correct
 
 pr.confProDy(verbosity="none")
 
@@ -41,10 +41,11 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
 
-    can_be_merged, mask, alignment, warning = can_be_directly_merged(aligner,
+    can_be_merged, mask, alignment, ang, crd, warning = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
-                                                            # sc_entry,
                                                             sc_entry["seq"],
+                                                            sc_entry["ang"],
+                                                            sc_entry["crd"],
                                                             pn_entry["mask"],
                                                                      pnid)
     new_entry = {}
