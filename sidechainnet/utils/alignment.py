@@ -382,7 +382,7 @@ def assert_mask_gaps_are_correct(mask, coordinates):
         prev_ca = coord_contig[0][CA_IDX]
         for cur_res in coord_contig[1:]:
             cur_ca = cur_res[CA_IDX]
-            if np.linalg.norm(cur_ca - prev_ca) > PRODY_CA_DIST:
+            if np.linalg.norm(cur_ca - prev_ca) > PRODY_CA_DIST * 1.85:
                 return False
             prev_ca = cur_ca.copy()
 
