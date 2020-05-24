@@ -3,8 +3,7 @@ import argparse
 import torch
 
 import sidechainnet
-from sidechainnet.utils.dataset import ProteinDataset
-from sidechainnet.examples.models import RGN
+from sidechainnet.examples.rgn import RGN
 
 
 def main():

@@ -75,7 +75,7 @@ For a complete example of model training, please see [sidechainnet/examples/trai
 
 ```python
 import sidechainnet
-from sidechainnet.examples.models import RGN
+from sidechainnet.examples.rgn import RGN
 from sidechainnet.utils.losses import drmsd
 
 

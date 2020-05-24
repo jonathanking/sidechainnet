@@ -10,10 +10,9 @@ Date : 3/09/2020
 
 import numpy as np
 from Bio import Align
-from tqdm import tqdm
 
-from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
-from sidechainnet.download_and_parse import ASTRAL_ID_MAPPING, determine_pnid_type
+from sidechainnet.utils.build_info import NUM_COORDS_PER_RES
+from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
 def init_aligner(allow_target_gaps=False, allow_target_mismatches=False):
@@ -297,8 +296,8 @@ def expand_data_with_mask(data, mask):
 
     size = data.shape[-1]
     if size == 3:
-        data = coordinate_iterator(data, NUM_PREDICTED_COORDS)
-        blank = np.empty((NUM_PREDICTED_COORDS, 3))
+        data = coordinate_iterator(data, NUM_COORDS_PER_RES)
+        blank = np.empty((NUM_COORDS_PER_RES, 3))
     else:
         data = iter(data)
         blank = np.empty((size,))
@@ -358,6 +357,6 @@ def manually_adjust_data(pnid, sc_entry):
     if "5FXN" in pnid and len(sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
         sc_entry["seq"] = sc_entry["seq"][:-2]
         sc_entry["ang"] = sc_entry["ang"][:-2]
-        sc_entry["crd"] = sc_entry["crd"][:-NUM_PREDICTED_COORDS*2]
+        sc_entry["crd"] = sc_entry["crd"][:-NUM_COORDS_PER_RES * 2]
 
     return sc_entry
