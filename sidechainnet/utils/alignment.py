@@ -173,7 +173,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                 break
             computed_mask = get_mask_from_alignment(a0)
             if third_try:
-                computed_mask.replace("X", "+")
+                computed_mask = computed_mask.replace("X", "+").replace(".", "+")
             if not best_mask:
                 best_mask = computed_mask
                 best_idx = i
