@@ -176,11 +176,8 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                 break
             computed_mask = get_mask_from_alignment(a0)
             if third_try:
-<<<<<<< HEAD:sidechainnet/utils/alignment.py
-=======
                 if computed_mask.count("X") + computed_mask.count(".") > 5:
                     warning = "too many wrong AAs"
->>>>>>> ea55c4de895137f56017dd1d2b7cda4cc4e4a3c8:sidechainnet/utils/align.py
                 computed_mask = computed_mask.replace("X", "+").replace(".", "+")
             if not best_mask:
                 best_mask = computed_mask
