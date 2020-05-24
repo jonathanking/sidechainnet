@@ -7,6 +7,7 @@ import pickle
 from glob import glob
 
 import numpy as np
+import prody as pr
 
 
 def load_ids_from_text_files(directory, training_set):
@@ -25,10 +26,51 @@ def load_ids_from_text_files(directory, training_set):
 
 
 def read_protein_from_file(file_pointer, include_tertiary):
-    """
-    Modified from github.com/OpenProtein/openprotein:preprocessing.py on June
-    20, 2019. Original carries an MIT license. Copyright (c) 2018 Jeppe
-    Hallgren.
+    """Parses a single record from a text-based ProteinNet file as a dictionary.
+
+    This function was originally written by Jeppe Hallgren, though I have made
+    slight modifications. The most recent version is available here:
+    https://github.com/biolib/openprotein/blob/master/preprocessing.py
+    Because Mr. Hallgren's software caries an MIT license, I have included his
+    copyright notice which describes the method below. All other portions of
+    this software are licensed according to the LICENSE file in this
+    repository's home directory.
+
+    MIT License
+
+    Copyright (c) 2018 Jeppe Hallgren
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+    Args:
+        file_pointer: Opened file object that contains ProteinNet text records
+        include_tertiary: boolean, whether or not to parse atomic coordinates
+
+    Returns:
+        A dictionary containing various data entries for a single ProteinNet ID.
+
+                ex:
+                     { "id"          : "1A9U_1_A",
+                       "primary"     : "MRYSKKKNACEWNA",
+                       "evolutionary": np.ndarray(...),
+                        ...
+                       }
     """
     dict_ = {}
     _dssp_dict = {
@@ -110,19 +152,6 @@ def process_file(input_filename_out_dir, return_ids=False):
     print(f"{input_filename} finished.")
     if return_ids:
         return (input_filename, all_ids)
-
-
-class ProteinNet(object):
-    """
-    Defines a wrapper for interacting with a ProteinNet dataset.
-    """
-
-    def __init__(self, raw_dir, training_set):
-        self.raw_dir = raw_dir
-        self.training_set = training_set
-
-    def parse_raw_data(self):
-        input_files = glob(os.path.join(self.raw_dir, "raw/*[!.ids]"))
 
 
 def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
@@ -215,3 +244,43 @@ def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
             relevant_ids += f.read().splitlines()
 
     return relevant_ids
+
+
+def parse_astral_summary_file(lines):
+    """
+    Given a path to the ASTRAL database summary file, this function parses
+    that file and returns a dictionary that maps ASTRAL IDs to (pdbid, chain).
+    """
+    d = {}
+    for line in lines:
+        if line.startswith("#"):
+            continue
+        line_items = line.split()
+        if line_items[3] == "-":
+            continue
+        if line_items[3] not in d.keys():
+            d[line_items[3]] = (line_items[4], line_items[5])
+    return d
+
+
+def get_chain_from_astral_id(astral_id, d):
+    """
+    Given an ASTRAL ID and the ASTRAL->PDB/chain mapping dictionary,
+    this function attempts to return the relevant, parsed ProDy object.
+    """
+    pdbid, chain = d[astral_id]
+    assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid {pdbid}."
+    chain, resnums = chain.split(":")
+
+    if astral_id == "d4qrye_":
+        chain = "A"
+
+    a = pr.parsePDB(pdbid, chain=chain)
+    if resnums != "":
+        if resnums[0] == "-":
+            # Ranges with negative numbers must be escaped with ` character
+            a = a.select(
+                f"resnum `{resnums[0] + resnums[1:].replace('-', ' to ')}`")
+        else:
+            a = a.select(f"resnum {resnums.replace('-', ' to ')}")
+    return a

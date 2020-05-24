@@ -11,14 +11,14 @@ import prody as pr
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
-from sidechainnet.utils.alignment import can_be_directly_merged, expand_data_with_mask
+from sidechainnet.utils.align import can_be_directly_merged, expand_data_with_mask
 
 pr.confProDy(verbosity="none")
 
-from sidechainnet.download_and_parse import download_sidechain_data, load_data, save_data
-from sidechainnet.utils.proteinnet import parse_raw_proteinnet
-from sidechainnet.utils.alignment import init_aligner
-from sidechainnet.utils.structure import NUM_PREDICTED_COORDS
+from sidechainnet.utils.download import download_sidechain_data, load_data, save_data
+from sidechainnet.utils.parse import parse_raw_proteinnet
+from sidechainnet.utils.align import init_aligner, manually_adjust_data
+from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
@@ -38,6 +38,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if "secondary" in pn_entry:
         print("WARNING: secondary structure information is not yet supported. "
               "As of May 2020, it is not included in ProteinNet.")
+
+    sc_entry = manually_adjust_data(pnid, sc_entry)
 
     can_be_merged, mask, alignment, warning = can_be_directly_merged(aligner,
                                                             pn_entry["primary"],
@@ -60,8 +62,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         l = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
-                if len(v) // NUM_PREDICTED_COORDS != l: return {}, "failed"
-                assert len(v) // NUM_PREDICTED_COORDS == l, f"{k} does not have correct length {l} (is {len(v)//NUM_PREDICTED_COORDS})."
+                if len(v) // NUM_COORDS_PER_RES != l: return {}, "failed"
+                assert len(v) // NUM_COORDS_PER_RES == l, f"{k} does not have correct length {l} (is {len(v) // NUM_COORDS_PER_RES})."
             else:
                 if len(v) != l: return {}, "failed"
                 assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
@@ -110,6 +112,9 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
               "single alignment, found matching mask, mismatch used in alignment": [],
               "multiple alignments, found matching mask, mismatch used in alignment": [],
               "multiple alignments, found matching mask, many alignments, mismatch used in alignment": [],
+              "mismatch used in alignment": [],
+              "too many wrong AAs, mismatch used in alignment": [],
+              'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment': [],
               }
 
     aligner = init_aligner()
@@ -158,6 +163,12 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     with open("errors/COMBINED_M-ALN_MATCH_MANY_WRONGAA.txt", "w") as f:
         for failed_id in errors[
             "multiple alignments, found matching mask, many alignments, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_WRONGAA-only.txt", "w") as f:
+        for failed_id in errors["mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_MANY-WRONGAA.txt", "w") as f:
+        for failed_id in errors['too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
             f.write(f"{failed_id}\n")
 
     print(f"Finished unifying sidechain information with ProteinNet data.\n"

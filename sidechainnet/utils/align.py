@@ -10,10 +10,9 @@ Date : 3/09/2020
 
 import numpy as np
 from Bio import Align
-from tqdm import tqdm
 
-from sidechainnet.utils.build_info import NUM_PREDICTED_COORDS
-from sidechainnet.download_and_parse import ASTRAL_ID_MAPPING, determine_pnid_type
+from sidechainnet.utils.build_info import NUM_COORDS_PER_RES
+from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
 def init_aligner(allow_target_gaps=False, allow_target_mismatches=False):
@@ -136,7 +135,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
         result, mask, a0, warning = can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                                       third_try=True)
-        warning += ", mismatch used in alignment"
+        warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return result, mask, a0, warning
 
     elif n_alignments == 0 and third_try:
@@ -146,6 +145,10 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
     elif n_alignments == 1:
         a0 = a[0]
         computed_mask = get_mask_from_alignment(a0)
+        if third_try:
+            if computed_mask.count("X") + computed_mask.count(".") > 5:
+                warning = "too many wrong AAs"
+            computed_mask = computed_mask.replace("X", "+").replace(".", "+")
         if not masks_match(pn_mask, computed_mask):
             if "astral" in determine_pnid_type(pnid):
                 pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace("-", "_")]
@@ -173,6 +176,11 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                 break
             computed_mask = get_mask_from_alignment(a0)
             if third_try:
+<<<<<<< HEAD:sidechainnet/utils/alignment.py
+=======
+                if computed_mask.count("X") + computed_mask.count(".") > 5:
+                    warning = "too many wrong AAs"
+>>>>>>> ea55c4de895137f56017dd1d2b7cda4cc4e4a3c8:sidechainnet/utils/align.py
                 computed_mask = computed_mask.replace("X", "+").replace(".", "+")
             if not best_mask:
                 best_mask = computed_mask
@@ -186,13 +194,13 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
                 best_idx = i
                 break
         if found_a_match:
-            warning = "multiple alignments, found matching mask"
+            warning = "multiple alignments, found matching mask" if not warning else warning + ", multiple alignments, found matching mask"
             if has_many_alignments:
                 warning += ", many alignments"
             return True, best_mask, best_alignment, warning
         else:
             mask = get_mask_from_alignment(a[0])
-            warning = "multiple alignments, mask mismatch"
+            warning = "multiple alignments, mask mismatch" if not warning else warning + ", multiple alignments, mask mismatch"
             if has_many_alignments:
                 warning += ", many alignments"
             return True, mask, a[0], warning
@@ -291,8 +299,8 @@ def expand_data_with_mask(data, mask):
 
     size = data.shape[-1]
     if size == 3:
-        data = coordinate_iterator(data, NUM_PREDICTED_COORDS)
-        blank = np.empty((NUM_PREDICTED_COORDS, 3))
+        data = coordinate_iterator(data, NUM_COORDS_PER_RES)
+        blank = np.empty((NUM_COORDS_PER_RES, 3))
     else:
         data = iter(data)
         blank = np.empty((size,))
@@ -305,6 +313,8 @@ def expand_data_with_mask(data, mask):
             new_data.append(next(data))
         elif m == "-":
             new_data.append(blank.copy())
+        else:
+            raise ValueError(f"Unknown mask character '{m}'.")
 
     return np.vstack(new_data)
 
@@ -327,3 +337,29 @@ def pad_seq_with_mask(seq, mask):
         elif m == "-":
             new_seq += "-"
     return new_seq
+
+
+def manually_adjust_data(pnid, sc_entry):
+    """ Returns a modified version of sc_entry to fix some issues manually.
+
+    Args:
+        pnid: string, ProteinNet ID
+        sc_entry: dictionary containing "seq", "ang", "crd" data
+
+    Returns:
+        If sc_entry must be modified, then it is corrected and returned.
+        Otherwise, it is returned without modifications.
+
+    """
+
+    # In the case of 5FXN, ProDy mistakenly parses two extranneous residues "VK"
+    # from the file due to the file not distinguishing these resides as being
+    # on a different segment. We can manually remove this data here before
+    # proceeding with alignment.
+    # https://github.com/prody/ProDy/issues/1045
+    if "5FXN" in pnid and len(sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
+        sc_entry["seq"] = sc_entry["seq"][:-2]
+        sc_entry["ang"] = sc_entry["ang"][:-2]
+        sc_entry["crd"] = sc_entry["crd"][:-NUM_COORDS_PER_RES * 2]
+
+    return sc_entry
