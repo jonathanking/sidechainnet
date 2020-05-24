@@ -1,7 +1,7 @@
  # Reproducing SidechainNet
  For steps 1 and 2, pay careful attention to the subdirectory structure indicated by `cd` and `mkdir` commands when downloading ProteinNet data. After ProteinNet data has been downloaded, you may clone the SidechainNet repository anywhere you wish.
 
-### 1. Download raw ProteinNet data 
+### 1. Download raw ProteinNet data using links from [proteinnet/README.md](https://github.com/aqlaboratory/proteinnet/blob/master/README.md)
 ```shell script
 mkdir -p proteinnet/casp12/targets
 cd proteinnet
