@@ -28,7 +28,7 @@ wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0
 tar -xvf targets/targets.gz
 ```
 
-### 3. Generate SidechainNet
+### 3. Generate SidechainNet (in a dierctory of your choosing)
 ```shell script
 git clone https://github.com/jonathanking/sidechainnet.git
 cd sidechainnet/sidechainnet
