@@ -188,7 +188,7 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
                 best_idx = i
             if not best_alignment:
                 best_alignment = a0
-            if masks_match(pn_mask, computed_mask):
+            if masks_match(pn_mask, computed_mask) or assert_mask_gaps_are_correct(computed_mask, crd):
                 found_a_match = True
                 best_mask = computed_mask
                 best_alignment = a0
