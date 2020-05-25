@@ -3,71 +3,13 @@
 import numpy as np
 import prody as pr
 
-from sidechainnet.utils.build_info import SC_BUILD_INFO, NUM_PREDICTED_ANGLES, \
-    NUM_BB_TORSION_ANGLES, NUM_BB_OTHER_ANGLES, NUM_PREDICTED_COORDS
+from sidechainnet.utils.build_info import SC_BUILD_INFO, NUM_ANGLES, \
+    NUM_BB_TORSION_ANGLES, NUM_BB_OTHER_ANGLES, NUM_COORDS_PER_RES
 from sidechainnet.utils.errors import \
     NonStandardAminoAcidError, IncompleteStructureError, SequenceError, \
     MissingAtomsError, NoneStructureError
 
 GLOBAL_PAD_CHAR = np.nan
-
-
-def parse_astral_summary_file(lines):
-    """
-    Given a path to the ASTRAL database summary file, this function parses
-    that file and returns a dictionary that maps ASTRAL IDs to (pdbid, chain).
-    """
-    d = {}
-    for line in lines:
-        if line.startswith("#"):
-            continue
-        line_items = line.split()
-        if line_items[3] == "-":
-            continue
-        if line_items[3] not in d.keys():
-            d[line_items[3]] = (line_items[4], line_items[5])
-    return d
-
-
-def get_chain_from_astral_id(astral_id, d):
-    """
-    Given an ASTRAL ID and the ASTRAL->PDB/chain mapping dictionary,
-    this function attempts to return the relevant, parsed ProDy object.
-    """
-    pdbid, chain = d[astral_id]
-    assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid {pdbid}."
-    chain, resnums = chain.split(":")
-
-    if astral_id == "d4qrye_":
-        chain = "A"
-
-    a = pr.parsePDB(pdbid, chain=chain)
-    if resnums != "":
-        if resnums[0] == "-":
-            # Ranges with negative numbers must be escaped with ` character
-            a = a.select(
-                f"resnum `{resnums[0] + resnums[1:].replace('-', ' to ')}`")
-        else:
-            a = a.select(f"resnum {resnums.replace('-', ' to ')}")
-    return a
-
-
-def get_header_seq_from_astral_id(astral_id, d):
-    """
-    Attempts to return the sequence associated with a given ASTRAL ID.
-    Requires the ASTRAL->PDB/chain mapping dictionary.
-    # TODO might not want to do this anymore, maybe using wrong file/IDs
-    """
-    pdbid, chain = d[astral_id]
-    assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid {pdbid}."
-    chain, resnums = chain.split(":")
-    resnums = ''.join(i for i in resnums if (i.isdigit() or i == "-"))
-    a, h = pr.parsePDB(pdbid, chain=chain, header=True)
-    if resnums == "":
-        return h[chain].sequence
-    else:
-        # This means the ASTRAL id is a substructure, and I can't use the seqres record directly
-        raise SequenceError
 
 
 def angle_list_to_sin_cos(angs, reshape=True):
@@ -84,7 +26,7 @@ def angle_list_to_sin_cos(angs, reshape=True):
         new_mat[:, :, 0] = np.cos(a)
         new_mat[:, :, 1] = np.sin(a)
         if reshape:
-            new_list.append(new_mat.reshape(-1, NUM_PREDICTED_ANGLES * 2))
+            new_list.append(new_mat.reshape(-1, NUM_ANGLES * 2))
         else:
             new_list.append(new_mat)
     return new_list
@@ -127,8 +69,8 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
         raise NonStandardAminoAcidError
     if len(torsion_names) == 0:
         return (
-            NUM_PREDICTED_ANGLES -
-            (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES)) * [GLOBAL_PAD_CHAR]
+                       NUM_ANGLES -
+                       (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES)) * [GLOBAL_PAD_CHAR]
 
     # Compute CB dihedral, which may depend on the previous or next residue for placement
     try:
@@ -157,7 +99,7 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
             compute_single_dihedral(
                 [residue.select("name " + an) for an in atom_names]))
 
-    return res_dihedrals + (NUM_PREDICTED_ANGLES -
+    return res_dihedrals + (NUM_ANGLES -
                             (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) -
                             len(res_dihedrals)) * [GLOBAL_PAD_CHAR]
 
@@ -187,7 +129,7 @@ def measure_res_coordinates(_res):
     bbcoords = get_atom_coords_by_names(_res, ["N", "CA", "C", "O"])
     sccoords = get_atom_coords_by_names(_res, sc_atom_names)
     coord_padding = np.zeros(
-        (NUM_PREDICTED_COORDS - len(bbcoords) - len(sccoords), 3))
+        (NUM_COORDS_PER_RES - len(bbcoords) - len(sccoords), 3))
     coord_padding[:] = GLOBAL_PAD_CHAR
     return np.concatenate((np.stack(bbcoords + sccoords), coord_padding))
 
@@ -197,7 +139,7 @@ def empty_coord():
     Return an empty coordinate tensor, representing 1 padding character at
     the residue level.
     """
-    coord_padding = np.zeros((NUM_PREDICTED_COORDS, 3))
+    coord_padding = np.zeros((NUM_COORDS_PER_RES, 3))
     coord_padding[:] = GLOBAL_PAD_CHAR
     return coord_padding
 
@@ -207,7 +149,7 @@ def empty_ang():
     Return an empty angle tensor, representing 1 padding character at the
     residue level.
     """
-    dihe_padding = np.zeros(NUM_PREDICTED_ANGLES)
+    dihe_padding = np.zeros(NUM_ANGLES)
     dihe_padding[:] = GLOBAL_PAD_CHAR
     return dihe_padding
 
@@ -301,10 +243,10 @@ def get_seq_coords_and_angles(chain):
     dihedrals_np = np.asarray(dihedrals)
     coords_np = np.concatenate(coords)
 
-    if coords_np.shape[0] != len(observed_sequence) * NUM_PREDICTED_COORDS:
+    if coords_np.shape[0] != len(observed_sequence) * NUM_COORDS_PER_RES:
         print(
-            f"Coords shape {coords_np.shape} does not match len(seq)*{NUM_PREDICTED_COORDS} = "
-            f"{len(observed_sequence) * NUM_PREDICTED_COORDS},\nOBS: {observed_sequence}\n{chain}"
+            f"Coords shape {coords_np.shape} does not match len(seq)*{NUM_COORDS_PER_RES} = "
+            f"{len(observed_sequence) * NUM_COORDS_PER_RES},\nOBS: {observed_sequence}\n{chain}"
         )
         raise SequenceError
 

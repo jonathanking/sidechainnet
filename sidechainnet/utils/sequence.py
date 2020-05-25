@@ -1,6 +1,6 @@
 import numpy as np
 
-from sidechainnet.utils.structure import empty_coord, empty_ang
+from sidechainnet.utils.measure import empty_coord, empty_ang
 
 
 def trim_mask_and_true_seqs(mask_seq, true_seq):

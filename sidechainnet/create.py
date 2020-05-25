@@ -11,14 +11,14 @@ import prody as pr
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
-from sidechainnet.utils.alignment import can_be_directly_merged, expand_data_with_mask, assert_mask_gaps_are_correct
+from sidechainnet.utils.align import can_be_directly_merged, expand_data_with_mask, assert_mask_gaps_are_correct
 
 pr.confProDy(verbosity="none")
 
-from sidechainnet.download_and_parse import download_sidechain_data, load_data, save_data
-from sidechainnet.utils.proteinnet import parse_raw_proteinnet
-from sidechainnet.utils.alignment import init_aligner, manually_adjust_data
-from sidechainnet.utils.structure import NUM_PREDICTED_COORDS
+from sidechainnet.utils.download import download_sidechain_data, load_data, save_data
+from sidechainnet.utils.parse import parse_raw_proteinnet
+from sidechainnet.utils.align import init_aligner, manually_adjust_data
+from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
@@ -64,13 +64,11 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["msk"] = mask
 
-
-
         l = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
-                if len(v) // NUM_PREDICTED_COORDS != l: return {}, "failed"
-                assert len(v) // NUM_PREDICTED_COORDS == l, f"{k} does not have correct length {l} (is {len(v)//NUM_PREDICTED_COORDS})."
+                if len(v) // NUM_COORDS_PER_RES != l: return {}, "failed"
+                assert len(v) // NUM_COORDS_PER_RES == l, f"{k} does not have correct length {l} (is {len(v) // NUM_COORDS_PER_RES})."
             else:
                 if len(v) != l: return {}, "failed"
                 assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."

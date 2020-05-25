@@ -1,7 +1,10 @@
  # Reproducing SidechainNet
- For steps 1 and 2, pay careful attention to the subdirectory structure indicated by `cd` and `mkdir` commands when downloading ProteinNet data. After ProteinNet data has been downloaded, you may clone the SidechainNet repository anywhere you wish.
+ For steps 1 and 2, pay careful attention to the subdirectory structure indicated by `cd` and `mkdir` commands when downloading ProteinNet data. After ProteinNet data has been downloaded, you may clone the SidechainNet repository anywhere you wish. 
+ 
+ The entire procedure takes 2 hrs and 45 minutes on a workstation with 16 cores and 64 GB RAM.
 
-### 1. Download raw ProteinNet data 
+
+### 1. Download raw ProteinNet data using links from [proteinnet/README.md](https://github.com/aqlaboratory/proteinnet/blob/master/README.md)
 ```shell script
 mkdir -p proteinnet/casp12/targets
 cd proteinnet
@@ -31,4 +34,4 @@ git clone https://github.com/jonathanking/sidechainnet.git
 cd sidechainnet/sidechainnet
 python create.py $PN_PATH
 ```
-SidechainNet files are now created in `../data/sidechainnet/casp12_100.pkl`
+SidechainNet files are now created in `sidechainnet/data/sidechainnet/casp12_100.pkl`
