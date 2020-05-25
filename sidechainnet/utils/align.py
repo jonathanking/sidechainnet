@@ -99,13 +99,13 @@ def shorten_ends(s1, s2, s1_ang, s1_crd):
     while mask[i] == "-":
         s1 = s1[:-1]
         s1_ang = s1_ang[:-1]
-        s1_crd = s1_crd[:-NUM_PREDICTED_COORDS]
+        s1_crd = s1_crd[:-NUM_COORDS_PER_RES]
         mask = mask[:-1]
         i -= 1
     while mask[0] == "-":
         s1 = s1[1:]
         s1_ang = s1_ang[1:]
-        s1_crd = s1_crd[NUM_PREDICTED_COORDS:]
+        s1_crd = s1_crd[NUM_COORDS_PER_RES:]
         mask = mask[1:]
     return s1, s1_ang, s1_crd
 
@@ -353,12 +353,12 @@ def assert_mask_gaps_are_correct(mask, coordinates):
     if mask.count("-") == 0:
         return True
 
-    assert mask.count("+") == len(coordinates) // NUM_PREDICTED_COORDS, \
+    assert mask.count("+") == len(coordinates) // NUM_COORDS_PER_RES, \
         "The number of coordinates must match the number of matched residues."
 
     # First, build a nested list that holds all contiguous regions of the data
     # according to the mask
-    coord_iter = coordinate_iterator(coordinates, NUM_PREDICTED_COORDS)
+    coord_iter = coordinate_iterator(coordinates, NUM_COORDS_PER_RES)
     coord_contigs = []
     cur_contig = []
 
