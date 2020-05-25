@@ -184,8 +184,10 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
           f"{len(errors['failed'])} IDs failed to combine successfully.")
     return pn_data
 
+
 def get_tuple(pndata, scdata, pnid):
     return pndata[pnid], scdata[pnid], pnid
+
 
 def combine_wrapper(pndata_scdata_pnid):
     pn_data, sc_data, pnid = pndata_scdata_pnid
