@@ -11,7 +11,7 @@ import prody as pr
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 
-from sidechainnet.utils.align import can_be_directly_merged, expand_data_with_mask, assert_mask_gaps_are_correct
+from sidechainnet.utils.align import can_be_directly_merged, expand_data_with_mask, assert_mask_gaps_are_correct, init_basic_aligner, init_aligner
 
 pr.confProDy(verbosity="none")
 

@@ -15,6 +15,15 @@ from sidechainnet.utils.build_info import NUM_COORDS_PER_RES, PRODY_CA_DIST
 from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
+def init_basic_aligner(allow_mismatches=False):
+    """ Returns an aligner with minimal assumptions about gaps."""
+    a = Align.PairwiseAligner()
+    if not allow_mismatches:
+        a.mismatch = -np.inf
+        a.mismatch_score = -np.inf
+    return a
+
+
 def init_aligner(allow_target_gaps=False, allow_target_mismatches=False):
     """
     Creates an aligner whose weights penalize excessive gaps, make gaps
@@ -22,12 +31,12 @@ def init_aligner(allow_target_gaps=False, allow_target_mismatches=False):
     of sequences.
     """
     a = Align.PairwiseAligner()
+    a.mismatch = -np.inf
+    a.mismatch_score = -np.inf
 
     # Don't allow for gaps or mismatches with the target sequence
     if not allow_target_gaps:
         a.target_gap_score = -np.inf
-    a.mismatch = -np.inf
-    a.mismatch_score = -np.inf
 
     # Do not let matching items overwhelm determining where gaps should go
     if not allow_target_gaps:
