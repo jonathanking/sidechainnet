@@ -33,7 +33,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 <sup>⸸</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
-## Downloading SidechainNet
+## Downloading SidechainNet data
 
 For every existing ProteinNet dataset, a corresponding SidechainNet dataset has been created and can be downloaded via [Box](https://www.youtube.com/watch?v=dQw4w9WgXcQ). 
 
@@ -127,6 +127,16 @@ In addition to the data itself, this repository also provides several utilities:
 If you are only interested in using and interacting with SidechainNet data, please see the above examples. However, if you would like to reproduce our work or make modifications to the dataset, you may follow the directions below to generate SidechainNet from scratch.
 
 [How to reproduce and generate SidechainNet](how_to_reproduce.md)
+
+## Package Requirements
+
+- Python 3
+- ProDy (`pip install ProDy`)
+- Biopython
+- numpy
+- scipy
+- PyTorch
+- tqdm
 
 
 ## Acknowledgements
