@@ -6,9 +6,7 @@ from sidechainnet.datasets.batch_sampler import SimilarLengthBatchSampler
 from sidechainnet.datasets.protein_dataset import ProteinDataset, BinnedProteinDataset
 from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.utils.build_info import NUM_COORDS_PER_RES
-
-VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
-MAX_SEQ_LEN = 500
+from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
 def paired_collate_fn(insts):

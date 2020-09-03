@@ -28,6 +28,7 @@ from sidechainnet.utils.measure import angle_list_to_sin_cos, get_seq_coords_and
 from sidechainnet.utils.parse import parse_astral_summary_file, get_chain_from_astral_id
 
 MAX_SEQ_LEN = 10_000
+VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
 ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
 del ASTRAL_SUMMARY
 
@@ -583,7 +584,6 @@ if __name__ == "__main__":
                         '{30,50,70,90,95,100}. Default 100.')
     args = parser.parse_args()
 
-    VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
     TRAIN_FILE = f"training_{args.training_set}.pt"
     PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = None, None, None
     ASTRAL_FILE = "../data/astral_summary.txt"  # combined previous versions of dir.des.scope.2.xx-stable.txt into
