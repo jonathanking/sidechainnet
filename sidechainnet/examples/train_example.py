@@ -8,7 +8,7 @@ from sidechainnet.examples.rgn import RGN
 
 def main():
     """ An example of model training. """
-    data = sidechainnet.load_datasets("../../data/sidechainnet/sidechainnet_casp12_100.pt")
+    data = sidechainnet.load_datasets("../../data/sidechainnet/sidechainnet_casp12_100.pkl")
     model = RGN(args.d_in, args.d_hidden, args.d_out, args.n_layers)
 
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     # Required args
     required = parser.add_argument_group("Required Args")
-    required.add_argument('--data', help="Path to SidechainNet.", default="../data/proteinnet/casp12_200123_30.pt")
+    required.add_argument('--data', help="Path to SidechainNet.", default="../data/proteinnet/casp12_200123_30.pkl")
 
     # Training parameters
     training = parser.add_argument_group("Training Args")
