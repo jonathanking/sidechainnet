@@ -143,7 +143,6 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     Preprocesses raw ProteinNet records by reading them and transforming them into PyTorch-saved
     dictionaries. Files are kept separate due to file size. For ease of inspection,
     the ProteinNet IDs are extracted and save as `.ids` files.
-    # TODO: assert existence of test/targets files
 
     Args:
         proteinnet_in_dir: Directory where all raw ProteinNet files are kept
@@ -163,9 +162,9 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
         relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
         return relevant_ids
 
-    # If the torch-preprocessed ProteinNet dictionaries don't exist, create them.
+    # If the preprocessed ProteinNet dictionaries don't exist, create them.
     if not os.path.exists(proteinnet_out_dir):
-        os.mkdir(proteinnet_out_dir)
+        os.makedirs(proteinnet_out_dir)
 
     # Look for the target ProteinNet files
     if not os.path.isdir(os.path.join(proteinnet_in_dir, "targets")):
@@ -174,14 +173,14 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
               "following link: http://predictioncenter.org/download_area/CASP12/targets/\n"
               "(replace 'CASP12' with the CASP version of interest and download "
               "the most recent, largest compressed file in the list.")
+        raise ValueError("Could not find ProteinNet targets.")
     # Look for the raw ProteinNet files
     input_files = [f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]")) if
         not os.path.isdir(f)]
-    assert len(input_files) == 8, f"Looking for raw ProteinNet files in " \
-                                  f"'{proteinnet_in_dir}', but could not find" \
-                                  f" all 8.\n Please download from Mohammed " \
-                                  f"AlQuraishi's repository: " \
-                                  f"https://github.com/aqlaboratory/proteinnet"
+    assert len(input_files) == 8, (f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
+                                   "could not find all 8.\n Please download from Mohammed "
+                                   "AlQuraishi's repository: "
+                                   "https://github.com/aqlaboratory/proteinnet")
 
     # Process each ProteinNet file by turning them into PyTorch saved dictionaries
     print("Preprocessing raw ProteinNet files...")
