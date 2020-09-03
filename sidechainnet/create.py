@@ -25,12 +25,11 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     """ Supplements one entry in ProteinNet with sidechain information.
 
     Args:
-        aligner: A sequence aligner with desired settings.
-            See utils.alignment.init_aligner()
-        pn_entry: A dictionary describing a single ProteinNet protein. Contains
-            sequence, coordinates, PSSMs, secondary structure.
-        sc_entry: A dictionary describing the sidechain information for the
-            same protein. Contains sequence, coordinates, and angles.
+        aligner: A sequence aligner with desired settings. See utils.alignment.init_aligner().
+        pn_entry: A dictionary describing a single ProteinNet protein. Contains sequence,
+            coordinates, PSSMs, secondary structure.
+        sc_entry: A dictionary describing the sidechain information for the same protein. Contains
+        sequence, coordinates, and angles.
 
     Returns:
         A dictionary that has unified the two sets of information.
@@ -195,7 +194,7 @@ def combine_wrapper(pndata_scdata_pnid):
 
 
 def main():
-    # First, create PyTorch versions of  raw proteinnet files for convenience
+    # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, args.training_set)
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
