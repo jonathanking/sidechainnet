@@ -49,7 +49,7 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version,
     """
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
-    output_name = f"sidechain-only_{casp_version}_{training_set}.pt"
+    output_name = f"sidechain-only_{casp_version}_{training_set}.pkl"
     output_path = os.path.join(sidechainnet_out_dir, output_name)
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
@@ -496,7 +496,7 @@ def save_data_dict(data):
     Saves a Python dictionary containing all training data to disk via Pickle or PyTorch.
     """
     if not args.out_file:
-        args.out_file = "../data/proteinnet/" + CASP_VERSION + "_" + SUFFIX + ".pt"
+        args.out_file = "../data/proteinnet/" + CASP_VERSION + "_" + SUFFIX + ".pkl"
     torch.save(data, args.out_file)
     print(f"Data saved to {args.out_file}.")
 
@@ -509,8 +509,8 @@ def main():
     print("IDs fetched.")
     PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = torch.load(
         os.path.join(args.input_dir, "torch", TRAIN_FILE)), torch.load(
-            os.path.join(args.input_dir, "torch", "validation.pt")), torch.load(
-                os.path.join(args.input_dir, "torch", "testing.pt"))
+            os.path.join(args.input_dir, "torch", "validation.pkl")), torch.load(
+                os.path.join(args.input_dir, "torch", "testing.pkl"))
     print(len(train_pdb_ids), len(valid_ids), len(test_casp_ids))
     # Download and preprocess all data from PDB IDs
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
@@ -584,7 +584,7 @@ if __name__ == "__main__":
                         '{30,50,70,90,95,100}. Default 100.')
     args = parser.parse_args()
 
-    TRAIN_FILE = f"training_{args.training_set}.pt"
+    TRAIN_FILE = f"training_{args.training_set}.pkl"
     PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = None, None, None
     ASTRAL_FILE = "../data/astral_summary.txt"  # combined previous versions of dir.des.scope.2.xx-stable.txt into
     # one big dict

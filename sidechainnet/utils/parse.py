@@ -144,7 +144,7 @@ def process_file(input_filename_out_dir, return_ids=False):
         if return_ids:
             all_ids.append(id_)
     with open(os.path.join(out_dir,
-                           os.path.basename(input_filename) + ".pt"),
+                           os.path.basename(input_filename) + ".pkl"),
               "wb") as f:
         pickle.dump(meta_dict, f)
     input_file.close()
@@ -172,7 +172,7 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
         relevant_ids: A list of ProteinNet IDs from corresponding training_set
 
     """
-    train_file = f"training_{training_set}.pt"
+    train_file = f"training_{training_set}.pkl"
 
     # If the desired ProteinNet dataset has already been processed, load its IDs
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
@@ -230,9 +230,9 @@ def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
     Returns:
         A list of ProteinNet IDs (training, validation, and test set).
     """
-    train_file = f"training_{training_set}.pt"
+    train_file = f"training_{training_set}.pkl"
     relevant_training_file = os.path.join(proteinnet_out_dir,
-                                          train_file.replace(".pt", "_ids.txt"))
+                                          train_file.replace(".pkl", "_ids.txt"))
     relevant_id_files = [
         relevant_training_file,
         os.path.join(proteinnet_out_dir, "validation_ids.txt"),

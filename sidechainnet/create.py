@@ -85,9 +85,9 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         for sidechain prediction.
     """
     print("Preparing to merge ProteinNet data with downloaded sidechain data.")
-    pn_files = [os.path.join(proteinnet_out, f"training_{training_set}.pt"),
-                os.path.join(proteinnet_out, f"validation.pt"),
-                os.path.join(proteinnet_out, f"testing.pt")]
+    pn_files = [os.path.join(proteinnet_out, f"training_{training_set}.pkl"),
+                os.path.join(proteinnet_out, f"validation.pkl"),
+                os.path.join(proteinnet_out, f"testing.pkl")]
 
     pn_data = {}
     for f in pn_files:
@@ -197,7 +197,7 @@ def main():
                                                    args.proteinnet_in)
 
     # For debugging errors
-    # sc_data = load_data("../data/sidechainnet/seq-only_casp12_100.pt")
+    # sc_data = load_data("../data/sidechainnet/seq-only_casp12_100.pkl")
 
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet = combine_datasets(args.proteinnet_out, sc_data,
@@ -205,7 +205,7 @@ def main():
 
     save_data(sidechainnet, os.path.join(args.sidechainnet_out,
                                          f"sidechainnet_{args.casp_version}"
-                                         f"_{args.training_set}.pt"))
+                                         f"_{args.training_set}.pkl"))
 
 
 if __name__ == "__main__":
