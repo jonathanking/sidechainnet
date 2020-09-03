@@ -13,7 +13,7 @@ mkdir -p proteinnet/casp12/targets
 cd proteinnet
 
 # Ensure you are downloading the correct CASP version here
-wget https://sharehost.hms.harvard.edu/sysbio/alquraishi/proteinnet/human_readable/casp12.tar.gz casp12/
+wget https://sharehost.hms.harvard.edu/sysbio/alquraishi/proteinnet/human_readable/casp12.tar.gz -P casp12/
 cd casp12
 tar -xvf casp12.tar.gz
 
@@ -57,7 +57,7 @@ We must also download the target structure files used in the CASP competitions. 
 On this webpage, we can identify a compressed file to download (the largest and most recent file, assumedly) that contains all of the relevant target files. Then, download and unarchive the corresponding file. SidechainNet assumes that that there will be a subdirectory title `targets` within the CASP directory you downloaded from ProteinNet previously. I have selected an appropriate file for the CASP12 targets below.
 
 ```shell script
-wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0.releaseDec022016.tgz targets/
+wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0.releaseDec022016.tgz -P targets/
 tar -xvf targets/targets.gz
 ```
 
