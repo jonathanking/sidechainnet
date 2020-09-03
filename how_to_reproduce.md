@@ -1,7 +1,10 @@
- # Reproducing SidechainNet
- For steps 1 and 2, pay careful attention to the subdirectory structure indicated by `cd` and `mkdir` commands when downloading ProteinNet data. After ProteinNet data has been downloaded, you may clone the SidechainNet repository anywhere you wish. 
+# Reproducing SidechainNet
  
- The entire procedure takes 2 hrs and 45 minutes on a workstation with 16 cores and 64 GB RAM.
+ For steps 1 and 2, pay careful attention to the subdirectory structure indicated by `cd` and `mkdir` commands when downloading the raw ProteinNet data. **You will not need to download the ProteinNet repository, only the data linked to by ProteinNet's README.** 
+
+After downloading the ProteinNet data, you may clone the SidechainNet repository anywhere you wish. 
+ 
+ The entire procedure to generate SidechainNet takes 2 hrs and 45 minutes on a workstation with 16 cores and 64 GB RAM.
 
 
 ### 1. Download raw ProteinNet data using links from [proteinnet/README.md](https://github.com/aqlaboratory/proteinnet/blob/master/README.md)
@@ -17,18 +20,48 @@ tar -xvf casp12.tar.gz
 # Save the path to this directory for generating SidechainNet
 PN_PATH=$(pwd)
 ```
+
+After downloading the data, you should have a directory structure that looks like this:
+
+ ```
+proteinnet/
+├── casp12/
+│  ├── testing
+│  ├── training_30
+│  ├── training_50
+│  ├── training_70
+│  ├── training_90
+│  ├── training_95
+│  ├── training_100
+│  ├── validation
+│  └──targets/
+│    ├── T0283.pbd
+│    ├── T0284.pbd
+│    ├── ...
+│    └── T0386.pbd
+└── caspX/
+   ├── testing
+   ├── training_30
+   ├── ...
+   └──targets/
+     └── ...
+ ```
+
 ### 2. Download raw CASP target data into `targets` subdirectory
 We must also download the target structure files used in the CASP competitions. For each compeition, you can vist the corresponding target data webpage (replace `CASP12` with the competition of interest). 
-```shell script
-https://predictioncenter.org/download_area/CASP12/targets/
-```
-On this webpage, we can identify a compressed file to download (the largest and most recent file, assumedly) that contains all of the relevant target files. Then, download and unarchive the corresponding file. SidechainNet assumes that that there will be a subdirectory title `targets` within the CASP directory you downloaded from ProteinNet previously.
+
+
+[https://predictioncenter.org/download_area/CASP12/targets/](https://predictioncenter.org/download_area/CASP12/targets/)
+
+
+On this webpage, we can identify a compressed file to download (the largest and most recent file, assumedly) that contains all of the relevant target files. Then, download and unarchive the corresponding file. SidechainNet assumes that that there will be a subdirectory title `targets` within the CASP directory you downloaded from ProteinNet previously. I have selected an appropriate file for the CASP12 targets below.
+
 ```shell script
 wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0.releaseDec022016.tgz targets/
 tar -xvf targets/targets.gz
 ```
 
-### 3. Generate SidechainNet
+### 3. Generate SidechainNet (in a dierctory of your choosing)
 ```shell script
 git clone https://github.com/jonathanking/sidechainnet.git
 cd sidechainnet/sidechainnet
