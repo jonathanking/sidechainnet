@@ -140,9 +140,9 @@ def process_file(input_filename_out_dir, return_ids=False):
 def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     """Extracts and saves information for a single ProteinNet dataset.
 
-    Preprocesses raw ProteinNet records by reading them and transforming them into PyTorch-saved
-    dictionaries. Files are kept separate due to file size. For ease of inspection,
-    the ProteinNet IDs are extracted and save as `.ids` files.
+    Preprocesses raw ProteinNet records by reading them and transforming them
+    into PyTorch-saved dictionaries. Files are kept separate due to file size.
+    For ease of inspection, the ProteinNet IDs are extracted and save as `.ids` files.
 
     Args:
         proteinnet_in_dir: Directory where all raw ProteinNet files are kept

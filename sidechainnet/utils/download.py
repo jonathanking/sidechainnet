@@ -35,18 +35,20 @@ del ASTRAL_SUMMARY
 
 def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version,
                             training_set, limit, proteinnet_in):
-    """
-    Downloads the sidechain data for the corresponding ProteinNet IDs.
+    """Downloads the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
-        training_set: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
-        casp_version: A string that describes the CASP version i.e. 'casp7'
         pnids: List of ProteinNet IDs to download sidechain data for
         sidechainnet_out_dir: Path to directory for saving sidechain data
+        casp_version: A string that describes the CASP version i.e. 'casp7'
+        training_set: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
+        limit: An integer describing maximum number of proteins to process
+        proteinnet_in: A string representing the path where processed proteinnet data is stored.
 
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
     """
+    # Initalize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
     output_name = f"sidechain-only_{casp_version}_{training_set}.pkl"
@@ -54,16 +56,18 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version,
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
 
+    # Simply load sidechain data if it has already been processed.
     if os.path.exists(output_path):
         print(f"Sidechain information already preprocessed ({output_path}).")
         return load_data(output_path), output_path
 
+    # Clean up any error logs that have been left-over from previous runs.
     if os.path.exists("errors"):
         for file in glob('errors/*.txt'):
             os.remove(file)
 
+    # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
-
     save_data(sc_data, output_path)
     report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
@@ -75,7 +79,7 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version,
 
 
 def report_errors(pnids_errorcodes, total_pnids):
-    """ Provides a summary of errors after parsing SidechainNet data.
+    """Provides a summary of errors after parsing SidechainNet data.
 
     Args:
         pnids_errorcodes: A list of tuples (pnid, error_code) of ProteinNet IDs

@@ -22,7 +22,7 @@ from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
-    """ Supplements one entry in ProteinNet with sidechain information.
+    """Supplements one entry in ProteinNet with sidechain information.
 
     Args:
         aligner: A sequence aligner with desired settings. See utils.alignment.init_aligner().
@@ -198,7 +198,8 @@ def main():
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, args.training_set)
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
-    sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out, args.casp_version,
+    sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
+                                                   args.casp_version,
                                                    args.training_set, args.limit,
                                                    args.proteinnet_in)
 
@@ -208,8 +209,9 @@ def main():
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet = combine_datasets(args.proteinnet_out, sc_data, args.training_set)
 
-    save_data(sidechainnet, os.path.join(args.sidechainnet_out, f"sidechainnet_{args.casp_version}"
-                                                                f"_{args.training_set}.pkl"))
+    save_data(sidechainnet,
+              os.path.join(args.sidechainnet_out,
+                           f"sidechainnet_{args.casp_version}_{args.training_set}.pkl"))
 
 
 if __name__ == "__main__":
