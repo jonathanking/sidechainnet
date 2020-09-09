@@ -1,4 +1,6 @@
-""" This script parses the raw ProteinNet files from https://github.com/aqlaboratory/proteinnet. """
+""" This script parses the raw ProteinNet files from
+https://github.com/aqlaboratory/proteinnet. """
+
 import itertools
 import multiprocessing
 import os
@@ -15,8 +17,9 @@ def load_ids_from_text_files(directory, training_set):
     files, reads and returns the contents of those files. Effectively returns
     a list of IDs associated with the training, validation, and test sets.
     """
-    with open(os.path.join(directory, f"training_{training_set}_ids.txt"), "r") as trainf, open(
-        os.path.join(directory, "validation_ids.txt"), "r") as validf, open(
+    with open(os.path.join(directory, f"training_{training_set}_ids.txt"),
+              "r") as trainf, open(os.path.join(directory, "validation_ids.txt"),
+                                   "r") as validf, open(
         os.path.join(directory, "testing_ids.txt"), "r") as testf:
         train_ids = trainf.read().splitlines()
         valid_ids = validf.read().splitlines()
@@ -86,7 +89,8 @@ def read_protein_from_file(file_pointer, include_tertiary):
         elif next_line == '[EVOLUTIONARY]\n':
             evolutionary = []
             for residue in range(21):
-                evolutionary.append([float(step) for step in file_pointer.readline().split()])
+                evolutionary.append(
+                    [float(step) for step in file_pointer.readline().split()])
             evolutionary = np.asarray(evolutionary).T
             dict_.update({'evolutionary': evolutionary})
         elif next_line == '[SECONDARY]\n':
@@ -96,7 +100,8 @@ def read_protein_from_file(file_pointer, include_tertiary):
             tertiary = []
             # 3 dimension
             for axis in range(3):
-                tertiary.append([float(coord) for coord in file_pointer.readline().split()])
+                tertiary.append(
+                    [float(coord) for coord in file_pointer.readline().split()])
             dict_.update({'tertiary': tertiary})
         elif next_line == '[MASK]\n':
             mask = list([_mask_dict[aa] for aa in file_pointer.readline()[:-1]])
@@ -115,7 +120,8 @@ def process_file(input_filename_out_dir, return_ids=False):
     all_ids = []
     input_filename, out_dir = input_filename_out_dir
     print("    " + input_filename)
-    text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '_ids.txt'), "w")
+    text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '_ids.txt'),
+                     "w")
     input_file = open(input_filename, "r")
     meta_dict = {}
     while True:
@@ -128,7 +134,8 @@ def process_file(input_filename_out_dir, return_ids=False):
         text_file.write(f"{id_}\n")
         if return_ids:
             all_ids.append(id_)
-    with open(os.path.join(out_dir, os.path.basename(input_filename) + ".pkl"), "wb") as f:
+    with open(os.path.join(out_dir, os.path.basename(input_filename) + ".pkl"),
+              "wb") as f:
         pickle.dump(meta_dict, f)
     input_file.close()
     text_file.close()
@@ -156,10 +163,10 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
 
     # If the desired ProteinNet dataset has already been processed, load its IDs
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
-        print(
-            f"Raw ProteinNet files already preprocessed ("
-            f"{os.path.join(proteinnet_out_dir, train_file)}).")
-        relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
+        print(f"Raw ProteinNet files already preprocessed ("
+              f"{os.path.join(proteinnet_out_dir, train_file)}).")
+        relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
+                                                                  training_set)
         return relevant_ids
 
     # If the preprocessed ProteinNet dictionaries don't exist, create them.
@@ -170,17 +177,19 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     if not os.path.isdir(os.path.join(proteinnet_in_dir, "targets")):
         print("There must be a subdirectory containing all protein targets with "
               "the name 'targets'.\nYou can download the .tgz file from the "
-              "following link: http://predictioncenter.org/download_area/CASP12/targets/\n"
+              "following link: http://predictioncenter.org/download_area/CASP12/targets"
+              "/\n"
               "(replace 'CASP12' with the CASP version of interest and download "
               "the most recent, largest compressed file in the list.")
         raise ValueError("Could not find ProteinNet targets.")
     # Look for the raw ProteinNet files
     input_files = [f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]")) if
-        not os.path.isdir(f)]
-    assert len(input_files) == 8, (f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
-                                   "could not find all 8.\n Please download from Mohammed "
-                                   "AlQuraishi's repository: "
-                                   "https://github.com/aqlaboratory/proteinnet")
+                   not os.path.isdir(f)]
+    assert len(input_files) == 8, (
+        f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
+        "could not find all 8.\n Please download from Mohammed "
+        "AlQuraishi's repository: "
+        "https://github.com/aqlaboratory/proteinnet")
 
     # Process each ProteinNet file by turning them into PyTorch saved dictionaries
     print("Preprocessing raw ProteinNet files...")
@@ -189,7 +198,8 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     print(f"Done. Processed ProteinNet files saved to {proteinnet_out_dir}.")
 
     # Return the ProteinNet IDs associated with the target dataset
-    relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
+    relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
+                                                              training_set)
     return relevant_ids
 
 
@@ -207,8 +217,8 @@ def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
     relevant_training_file = os.path.join(proteinnet_out_dir,
                                           train_file.replace(".pkl", "_ids.txt"))
     relevant_id_files = [relevant_training_file,
-        os.path.join(proteinnet_out_dir, "validation_ids.txt"),
-        os.path.join(proteinnet_out_dir, "testing_ids.txt")]
+                         os.path.join(proteinnet_out_dir, "validation_ids.txt"),
+                         os.path.join(proteinnet_out_dir, "testing_ids.txt")]
     relevant_ids = []
     for fname in relevant_id_files:
         with open(fname, "r") as f:
@@ -240,7 +250,8 @@ def get_chain_from_astral_id(astral_id, d):
     this function attempts to return the relevant, parsed ProDy object.
     """
     pdbid, chain = d[astral_id]
-    assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid {pdbid}."
+    assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid " \
+                             f"{pdbid}."
     chain, resnums = chain.split(":")
 
     if astral_id == "d4qrye_":

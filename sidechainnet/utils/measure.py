@@ -1,13 +1,10 @@
-""" Utility functions when parsing protein structures. """
+""" Utility functions for parsing protein structures. """
 
 import numpy as np
 import prody as pr
 
-from sidechainnet.utils.build_info import SC_BUILD_INFO, NUM_ANGLES, \
-    NUM_BB_TORSION_ANGLES, NUM_BB_OTHER_ANGLES, NUM_COORDS_PER_RES
-from sidechainnet.utils.errors import \
-    NonStandardAminoAcidError, IncompleteStructureError, SequenceError, \
-    MissingAtomsError, NoneStructureError
+from sidechainnet.utils.build_info import NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError,    NonStandardAminoAcidError, NoneStructureError, SequenceError
 
 GLOBAL_PAD_CHAR = np.nan
 
@@ -68,27 +65,23 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
     except KeyError:
         raise NonStandardAminoAcidError
     if len(torsion_names) == 0:
-        return (
-                       NUM_ANGLES -
-                       (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES)) * [GLOBAL_PAD_CHAR]
+        return (NUM_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES)) * [GLOBAL_PAD_CHAR]
 
     # Compute CB dihedral, which may depend on the previous or next residue for placement
     try:
         if prev_residue:
-            cb_dihedral = compute_single_dihedral(
-                (prev_residue.select("name C"),
-                 *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])))
+            cb_dihedral = compute_single_dihedral((prev_residue.select("name C"),
+                                                   *(residue.select(f"name {an}") for an in
+                                                     ["N", "CA", "CB"])))
         else:
-            cb_dihedral = compute_single_dihedral(
-                (next_res.select("name N"),
-                 *(residue.select(f"name {an}") for an in ["C", "CA", "CB"])))
+            cb_dihedral = compute_single_dihedral((
+            next_res.select("name N"), *(residue.select(f"name {an}") for an in ["C", "CA", "CB"])))
     except AttributeError:
         cb_dihedral = GLOBAL_PAD_CHAR
 
     res_dihedrals = [cb_dihedral]
 
-    for t_name, t_val in zip(
-            torsion_names[1:],
+    for t_name, t_val in zip(torsion_names[1:],
             SC_BUILD_INFO[residue.getResname()]["torsion-vals"][1:]):
         # Only record torsional angles that are relevant (i.e. not planar).
         # All torsion values that vary are marked with 'p' in SC_BUILD_INFO
@@ -96,12 +89,11 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
             break
         atom_names = t_name.split("-")
         res_dihedrals.append(
-            compute_single_dihedral(
-                [residue.select("name " + an) for an in atom_names]))
+            compute_single_dihedral([residue.select("name " + an) for an in atom_names]))
 
-    return res_dihedrals + (NUM_ANGLES -
-                            (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) -
-                            len(res_dihedrals)) * [GLOBAL_PAD_CHAR]
+    return res_dihedrals + (
+                NUM_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) - len(res_dihedrals)) * [
+               GLOBAL_PAD_CHAR]
 
 
 def get_atom_coords_by_names(residue, atom_names):
@@ -128,8 +120,7 @@ def measure_res_coordinates(_res):
     sc_atom_names = determine_sidechain_atomnames(_res)
     bbcoords = get_atom_coords_by_names(_res, ["N", "CA", "C", "O"])
     sccoords = get_atom_coords_by_names(_res, sc_atom_names)
-    coord_padding = np.zeros(
-        (NUM_COORDS_PER_RES - len(bbcoords) - len(sccoords), 3))
+    coord_padding = np.zeros((NUM_COORDS_PER_RES - len(bbcoords) - len(sccoords), 3))
     coord_padding[:] = GLOBAL_PAD_CHAR
     return np.concatenate((np.stack(bbcoords + sccoords), coord_padding))
 
@@ -167,21 +158,9 @@ def replace_nonstdaas(residues):
         for a complete list of non-standard amino acids supported here.
         `XAA` is treated as missing.
     """
-    replacements = {
-        "ASX": "ASP",
-        "GLX": "GLU",
-        "CSO": "CYS",
-        "HIP": "HIS",
-        "HSD": "HIS",
-        "HSE": "HIS",
-        "HSP": "HIS",
-        "MSE": "MET",
-        "SEC": "CYS",
-        "SEP": "SER",
-        "TPO": "THR",
-        "PTR": "TYR",
-        "XLE": "LEU"
-    }
+    replacements = {"ASX": "ASP", "GLX": "GLU", "CSO": "CYS", "HIP": "HIS", "HSD": "HIS",
+        "HSE"            : "HIS", "HSP": "HIS", "MSE": "MET", "SEC": "CYS", "SEP": "SER",
+        "TPO"            : "THR", "PTR": "TYR", "XLE": "LEU"}
 
     for r in residues:
         rname = r.getResname()
@@ -228,8 +207,8 @@ def get_seq_coords_and_angles(chain):
         bond_angles = measure_bond_angles(res, res_id, all_residues)
 
         # Measure sidechain angles
-        all_res_angles = bb_angles + bond_angles + compute_sidechain_dihedrals(
-            res, prev_res, next_res)
+        all_res_angles = bb_angles + bond_angles + compute_sidechain_dihedrals(res, prev_res,
+            next_res)
 
         # Measure coordinates
         rescoords = measure_res_coordinates(res)
@@ -244,10 +223,8 @@ def get_seq_coords_and_angles(chain):
     coords_np = np.concatenate(coords)
 
     if coords_np.shape[0] != len(observed_sequence) * NUM_COORDS_PER_RES:
-        print(
-            f"Coords shape {coords_np.shape} does not match len(seq)*{NUM_COORDS_PER_RES} = "
-            f"{len(observed_sequence) * NUM_COORDS_PER_RES},\nOBS: {observed_sequence}\n{chain}"
-        )
+        print(f"Coords shape {coords_np.shape} does not match len(seq)*{NUM_COORDS_PER_RES} = "
+              f"{len(observed_sequence) * NUM_COORDS_PER_RES},\nOBS: {observed_sequence}\n{chain}")
         raise SequenceError
 
     return dihedrals_np, coords_np, observed_sequence
@@ -377,12 +354,11 @@ def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
     a3 = coords4 - coords3
 
     v1 = np.cross(a1, a2)
-    v1 = v1 / (v1 * v1).sum(-1)**0.5
+    v1 = v1 / (v1 * v1).sum(-1) ** 0.5
     v2 = np.cross(a2, a3)
-    v2 = v2 / (v2 * v2).sum(-1)**0.5
+    v2 = v2 / (v2 * v2).sum(-1) ** 0.5
     porm = np.sign((v1 * a3).sum(-1))
-    arccos_input_raw = (v1 * v2).sum(-1) / ((v1**2).sum(-1) *
-                                            (v2**2).sum(-1))**0.5
+    arccos_input_raw = (v1 * v2).sum(-1) / ((v1 ** 2).sum(-1) * (v2 ** 2).sum(-1)) ** 0.5
     if -1 <= arccos_input_raw <= 1:
         arccos_input = arccos_input_raw
     elif arccos_input_raw > 1 and arccos_input_raw - 1 < eps:

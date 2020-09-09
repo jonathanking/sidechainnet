@@ -58,7 +58,7 @@ On this webpage, we can identify a compressed file to download (the largest and 
 
 ```shell script
 wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0.releaseDec022016.tgz -P targets/
-tar -xvf targets/targets.gz
+tar -xvf targets/*.gz
 ```
 
 ### 3. Generate SidechainNet (in a dierctory of your choosing)

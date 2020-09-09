@@ -1,7 +1,9 @@
 """
-    Using ProteinNet as a guide, this script creates a new dataset that adds sidechain atom information.
+    Using ProteinNet as a guide, this script creates a new dataset that adds sidechain atom
+    information.
     It retains data splits, sequences, and masks but recomputes each structure's coordinates so that
-    sidechain atoms may be recorded. It also saves the entirety of the data as a single Python dictionary.
+    sidechain atoms may be recorded. It also saves the entirety of the data as a single Python
+    dictionary.
 
     Author: Jonathan King
     Date:   July 21, 2019
@@ -19,13 +21,13 @@ import numpy as np
 import prody as pr
 import tqdm
 
-import sidechainnet
 from sidechainnet.utils.astral_data import ASTRAL_SUMMARY
-from sidechainnet.utils.errors import ERRORS
 from sidechainnet.utils.errors import *
+from sidechainnet.utils.errors import ERRORS, report_errors
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR, angle_list_to_sin_cos, \
+    get_seq_coords_and_angles, no_nans_infs_allzeros
+from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file
 from sidechainnet.utils.sequence import bin_sequence_data
-from sidechainnet.utils.measure import angle_list_to_sin_cos, get_seq_coords_and_angles, no_nans_infs_allzeros, GLOBAL_PAD_CHAR
-from sidechainnet.utils.parse import parse_astral_summary_file, get_chain_from_astral_id
 
 MAX_SEQ_LEN = 10_000
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
@@ -33,8 +35,8 @@ ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
 del ASTRAL_SUMMARY
 
 
-def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version,
-                            training_set, limit, proteinnet_in):
+def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set, limit,
+                            proteinnet_in):
     """Downloads the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
@@ -78,34 +80,6 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version,
     return sc_data, output_path
 
 
-def report_errors(pnids_errorcodes, total_pnids):
-    """Provides a summary of errors after parsing SidechainNet data.
-
-    Args:
-        pnids_errorcodes: A list of tuples (pnid, error_code) of ProteinNet IDs
-            that could not be parsed completely.
-        total_pnids: Total number of pnids processed.
-
-    Returns:
-        None. Prints summary to stdout and generates files containing failed
-        IDs in .errors/{ERROR_CODE}.txt
-
-    """
-    print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain "
-          f"data.")
-    error_summarizer = sidechainnet.utils.errors.ProteinErrors()
-    for pnid, error_code in pnids_errorcodes:
-        error_summarizer.count(error_code, pnid)
-    error_summarizer.summarize(total_pnids)
-    if os.path.exists("errors/MODIFIED_MODEL_WARNING.txt"):
-        with open("errors/MODIFIED_MODEL_WARNING.txt", "r") as f:
-            model_number_errors = len(f.readlines())
-            print(f"Be aware that {model_number_errors} files may be using a "
-                  f"different model number than the one specified by "
-                  f"ProteinNet. See errors/MODIFIED_MODEL_WARNING.txt for "
-                  f"a list of these proteins.")
-
-
 def get_sidechain_data(pnids, limit):
     """Acquires sidechain data for specified ProteinNet IDs.
     Args:
@@ -123,8 +97,8 @@ def get_sidechain_data(pnids, limit):
         that failed to download.
     """
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        results = list(tqdm.tqdm(p.imap(process_id, pnids[:limit]),
-                                 total=len(pnids[:limit]), dynamic_ncols=True))
+        results = list(tqdm.tqdm(p.imap(process_id, pnids[:limit]), total=len(pnids[:limit]),
+                                 dynamic_ncols=True))
     all_errors = []
     all_data = dict()
     with open("errors/MODIFIED_MODEL_WARNING.txt", "a") as model_warning_file:
@@ -230,8 +204,7 @@ def get_chain_from_trainid(pnid):
     except ValueError:
         try:
             pdbid, astral_id = pnid.split("_")
-            return get_chain_from_astral_id(astral_id.replace("-", "_"),
-                                            ASTRAL_ID_MAPPING)
+            return get_chain_from_astral_id(astral_id.replace("-", "_"), ASTRAL_ID_MAPPING)
         except KeyError:
             return pnid, ERRORS["MISSING_ASTRAL_IDS"]
         except ValueError:
@@ -259,7 +232,7 @@ def get_chain_from_trainid(pnid):
             except Exception as e:
                 print(e)
                 return pnid, ERRORS["PARSING_ERROR_OSERROR"]
-        except Exception as e: # EOFERROR
+        except Exception as e:  # EOFERROR
             print(e)
             return pnid, ERRORS["PARSING_ERROR_OSERROR"]
     except AttributeError:
@@ -267,8 +240,7 @@ def get_chain_from_trainid(pnid):
     except (pr.proteins.pdbfile.PDBParseError, IndexError):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
-        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseCIF(
-            pdbid, chain=chid)
+        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseCIF(pdbid, chain=chid)
         if struct and chnum > 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
@@ -302,8 +274,7 @@ def get_chain_from_testid(pnid):
 
     category, caspid = pnid.split("#")
     try:
-        chain = pr.parsePDB(
-            os.path.join(PROTEINNET_IN_DIR, "targets", caspid + ".pdb"))
+        chain = pr.parsePDB(os.path.join(PROTEINNET_IN_DIR, "targets", caspid + ".pdb"))
     except AttributeError:
         return pnid, ERRORS["TEST_PARSING_ERRORS"]
     try:
@@ -356,9 +327,7 @@ def unpack_processed_results(results, pnids):
             all_crds.append(coords)
             all_ids.append(i)
             c += 1
-    print(
-        f"{(c * 100) / len(results):.1f}% of chains parsed. ({c}/{len(results)})"
-    )
+    print(f"{(c * 100) / len(results):.1f}% of chains parsed. ({c}/{len(results)})")
     return all_ohs, all_angs, all_crds, all_ids
 
 
@@ -371,57 +340,42 @@ def validate_data_dict(data):
     test_len = len(data["test"]["seq"])
     items_recorded = ["seq", "ang", "ids", "crd"]
     for num_items, subset in zip([train_len, test_len], ["train", "test"]):
-        assert all([
-            l == num_items
-            for l in map(len, [data[subset][k] for k in items_recorded])
-        ]), f"{subset} lengths don't match."
+        assert all([l == num_items for l in map(len, [data[subset][k] for k in
+                                                      items_recorded])]), f"{subset} lengths " \
+                                                                          f"don't match."
 
     for split in VALID_SPLITS:
         valid_len = len(data[f"valid-{split}"]["seq"])
-        assert all([l == valid_len for l in map(len, [data[f"valid-{split}"][k] for k in ["ang", "ids", "crd"]])]), \
-            "Valid lengths don't match."
+        assert all([l == valid_len for l in map(len, [data[f"valid-{split}"][k] for k in
+                                                      ["ang", "ids",
+                                                       "crd"]])]), "Valid lengths don't match."
 
 
-def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd,
-                     test_crd, train_ids, test_ids, all_validation_data):
+def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd, test_crd, train_ids,
+                     test_ids, all_validation_data):
     """
     Given split data along with the query information that generated it, this function saves the
     data as a Python dictionary, which is then saved to disk using torch.save.
-    See commit  d1935a0869720f85c00824f3aecbbfc6b947711c for a method that saves all relevant information.
+    See commit  d1935a0869720f85c00824f3aecbbfc6b947711c for a method that saves all relevant
+    information.
     """
     # Sort data
-    train_ang, train_seq, train_crd, train_ids = sort_data(
-        train_ang, train_seq, train_crd, train_ids)
-    test_ang, test_seq, test_crd, test_ids = sort_data(test_ang, test_seq,
-                                                       test_crd, test_ids)
+    train_ang, train_seq, train_crd, train_ids = sort_data(train_ang, train_seq, train_crd,
+                                                           train_ids)
+    test_ang, test_seq, test_crd, test_ids = sort_data(test_ang, test_seq, test_crd, test_ids)
 
     # Create a dictionary data structure, using the sin/cos transformed angles
-    data = {
-        "train": {
-            "seq": train_seq,
-            "ang": angle_list_to_sin_cos(train_ang),
-            "ids": train_ids,
-            "crd": train_crd
-        },
-        "test": {
-            "seq": test_seq,
-            "ang": angle_list_to_sin_cos(test_ang),
-            "ids": test_ids,
-            "crd": test_crd
-        },
-        "settings": {
-            "max_len": max(map(len, train_seq + test_seq)),
-            "pad_char": GLOBAL_PAD_CHAR
-        },
-        "description": {f"ProteinNet {CASP_VERSION.upper()}"},
-        # To parse date later, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
-        "date": datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
-    }
+    data = {"train": {"seq": train_seq, "ang": angle_list_to_sin_cos(train_ang), "ids": train_ids,
+                      "crd": train_crd},
+            "test": {"seq": test_seq, "ang": angle_list_to_sin_cos(test_ang), "ids": test_ids,
+                     "crd": test_crd}, "settings": {"max_len" : max(map(len, train_seq + test_seq)),
+                                                    "pad_char": GLOBAL_PAD_CHAR},
+            "description": {f"ProteinNet {CASP_VERSION.upper()}"},
+            # To parse date later, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
+            "date": datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")}
     max_val_len = 0
-    for split, (seq_val, ang_val, crd_val,
-                ids_val) in all_validation_data.items():
-        ang_val, seq_val, crd_val, ids_val = sort_data(ang_val, seq_val,
-                                                       crd_val, ids_val)
+    for split, (seq_val, ang_val, crd_val, ids_val) in all_validation_data.items():
+        ang_val, seq_val, crd_val, ids_val = sort_data(ang_val, seq_val, crd_val, ids_val)
         data[f"valid-{split}"] = {}
         data[f"valid-{split}"]["seq"] = seq_val
         data[f"valid-{split}"]["ang"] = angle_list_to_sin_cos(ang_val)
@@ -429,11 +383,9 @@ def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd,
         data[f"valid-{split}"]["ids"] = ids_val
         max_split_len = max(data["settings"]["max_len"], max(map(len, seq_val)))
         max_val_len = max_split_len if max_split_len > max_val_len else max_val_len
-    data["settings"]["max_len"] = max(
-        list(map(len, train_seq + test_seq)) + [max_val_len])
+    data["settings"]["max_len"] = max(list(map(len, train_seq + test_seq)) + [max_val_len])
 
-    data["settings"]["bin-data"] = bin_sequence_data(train_seq,
-                                                     maxlen=MAX_SEQ_LEN)
+    data["settings"]["bin-data"] = bin_sequence_data(train_seq, maxlen=MAX_SEQ_LEN)
     data["settings"]["angle_means"] = compute_angle_means(data)
     validate_data_dict(data)
     return data
@@ -454,8 +406,7 @@ def add_proteinnetID_to_idx_mapping(data):
     to quickly extract a certain protein.
     """
     d = {}
-    for subset in ["train", "test"
-                  ] + [f"valid-{split}" for split in VALID_SPLITS]:
+    for subset in ["train", "test"] + [f"valid-{split}" for split in VALID_SPLITS]:
         for idx, pnid in enumerate(data[subset]["ids"]):
             d[pnid] = {"subset": subset, "idx": idx}
 
@@ -467,148 +418,14 @@ def sort_data(angs, seqs, crds, ids):
     """
     Sorts inputs by length, with shortest first.
     """
-    sorted_len_indices = [
-        a[0] for a in sorted(
-            enumerate(angs), key=lambda x: x[1].shape[0], reverse=False)
-    ]
+    sorted_len_indices = [a[0] for a in
+                          sorted(enumerate(angs), key=lambda x: x[1].shape[0], reverse=False)]
     seqs = [seqs[i] for i in sorted_len_indices]
     crds = [crds[i] for i in sorted_len_indices]
     angs = [angs[i] for i in sorted_len_indices]
     ids = [ids[i] for i in sorted_len_indices]
 
     return angs, seqs, crds, ids
-
-
-def group_validation_set(vset_ids):
-    """
-    Given a list of validation set ids, (i.e. 70#1A9U_1_A), this returns a dictionary that maps each split
-    to the list of PDBS in that split.
-    >>> vids = ["70#1A9U_1_A", "30#1Z3F_1_B"]
-    >>> group_validation_set(vids)
-    {70: "70#1A9U_1_A", 30:"30#1Z3F_1_B"}
-    """
-    # Because there are several validation sets, we group IDs by their seq identity for use later
-    valid_ids_grouped = {k: [] for k in VALID_SPLITS}
-    for vid in vset_ids:
-        group = int(vid[:2])
-        valid_ids_grouped[group].append(vid)
-    return valid_ids_grouped
-
-
-def save_data_dict(data):
-    """
-    Saves a Python dictionary containing all training data to disk via Pickle or PyTorch.
-    """
-    if not args.out_file:
-        args.out_file = "../data/proteinnet/" + CASP_VERSION + "_" + SUFFIX + ".pkl"
-    torch.save(data, args.out_file)
-    print(f"Data saved to {args.out_file}.")
-
-
-def main():
-    lim = args.limit
-    global PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT
-    train_pdb_ids, valid_ids, test_casp_ids = sidechainnet.utils.parse.parse_raw_proteinnet(
-        args.input_dir, TRAIN_FILE)
-    print("IDs fetched.")
-    PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = torch.load(
-        os.path.join(args.input_dir, "torch", TRAIN_FILE)), torch.load(
-            os.path.join(args.input_dir, "torch", "validation.pkl")), torch.load(
-                os.path.join(args.input_dir, "torch", "testing.pkl"))
-    print(len(train_pdb_ids), len(valid_ids), len(test_casp_ids))
-    # Download and preprocess all data from PDB IDs
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        train_results = list(
-            tqdm.tqdm(p.imap(process_id, train_pdb_ids[:lim]),
-                      total=len(train_pdb_ids[:lim]),
-                      dynamic_ncols=True))
-    if lim:
-        vlim = 1
-    else:
-        vlim = None
-    valid_result_meta = {}
-    for split, vids in group_validation_set(valid_ids).items():
-        valid_result_meta[split] = []
-        for vid in tqdm.tqdm(vids[:vlim], dynamic_ncols=True):
-            valid_result_meta[split].append(process_id(vid))
-
-    test_results = []
-    for tid in tqdm.tqdm(test_casp_ids[:vlim], dynamic_ncols=True):
-        test_results.append(process_id(tid))
-
-    print("Structures processed.")
-
-    # Unpack results
-    print("Training set:\t", end="")
-    train_ohs, train_angs, train_strs, train_ids = unpack_processed_results(
-        train_results, train_pdb_ids[:lim])
-    for (split, results), vids in zip(valid_result_meta.items(),
-                                      group_validation_set(valid_ids).values()):
-        print(f"Valid set {split}%:\t", end="")
-        valid_result_meta[split] = unpack_processed_results(
-            results, vids[:vlim])
-    print("Test set:\t\t", end="")
-    test_ohs, test_angs, test_strs, test_ids = unpack_processed_results(
-        test_results, test_casp_ids[:vlim])
-    ERRORS.summarize()
-
-    # Split into train, test and validation sets. Report sizes.
-    data = create_data_dict(train_ohs, test_ohs, train_angs, test_angs,
-                            train_strs, test_strs, train_ids, test_ids,
-                            valid_result_meta)
-    data = add_proteinnetID_to_idx_mapping(data)
-    save_data_dict(data)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description=
-        "Converts a ProteinNet directory of raw records into a dataset for all"
-        "atom protein structure prediction.")
-    parser.add_argument('input_dir',
-                        type=str,
-                        help='Path to ProteinNet raw records directory.')
-    parser.add_argument('-o',
-                        '--out_file',
-                        type=str,
-                        help='Path to output file (.tch file)')
-    parser.add_argument('-l',
-                        '--limit',
-                        type=int,
-                        default=None,
-                        help='Limit size of training set for debugging.')
-    parser.add_argument("--pdb_dir",
-                        default=os.path.expanduser("~/pdb/"),
-                        type=str,
-                        help="Path for ProDy-downloaded PDB files.")
-    parser.add_argument('--training_set',
-                        type=int,
-                        default=100,
-                        help='Which thinning of the training set to parse. '
-                        '{30,50,70,90,95,100}. Default 100.')
-    args = parser.parse_args()
-
-    TRAIN_FILE = f"training_{args.training_set}.pkl"
-    PN_TRAIN_DICT, PN_VALID_DICT, PN_TEST_DICT = None, None, None
-    ASTRAL_FILE = "../data/astral_summary.txt"  # combined previous versions of dir.des.scope.2.xx-stable.txt into
-    # one big dict
-    ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_FILE)
-    SUFFIX = str(
-        datetime.datetime.today().strftime("%y%m%d")) + f"_{args.training_set}"
-    match = re.search(r"casp\d+", args.input_dir, re.IGNORECASE)
-    assert match, "The input_dir is not titled with 'caspX'."
-    CASP_VERSION = match.group(0)
-
-    pr.pathPDBFolder(args.pdb_dir)  # Set PDB download location
-    np.set_printoptions(
-        suppress=True)  # suppresses scientific notation when printing
-    np.set_printoptions(threshold=sys.maxsize)  # suppresses '...' when printing
-
-    try:
-        main()
-    except Exception as e:
-        ERRORS.summarize()
-        raise e
 
 
 def load_data(path):

@@ -1,4 +1,8 @@
+"""Implement custom exceptions and error handling for processing protein data."""
+
 import os
+
+import sidechainnet
 
 ERROR_CODES = [
     ("SEQUENCE_ERRORS", "structures failed because of an unresolvable issue with sequences."),
@@ -179,3 +183,31 @@ class NoneStructureError(Exception):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+
+def report_errors(pnids_errorcodes, total_pnids):
+    """Provides a summary of errors after parsing SidechainNet data.
+
+    Args:
+        pnids_errorcodes: A list of tuples (pnid, error_code) of ProteinNet IDs
+            that could not be parsed completely.
+        total_pnids: Total number of pnids processed.
+
+    Returns:
+        None. Prints summary to stdout and generates files containing failed
+        IDs in .errors/{ERROR_CODE}.txt
+
+    """
+    print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain "
+          f"data.")
+    error_summarizer = sidechainnet.utils.errors.ProteinErrors()
+    for pnid, error_code in pnids_errorcodes:
+        error_summarizer.count(error_code, pnid)
+    error_summarizer.summarize(total_pnids)
+    if os.path.exists("errors/MODIFIED_MODEL_WARNING.txt"):
+        with open("errors/MODIFIED_MODEL_WARNING.txt", "r") as f:
+            model_number_errors = len(f.readlines())
+            print(f"Be aware that {model_number_errors} files may be using a "
+                  f"different model number than the one specified by "
+                  f"ProteinNet. See errors/MODIFIED_MODEL_WARNING.txt for "
+                  f"a list of these proteins.")
