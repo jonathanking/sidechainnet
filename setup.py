@@ -18,7 +18,6 @@ try:
 except:
     long_description = "\n".join(short_description[2:])
 
-
 setup(
     # Self-descriptive entries which should always be present
     name='sidechainnet',
@@ -55,5 +54,4 @@ setup(
 
     # Manual control if final package is compressible or not, set False to prevent the .egg from being made
     # zip_safe=False,
-
 )

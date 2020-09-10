@@ -106,8 +106,13 @@ def shorten_ends(s1, s2):
     return s1
 
 
-def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
-                           second_try=False, third_try=False):
+def can_be_directly_merged(aligner,
+                           pn_seq,
+                           my_seq,
+                           pn_mask,
+                           pnid,
+                           second_try=False,
+                           third_try=False):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
@@ -128,13 +133,21 @@ def can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
         my_seq = shorten_ends(my_seq, pn_seq)
-        return can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
+        return can_be_directly_merged(aligner,
+                                      pn_seq,
+                                      my_seq,
+                                      pn_mask,
+                                      pnid,
                                       second_try=True)
 
     elif n_alignments == 0 and second_try and not third_try:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
-        result, mask, a0, warning = can_be_directly_merged(aligner, pn_seq, my_seq, pn_mask, pnid,
-                                      third_try=True)
+        result, mask, a0, warning = can_be_directly_merged(aligner,
+                                                           pn_seq,
+                                                           my_seq,
+                                                           pn_mask,
+                                                           pnid,
+                                                           third_try=True)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return result, mask, a0, warning
 

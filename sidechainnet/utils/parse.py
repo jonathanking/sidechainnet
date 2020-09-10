@@ -20,7 +20,8 @@ def load_ids_from_text_files(directory, training_set):
     with open(os.path.join(directory, f"training_{training_set}_ids.txt"),
               "r") as trainf, open(os.path.join(directory, "validation_ids.txt"),
                                    "r") as validf, open(
-        os.path.join(directory, "testing_ids.txt"), "r") as testf:
+                                       os.path.join(directory, "testing_ids.txt"),
+                                       "r") as testf:
         train_ids = trainf.read().splitlines()
         valid_ids = validf.read().splitlines()
         test_ids = testf.read().splitlines()
@@ -120,8 +121,8 @@ def process_file(input_filename_out_dir, return_ids=False):
     all_ids = []
     input_filename, out_dir = input_filename_out_dir
     print("    " + input_filename)
-    text_file = open(os.path.join(out_dir, os.path.basename(input_filename) + '_ids.txt'),
-                     "w")
+    text_file = open(os.path.join(out_dir,
+                                  os.path.basename(input_filename) + '_ids.txt'), "w")
     input_file = open(input_filename, "r")
     meta_dict = {}
     while True:
@@ -134,8 +135,8 @@ def process_file(input_filename_out_dir, return_ids=False):
         text_file.write(f"{id_}\n")
         if return_ids:
             all_ids.append(id_)
-    with open(os.path.join(out_dir, os.path.basename(input_filename) + ".pkl"),
-              "wb") as f:
+    with open(os.path.join(out_dir,
+                           os.path.basename(input_filename) + ".pkl"), "wb") as f:
         pickle.dump(meta_dict, f)
     input_file.close()
     text_file.close()
@@ -165,8 +166,8 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
         print(f"Raw ProteinNet files already preprocessed ("
               f"{os.path.join(proteinnet_out_dir, train_file)}).")
-        relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
-                                                                  training_set)
+        relevant_ids = retrieve_relevant_proteinnetids_from_files(
+            proteinnet_out_dir, training_set)
         return relevant_ids
 
     # If the preprocessed ProteinNet dictionaries don't exist, create them.
@@ -183,8 +184,10 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
               "the most recent, largest compressed file in the list.")
         raise ValueError("Could not find ProteinNet targets.")
     # Look for the raw ProteinNet files
-    input_files = [f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]")) if
-                   not os.path.isdir(f)]
+    input_files = [
+        f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]"))
+        if not os.path.isdir(f)
+    ]
     assert len(input_files) == 8, (
         f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
         "could not find all 8.\n Please download from Mohammed "
@@ -216,9 +219,11 @@ def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
     train_file = f"training_{training_set}.pkl"
     relevant_training_file = os.path.join(proteinnet_out_dir,
                                           train_file.replace(".pkl", "_ids.txt"))
-    relevant_id_files = [relevant_training_file,
-                         os.path.join(proteinnet_out_dir, "validation_ids.txt"),
-                         os.path.join(proteinnet_out_dir, "testing_ids.txt")]
+    relevant_id_files = [
+        relevant_training_file,
+        os.path.join(proteinnet_out_dir, "validation_ids.txt"),
+        os.path.join(proteinnet_out_dir, "testing_ids.txt")
+    ]
     relevant_ids = []
     for fname in relevant_id_files:
         with open(fname, "r") as f:

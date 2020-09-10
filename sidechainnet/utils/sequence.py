@@ -54,7 +54,7 @@ def bin_sequence_data(seqs, maxlen):
     lens = list(map(lambda x: len(x) if len(x) <= maxlen else maxlen, seqs))
     hist_counts, hist_bins = np.histogram(lens, bins="auto")
     hist_bins = hist_bins[
-                1:]  # make each bin define the rightmost value in each bin, ie '( , ]'.
+        1:]  # make each bin define the rightmost value in each bin, ie '( , ]'.
     bin_probs = hist_counts / hist_counts.sum()
     bin_map = {}
 
@@ -71,8 +71,13 @@ def bin_sequence_data(seqs, maxlen):
         else:
             bin_j += 1
 
-    return {"hist_counts": hist_counts, "hist_bins": hist_bins, "bin_probs": bin_probs,
-            "bin_map"    : bin_map, "bin_max_len": maxlen}
+    return {
+        "hist_counts": hist_counts,
+        "hist_bins": hist_bins,
+        "bin_probs": bin_probs,
+        "bin_map": bin_map,
+        "bin_max_len": maxlen
+    }
 
 
 class ProteinVocabulary(object):
@@ -93,8 +98,8 @@ class ProteinVocabulary(object):
 
         # Extract the ordered list of 1-letter amino acid codes from the project-level
         # AA_MAP.
-        self.stdaas = map(lambda x: x[0],
-                          sorted(list(AA_MAP.items()), key=lambda x: x[1]))
+        self.stdaas = map(lambda x: x[0], sorted(list(AA_MAP.items()),
+                                                 key=lambda x: x[1]))
         self.stdaas = "".join(filter(lambda x: len(x) == 1, self.stdaas))
         for aa in self.stdaas:
             self.add(aa)
@@ -148,21 +153,58 @@ class ProteinVocabulary(object):
         seq = ""
         for i in ints:
             c = self.int2char(i)
-            if include_sos_eos or (
-                    c not in [self.sos_char, self.eos_char, self.pad_char]):
+            if include_sos_eos or (c not in [self.sos_char, self.eos_char, self.pad_char
+                                            ]):
                 seq += c
         return seq
 
 
-ONE_TO_THREE_LETTER_MAP = {"R": "ARG", "H": "HIS", "K": "LYS", "D": "ASP", "E": "GLU",
-                           "S": "SER", "T": "THR", "N": "ASN", "Q": "GLN", "C": "CYS",
-                           "G": "GLY", "P": "PRO", "A": "ALA", "V": "VAL", "I": "ILE",
-                           "L": "LEU", "M": "MET", "F": "PHE", "Y": "TYR", "W": "TRP"}
+ONE_TO_THREE_LETTER_MAP = {
+    "R": "ARG",
+    "H": "HIS",
+    "K": "LYS",
+    "D": "ASP",
+    "E": "GLU",
+    "S": "SER",
+    "T": "THR",
+    "N": "ASN",
+    "Q": "GLN",
+    "C": "CYS",
+    "G": "GLY",
+    "P": "PRO",
+    "A": "ALA",
+    "V": "VAL",
+    "I": "ILE",
+    "L": "LEU",
+    "M": "MET",
+    "F": "PHE",
+    "Y": "TYR",
+    "W": "TRP"
+}
 THREE_TO_ONE_LETTER_MAP = {v: k for k, v in ONE_TO_THREE_LETTER_MAP.items()}
 
-AA_MAP = {'A': 0, 'C': 1, 'D': 2, 'E': 3, 'F': 4, 'G': 5, 'H': 6, 'I': 7, 'K': 8, 'L': 9,
-          'M': 10, 'N': 11, 'P': 12, 'Q': 13, 'R': 14, 'S': 15, 'T': 16, 'V': 17, 'W': 18,
-          'Y': 19}
+AA_MAP = {
+    'A': 0,
+    'C': 1,
+    'D': 2,
+    'E': 3,
+    'F': 4,
+    'G': 5,
+    'H': 6,
+    'I': 7,
+    'K': 8,
+    'L': 9,
+    'M': 10,
+    'N': 11,
+    'P': 12,
+    'Q': 13,
+    'R': 14,
+    'S': 15,
+    'T': 16,
+    'V': 17,
+    'W': 18,
+    'Y': 19
+}
 AA_MAP_INV = {v: k for k, v in AA_MAP.items()}
 
 for one_letter_code in list(AA_MAP.keys()):

@@ -35,8 +35,8 @@ ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
 del ASTRAL_SUMMARY
 
 
-def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set, limit,
-                            proteinnet_in):
+def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set,
+                            limit, proteinnet_in):
     """Downloads the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
@@ -97,8 +97,10 @@ def get_sidechain_data(pnids, limit):
         that failed to download.
     """
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        results = list(tqdm.tqdm(p.imap(process_id, pnids[:limit]), total=len(pnids[:limit]),
-                                 dynamic_ncols=True))
+        results = list(
+            tqdm.tqdm(p.imap(process_id, pnids[:limit]),
+                      total=len(pnids[:limit]),
+                      dynamic_ncols=True))
     all_errors = []
     all_data = dict()
     with open("errors/MODIFIED_MODEL_WARNING.txt", "a") as model_warning_file:
@@ -204,7 +206,8 @@ def get_chain_from_trainid(pnid):
     except ValueError:
         try:
             pdbid, astral_id = pnid.split("_")
-            return get_chain_from_astral_id(astral_id.replace("-", "_"), ASTRAL_ID_MAPPING)
+            return get_chain_from_astral_id(astral_id.replace("-", "_"),
+                                            ASTRAL_ID_MAPPING)
         except KeyError:
             return pnid, ERRORS["MISSING_ASTRAL_IDS"]
         except ValueError:
@@ -240,7 +243,8 @@ def get_chain_from_trainid(pnid):
     except (pr.proteins.pdbfile.PDBParseError, IndexError):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
-        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseCIF(pdbid, chain=chid)
+        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseCIF(pdbid,
+                                                                            chain=chid)
         if struct and chnum > 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
@@ -346,13 +350,14 @@ def validate_data_dict(data):
 
     for split in VALID_SPLITS:
         valid_len = len(data[f"valid-{split}"]["seq"])
-        assert all([l == valid_len for l in map(len, [data[f"valid-{split}"][k] for k in
-                                                      ["ang", "ids",
-                                                       "crd"]])]), "Valid lengths don't match."
+        assert all([
+            l == valid_len
+            for l in map(len, [data[f"valid-{split}"][k] for k in ["ang", "ids", "crd"]])
+        ]), "Valid lengths don't match."
 
 
-def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd, test_crd, train_ids,
-                     test_ids, all_validation_data):
+def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd, test_crd,
+                     train_ids, test_ids, all_validation_data):
     """
     Given split data along with the query information that generated it, this function saves the
     data as a Python dictionary, which is then saved to disk using torch.save.
@@ -360,19 +365,33 @@ def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd, test_c
     information.
     """
     # Sort data
-    train_ang, train_seq, train_crd, train_ids = sort_data(train_ang, train_seq, train_crd,
-                                                           train_ids)
-    test_ang, test_seq, test_crd, test_ids = sort_data(test_ang, test_seq, test_crd, test_ids)
+    train_ang, train_seq, train_crd, train_ids = sort_data(train_ang, train_seq,
+                                                           train_crd, train_ids)
+    test_ang, test_seq, test_crd, test_ids = sort_data(test_ang, test_seq, test_crd,
+                                                       test_ids)
 
     # Create a dictionary data structure, using the sin/cos transformed angles
-    data = {"train": {"seq": train_seq, "ang": angle_list_to_sin_cos(train_ang), "ids": train_ids,
-                      "crd": train_crd},
-            "test": {"seq": test_seq, "ang": angle_list_to_sin_cos(test_ang), "ids": test_ids,
-                     "crd": test_crd}, "settings": {"max_len" : max(map(len, train_seq + test_seq)),
-                                                    "pad_char": GLOBAL_PAD_CHAR},
-            "description": {f"ProteinNet {CASP_VERSION.upper()}"},
-            # To parse date later, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
-            "date": datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")}
+    data = {
+        "train": {
+            "seq": train_seq,
+            "ang": angle_list_to_sin_cos(train_ang),
+            "ids": train_ids,
+            "crd": train_crd
+        },
+        "test": {
+            "seq": test_seq,
+            "ang": angle_list_to_sin_cos(test_ang),
+            "ids": test_ids,
+            "crd": test_crd
+        },
+        "settings": {
+            "max_len": max(map(len, train_seq + test_seq)),
+            "pad_char": GLOBAL_PAD_CHAR
+        },
+        "description": {f"ProteinNet {CASP_VERSION.upper()}"},
+        # To parse date later, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
+        "date": datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
+    }
     max_val_len = 0
     for split, (seq_val, ang_val, crd_val, ids_val) in all_validation_data.items():
         ang_val, seq_val, crd_val, ids_val = sort_data(ang_val, seq_val, crd_val, ids_val)
@@ -383,7 +402,8 @@ def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd, test_c
         data[f"valid-{split}"]["ids"] = ids_val
         max_split_len = max(data["settings"]["max_len"], max(map(len, seq_val)))
         max_val_len = max_split_len if max_split_len > max_val_len else max_val_len
-    data["settings"]["max_len"] = max(list(map(len, train_seq + test_seq)) + [max_val_len])
+    data["settings"]["max_len"] = max(
+        list(map(len, train_seq + test_seq)) + [max_val_len])
 
     data["settings"]["bin-data"] = bin_sequence_data(train_seq, maxlen=MAX_SEQ_LEN)
     data["settings"]["angle_means"] = compute_angle_means(data)
@@ -418,8 +438,9 @@ def sort_data(angs, seqs, crds, ids):
     """
     Sorts inputs by length, with shortest first.
     """
-    sorted_len_indices = [a[0] for a in
-                          sorted(enumerate(angs), key=lambda x: x[1].shape[0], reverse=False)]
+    sorted_len_indices = [
+        a[0] for a in sorted(enumerate(angs), key=lambda x: x[1].shape[0], reverse=False)
+    ]
     seqs = [seqs[i] for i in sorted_len_indices]
     crds = [crds[i] for i in sorted_len_indices]
     angs = [angs[i] for i in sorted_len_indices]

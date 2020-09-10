@@ -100,10 +100,9 @@ def prepare_dataloaders(data,
                                                    collate_fn=paired_collate_fn)
         valid_loaders[split] = valid_loader
 
-    test_loader = torch.utils.data.DataLoader(ProteinDataset(
-        seqs=data['test']['seq'],
-        crds=data['test']['crd'],
-        angs=data['test']['ang']),
+    test_loader = torch.utils.data.DataLoader(ProteinDataset(seqs=data['test']['seq'],
+                                                             crds=data['test']['crd'],
+                                                             angs=data['test']['ang']),
                                               num_workers=num_workers,
                                               batch_size=batch_size,
                                               collate_fn=paired_collate_fn)
