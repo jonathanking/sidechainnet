@@ -54,7 +54,10 @@ We must also download the target structure files used in the CASP competitions. 
 [https://predictioncenter.org/download_area/CASP12/targets/](https://predictioncenter.org/download_area/CASP12/targets/)
 
 
-On this webpage, we can identify a compressed file to download (the largest and most recent file, assumedly) that contains all of the relevant target files. Then, download and unarchive the corresponding file. SidechainNet assumes that that there will be a subdirectory title `targets` within the CASP directory you downloaded from ProteinNet previously. I have selected an appropriate file for the CASP12 targets below.
+
+On this webpage, we can identify** a compressed file to download that contains all of the relevant target files. Then, download and unarchive the corresponding file. SidechainNet assumes that that there will be a subdirectory title `targets` within the CASP directory you downloaded from ProteinNet previously. I have selected an appropriate file for the CASP12 targets below.
+
+_**Unfortunately, there doesn't seem to be a consistent naming convention across CASP target download directories. `R` usually stands for refinement, and `0` sometimes refers to protein structure prediction (the task we're interested in). Also, files annotated with `D` or `domain` contain the separate domains for each target, something we don't want. We are only interested in the files that contain the entire target proteins with names like `T0950.pdb` instead of `T0950-D1.pdb`._
 
 ```shell script
 wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0.releaseDec022016.tgz -P targets/
