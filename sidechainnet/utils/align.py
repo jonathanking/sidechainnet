@@ -67,7 +67,7 @@ def locate_char(c, s):
 
 
 def masks_match(pn, new):
-    """ Returns true if the two masks match, of if pn is a subset of new."""
+    """ Returns true if the two masks match, or if pn is a subset of new."""
     if pn == new:
         return True
     elif new.count("-") > pn.count("-"):
@@ -106,13 +106,7 @@ def shorten_ends(s1, s2):
     return s1
 
 
-def can_be_directly_merged(aligner,
-                           pn_seq,
-                           my_seq,
-                           pn_mask,
-                           pnid,
-                           second_try=False,
-                           third_try=False):
+def merge(aligner, pn_seq, my_seq, pn_mask, pnid, second_try=False, third_try=False):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
@@ -133,27 +127,17 @@ def can_be_directly_merged(aligner,
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
         my_seq = shorten_ends(my_seq, pn_seq)
-        return can_be_directly_merged(aligner,
-                                      pn_seq,
-                                      my_seq,
-                                      pn_mask,
-                                      pnid,
-                                      second_try=True)
+        return merge(aligner, pn_seq, my_seq, pn_mask, pnid, second_try=True)
 
     elif n_alignments == 0 and second_try and not third_try:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
-        result, mask, a0, warning = can_be_directly_merged(aligner,
-                                                           pn_seq,
-                                                           my_seq,
-                                                           pn_mask,
-                                                           pnid,
-                                                           third_try=True)
+        mask, a0, warning = merge(aligner, pn_seq, my_seq, pn_mask, pnid, third_try=True)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
-        return result, mask, a0, warning
+        return mask, a0, warning
 
     elif n_alignments == 0 and third_try:
         warning = "failed"
-        return False, None, None, warning
+        return None, None, warning
 
     elif n_alignments == 1:
         a0 = a[0]
@@ -176,7 +160,7 @@ def can_be_directly_merged(aligner,
                     warning = "single alignment, mask mismatch"
             else:
                 warning = "single alignment, mask mismatch"
-        return True, computed_mask, a0, warning
+        return computed_mask, a0, warning
 
     elif n_alignments > 1:
         best_mask = None
@@ -207,13 +191,13 @@ def can_be_directly_merged(aligner,
             warning = "multiple alignments, found matching mask" if not warning else warning + ", multiple alignments, found matching mask"
             if has_many_alignments:
                 warning += ", many alignments"
-            return True, best_mask, best_alignment, warning
+            return best_mask, best_alignment, warning
         else:
             mask = get_mask_from_alignment(a[0])
             warning = "multiple alignments, mask mismatch" if not warning else warning + ", multiple alignments, mask mismatch"
             if has_many_alignments:
                 warning += ", many alignments"
-            return True, mask, a[0], warning
+            return mask, a[0], warning
 
 
 def other_alignments_with_same_score(all_alignments, cur_alignment_idx,

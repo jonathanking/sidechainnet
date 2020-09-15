@@ -11,7 +11,7 @@ from multiprocessing import Pool, cpu_count
 import prody as pr
 from tqdm import tqdm
 
-from sidechainnet.utils.align import can_be_directly_merged, expand_data_with_mask
+from sidechainnet.utils.align import merge, expand_data_with_mask
 
 pr.confProDy(verbosity="none")
 
@@ -41,7 +41,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
 
-    can_be_merged, mask, alignment, warning = can_be_directly_merged(
+    mask, alignment, warning = merge(
         aligner,
         pn_entry["primary"],
         # sc_entry,
@@ -261,9 +261,9 @@ if __name__ == "__main__":
                         help="Location to download PDB files for ProDy.")
     parser.add_argument('--training_set',
                         type=int,
-                        default=100,
+                        default=30,
                         help='Which \'thinning\' of the ProteinNet training '
-                        'set to parse. {30,50,70,90,95,100}. Default 100.')
+                        'set to parse. {30,50,70,90,95,100}. Default 30.')
     args = parser.parse_args()
 
     match = re.search(r"casp\d+", args.proteinnet_in, re.IGNORECASE)

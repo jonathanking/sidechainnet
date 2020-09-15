@@ -45,7 +45,7 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
         casp_version: A string that describes the CASP version i.e. 'casp7'
         training_set: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
         limit: An integer describing maximum number of proteins to process
-        proteinnet_in: A string representing the path where processed proteinnet data is stored.
+        proteinnet_in: A string representing the path to processed proteinnet.
 
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
