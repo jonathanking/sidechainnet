@@ -60,7 +60,7 @@ On this webpage, we can identify** a compressed file to download that contains a
 _**Unfortunately, there doesn't seem to be a consistent naming convention across CASP target download directories. `R` usually stands for refinement, and `0` sometimes refers to protein structure prediction (the task we're interested in). Also, files annotated with `D` or `domain` contain the separate domains for each target, something we don't want. We are only interested in the files that contain the entire target proteins with names like `T0950.pdb` instead of `T0950-D1.pdb`._
 
 ```shell script
-wget https://predictioncenter.org/download_area/CASP12/targets/casp12.domains_T0.releaseDec022016.tgz -P targets/
+wget https://predictioncenter.org/download_area/CASP12/targets/casp12.targets_T0.releaseDec022016.tgz -P targets/
 tar -xvf targets/*.gz
 ```
 
