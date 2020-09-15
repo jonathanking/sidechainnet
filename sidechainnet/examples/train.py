@@ -321,7 +321,7 @@ def create_parser():
 
     # Required args
     required = parser.add_argument_group("Required Args")
-    required.add_argument('--data', help="Path to SidechainNet.", default="../data/proteinnet/casp12_200123_30.pt")
+    required.add_argument('--data', help="Path to SidechainNet.", default="../data/proteinnet/casp12_200123_30.pkl")
     required.add_argument("--name", type=str, help="A descriptive name for this training experiment.", default=None)
 
     # Training parameters

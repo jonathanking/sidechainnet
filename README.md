@@ -76,7 +76,7 @@ For a complete example of model training, please see [sidechainnet/examples/trai
 ```python
 import sidechainnet
 from sidechainnet.examples.rgn import RGN
-from sidechainnet.utils.losses import drmsd
+from sidechainnet.examples.losses import drmsd
 
 
 train, train_eval, validations, test = sidechainnet.get_dataloaders("casp12_100.pkl")

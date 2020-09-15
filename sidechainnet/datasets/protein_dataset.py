@@ -20,8 +20,7 @@ class ProteinDataset(torch.utils.data.Dataset):
                  reverse_sort=True):
 
         assert seqs is not None
-        assert (angs is None) or (len(seqs) == len(angs) and
-                                  len(angs) == len(crds))
+        assert (angs is None) or (len(seqs) == len(angs) and len(angs) == len(crds))
         self._seqs, self._angs, self._crds = [], [], []
         for i in range(len(seqs)):
             self._seqs.append(VOCAB.str2ints(seqs[i], add_sos_eos))
@@ -63,16 +62,10 @@ class BinnedProteinDataset(torch.utils.data.Dataset):
     Assumes protein data is sorted from shortest to longest (ascending).
     """
 
-    def __init__(self,
-                 seqs=None,
-                 angs=None,
-                 crds=None,
-                 add_sos_eos=False,
-                 bins="auto"):
+    def __init__(self, seqs=None, angs=None, crds=None, add_sos_eos=False, bins="auto"):
 
         assert seqs is not None
-        assert (angs is None) or (len(seqs) == len(angs) and
-                                  len(angs) == len(crds))
+        assert (angs is None) or (len(seqs) == len(angs) and len(angs) == len(crds))
         self.vocab = ProteinVocabulary()
         self._seqs, self._angs, self._crds = [], [], []
         for i in range(len(seqs)):
@@ -82,8 +75,7 @@ class BinnedProteinDataset(torch.utils.data.Dataset):
 
         # Compute length-based histogram bins and probabilities
         self.lens = list(
-            map(lambda x: len(x)
-                if len(x) <= MAX_SEQ_LEN else MAX_SEQ_LEN, self._seqs))
+            map(lambda x: len(x) if len(x) <= MAX_SEQ_LEN else MAX_SEQ_LEN, self._seqs))
         self.hist_counts, self.hist_bins = np.histogram(self.lens, bins=bins)
         self.hist_bins = self.hist_bins[
             1:]  # make each bin define the rightmost value in each bin, ie '( , ]'.

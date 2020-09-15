@@ -60,8 +60,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                 if self.use_largest_bin:
                     bin = len(self.data_source.hist_bins) - 1
                 else:
-                    bin = np.random.choice(range(len(
-                        self.data_source.hist_bins)),
+                    bin = np.random.choice(range(len(self.data_source.hist_bins)),
                                            p=self.data_source.bin_probs)
                 if self.dynamic_batch:
                     # Make the batch size a multiple of the number of available
@@ -70,13 +69,10 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                         largest_possible = int(self.dynamic_batch /
                                                self.data_source.hist_bins[bin])
                         this_batch_size = max(
-                            1, largest_possible -
-                            (largest_possible % self.cpu_count))
+                            1, largest_possible - (largest_possible % self.cpu_count))
                     else:
                         this_batch_size = max(
-                            1,
-                            int(self.dynamic_batch /
-                                self.data_source.hist_bins[bin]))
+                            1, int(self.dynamic_batch / self.data_source.hist_bins[bin]))
                 else:
                     this_batch_size = self.batch_size
                 yield np.random.choice(self.data_source.bin_map[bin],
