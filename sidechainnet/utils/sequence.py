@@ -68,11 +68,13 @@ def bin_sequence_data(seqs, maxlen):
         else:
             bin_j += 1
 
-    return {"hist_counts": hist_counts,
-            "hist_bins"  : hist_bins,
-            "bin_probs"  : bin_probs,
-            "bin_map"    : bin_map,
-            "bin_max_len": maxlen}
+    return {
+        "hist_counts": hist_counts,
+        "hist_bins": hist_bins,
+        "bin_probs": bin_probs,
+        "bin_map": bin_map,
+        "bin_max_len": maxlen
+    }
 
 
 class ProteinVocabulary(object):
@@ -104,7 +106,7 @@ class ProteinVocabulary(object):
 
         self.pad_id = self[self.pad_char]
         self.sos_id = self[self.sos_char]
-        self.eos_id =self[self.eos_char]
+        self.eos_id = self[self.eos_char]
 
     def __getitem__(self, aa):
         return self._char2int.get(aa, self._char2int[self.unk_char])
@@ -150,16 +152,52 @@ class ProteinVocabulary(object):
         return seq
 
 
-ONE_TO_THREE_LETTER_MAP = {"R": "ARG", "H": "HIS", "K": "LYS", "D": "ASP", "E": "GLU", "S": "SER", "T": "THR",
-                           "N": "ASN", "Q": "GLN", "C": "CYS", "G": "GLY", "P": "PRO", "A": "ALA", "V": "VAL",
-                           "I": "ILE", "L": "LEU", "M": "MET", "F": "PHE", "Y": "TYR", "W": "TRP"}
+ONE_TO_THREE_LETTER_MAP = {
+    "R": "ARG",
+    "H": "HIS",
+    "K": "LYS",
+    "D": "ASP",
+    "E": "GLU",
+    "S": "SER",
+    "T": "THR",
+    "N": "ASN",
+    "Q": "GLN",
+    "C": "CYS",
+    "G": "GLY",
+    "P": "PRO",
+    "A": "ALA",
+    "V": "VAL",
+    "I": "ILE",
+    "L": "LEU",
+    "M": "MET",
+    "F": "PHE",
+    "Y": "TYR",
+    "W": "TRP"
+}
 THREE_TO_ONE_LETTER_MAP = {v: k for k, v in ONE_TO_THREE_LETTER_MAP.items()}
 
-AA_MAP = {'A': 0, 'C': 1, 'D': 2, 'E': 3,
-          'F': 4, 'G': 5, 'H': 6, 'I': 7,
-          'K': 8, 'L': 9, 'M': 10, 'N': 11,
-          'P': 12, 'Q': 13, 'R': 14, 'S': 15,
-          'T': 16, 'V': 17, 'W': 18, 'Y': 19}
+AA_MAP = {
+    'A': 0,
+    'C': 1,
+    'D': 2,
+    'E': 3,
+    'F': 4,
+    'G': 5,
+    'H': 6,
+    'I': 7,
+    'K': 8,
+    'L': 9,
+    'M': 10,
+    'N': 11,
+    'P': 12,
+    'Q': 13,
+    'R': 14,
+    'S': 15,
+    'T': 16,
+    'V': 17,
+    'W': 18,
+    'Y': 19
+}
 AA_MAP_INV = {v: k for k, v in AA_MAP.items()}
 
 for one_letter_code in list(AA_MAP.keys()):

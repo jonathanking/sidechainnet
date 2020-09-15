@@ -2,7 +2,7 @@ import os
 
 ERROR_CODES = [("SEQUENCE_ERRORS", "structures failed because of an unresolvable issue with sequences."),
                ("MULTIPLE_CONTIG_ERRORS", "structures failed to parse because they had ambiguous sequence "
-                                          "alignments/multiple identical contigs."),
+                "alignments/multiple identical contigs."),
                ("FAILED_ASTRAL_IDS", "Astral IDs failed to parse for some unknown reason."),
                ("TEST_PARSING_ERRORS", "test structures experience AttributeErrors when parsing."),
                ("NSAA_ERRORS", "structures failed because they had non-standard amino acids."),
@@ -10,8 +10,7 @@ ERROR_CODES = [("SEQUENCE_ERRORS", "structures failed because of an unresolvable
                ("SHORT_ERRORS", "structures failed because they were too short."),
                ("PARSING_ERROR_ATTRIBUTE", "structures experienced AttributeErrors when parsing PDB/mmCIF files."),
                ("PARSING_ERROR", "structures experienced `pr.proteins.pdbfile.PDBParseError` when parsing PDB/mmCIF "
-                                 "files."),
-               ("PARSING_ERROR_OSERROR", "structures experienced OSErrors when parsing PDB/mmCIF files."),
+                "files."), ("PARSING_ERROR_OSERROR", "structures experienced OSErrors when parsing PDB/mmCIF files."),
                ("UNKNOWN_EXCEPTIONS", "structures experienced Unknown exceptions when parsing PDB/mmCIF files."),
                ("MISSING_ATOMS_ERROR", "structures failed because they had missing atoms."),
                ("NONE_STRUCTURE_ERRORS", "structures were returned as None from subroutine."),
@@ -31,8 +30,6 @@ class ProteinErrors(object):
     to the parent process, we create a simple mapping from error to code/description so that these can be shown to
     the user.
     """
-
-
     def __init__(self):
         self.code_to_name = {}
         self.code_to_descr = {}
@@ -45,11 +42,9 @@ class ProteinErrors(object):
             self.code_to_name[i] = error_name
             self.code_to_descr[i] = error_descr
 
-
     def __getitem__(self, error_name):
         """ Returns the error code for a certain error name. """
         return self.name_to_code[error_name]
-
 
     def count(self, ec, pnid):
         """ Creates a record of a certain PNID exhibiting a certain error. """
@@ -57,7 +52,6 @@ class ProteinErrors(object):
             self.counts = {ec: [] for ec in self.name_to_code.values()}
 
         self.counts[ec].append(pnid)
-
 
     def summarize(self, total_processed=None):
         """ Prints a summary of all errors that have been recorded."""
@@ -79,17 +73,14 @@ class ProteinErrors(object):
         print("")
         self.write_summary_files()
 
-
     def get_pnids_with_error_name(self, error_name):
         """ After counting, returns a list of pnids that have failed with a specified error code. """
         error_code = self[error_name]
         return self.counts[error_code]
 
-
     def get_error_names(self):
         """ Returns a list of error names. """
         return self.name_to_code.keys()
-
 
     def write_summary_files(self):
         """ For all counted errors, writes the list of pnids with each error to the errors/ directory. """
@@ -98,7 +89,6 @@ class ProteinErrors(object):
             if len(self.get_pnids_with_error_name(e)) > 0:
                 with open(f"errors/{e}.txt", "w") as f:
                     f.write("\n".join(self.get_pnids_with_error_name(e)) + "\n")
-
 
     def get_error_name_from_code(self, code):
         """ Returns the error name for the associated code. """
@@ -110,16 +100,12 @@ ERRORS = ProteinErrors()
 
 class IncompleteStructureError(Exception):
     """An exception to raise when a structure is incomplete."""
-
-
     def __init__(self, message):
         self.message = message
 
 
 class NonStandardAminoAcidError(Exception):
     """An exception to raise when a structure contains a Non-standard amino acid."""
-
-
     def __init__(self, *args):
         super().__init__(*args)
 
@@ -127,47 +113,35 @@ class NonStandardAminoAcidError(Exception):
 # TODO The one instance where this was called in stucture_utils.py was commented out. May not be needed.
 class MissingBackboneAtomsError(Exception):
     """An exception to raise when a protein backbone is incomplete."""
-
-
     def __init__(self, message):
         self.message = message
 
 
 class SequenceError(Exception):
     """An exception to raise when a sequence is not as expected."""
-
-
     def __init__(self, *args):
         super().__init__(*args)
 
 
 class ContigMultipleMatchingError(Exception):
     """An exception to raise when a sequence is ambiguous due to multiple matching contig locations."""
-
-
     def __init__(self, *args):
         super().__init__(*args)
 
 
 class ShortStructureError(Exception):
     """An exception to raise when a sequence too short to be meaningful."""
-
-
     def __init__(self, *args):
         super().__init__(*args)
 
 
 class MissingAtomsError(Exception):
     """An exception to raise when a residue is missing atoms and bond angles can't be calculated."""
-
-
     def __init__(self, *args):
         super().__init__(*args)
 
 
 class NoneStructureError(Exception):
     """An exception to raise when a parsed structure becomes None."""
-
-
     def __init__(self, *args):
         super().__init__(*args)

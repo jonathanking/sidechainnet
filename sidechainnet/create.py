@@ -41,13 +41,9 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
 
-    can_be_merged, mask, alignment, ang, crd, warning = can_be_directly_merged(aligner,
-                                                            pn_entry["primary"],
-                                                            sc_entry["seq"],
-                                                            sc_entry["ang"],
-                                                            sc_entry["crd"],
-                                                            pn_entry["mask"],
-                                                                     pnid)
+    can_be_merged, mask, alignment, ang, crd, warning = can_be_directly_merged(aligner, pn_entry["primary"],
+                                                                               sc_entry["seq"], sc_entry["ang"],
+                                                                               sc_entry["crd"], pn_entry["mask"], pnid)
     new_entry = {}
 
     if alignment:
@@ -68,11 +64,12 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         for k, v in new_entry.items():
             if k == "crd":
                 if len(v) // NUM_COORDS_PER_RES != l: return {}, "failed"
-                assert len(v) // NUM_COORDS_PER_RES == l, f"{k} does not have correct length {l} (is {len(v) // NUM_COORDS_PER_RES})."
+                assert len(
+                    v
+                ) // NUM_COORDS_PER_RES == l, f"{k} does not have correct length {l} (is {len(v) // NUM_COORDS_PER_RES})."
             else:
                 if len(v) != l: return {}, "failed"
                 assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
-
 
     return new_entry, warning
 
@@ -90,9 +87,11 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         for sidechain prediction.
     """
     print("Preparing to merge ProteinNet data with downloaded sidechain data.")
-    pn_files = [os.path.join(proteinnet_out, f"training_{training_set}.pt"),
-                os.path.join(proteinnet_out, f"validation.pt"),
-                os.path.join(proteinnet_out, f"testing.pt")]
+    pn_files = [
+        os.path.join(proteinnet_out, f"training_{training_set}.pt"),
+        os.path.join(proteinnet_out, f"validation.pt"),
+        os.path.join(proteinnet_out, f"testing.pt")
+    ]
 
     pn_data = {}
     for f in pn_files:
@@ -105,23 +104,24 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     # with open(error_file, "r") as f:
     #     error_ids = f.read().splitlines(keepends=False)
 
-    errors = {"failed": [],
-              "single alignment, mask mismatch": [],
-              "multiple alignments, mask mismatch": [],
-              "multiple alignments, mask mismatch, many alignments": [],
-              "multiple alignments, found matching mask": [],
-              "multiple alignments, found matching mask, many alignments": [],
-              "single alignment, mask mismatch, mismatch used in alignment": [],
-              "multiple alignments, mask mismatch, mismatch used in alignment": [],
-              "multiple alignments, mask mismatch, many alignments, mismatch used in alignment": [],
-              "single alignment, found matching mask, mismatch used in alignment": [],
-              "multiple alignments, found matching mask, mismatch used in alignment": [],
-              "multiple alignments, found matching mask, many alignments, mismatch used in alignment": [],
-              "mismatch used in alignment": [],
-              "too many wrong AAs, mismatch used in alignment": [],
-              'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment': [],
-              'bad gaps': []
-              }
+    errors = {
+        "failed": [],
+        "single alignment, mask mismatch": [],
+        "multiple alignments, mask mismatch": [],
+        "multiple alignments, mask mismatch, many alignments": [],
+        "multiple alignments, found matching mask": [],
+        "multiple alignments, found matching mask, many alignments": [],
+        "single alignment, mask mismatch, mismatch used in alignment": [],
+        "multiple alignments, mask mismatch, mismatch used in alignment": [],
+        "multiple alignments, mask mismatch, many alignments, mismatch used in alignment": [],
+        "single alignment, found matching mask, mismatch used in alignment": [],
+        "multiple alignments, found matching mask, mismatch used in alignment": [],
+        "multiple alignments, found matching mask, many alignments, mismatch used in alignment": [],
+        "mismatch used in alignment": [],
+        "too many wrong AAs, mismatch used in alignment": [],
+        'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment': [],
+        'bad gaps': []
+    }
 
     aligner = init_aligner()
     # for pnid in error_ids:
@@ -168,13 +168,14 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
             f.write(f"{failed_id}\n")
     with open("errors/COMBINED_M-ALN_MATCH_MANY_WRONGAA.txt", "w") as f:
         for failed_id in errors[
-            "multiple alignments, found matching mask, many alignments, mismatch used in alignment"]:
+                "multiple alignments, found matching mask, many alignments, mismatch used in alignment"]:
             f.write(f"{failed_id}\n")
     with open("errors/COMBINED_WRONGAA-only.txt", "w") as f:
         for failed_id in errors["mismatch used in alignment"]:
             f.write(f"{failed_id}\n")
     with open("errors/COMBINED_MANY-WRONGAA.txt", "w") as f:
-        for failed_id in errors['too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
+        for failed_id in errors[
+                'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
             f.write(f"{failed_id}\n")
     with open("errors/BAD_GAPS.txt", "w") as f:
         for failed_id in errors['bad gaps']:
@@ -197,44 +198,44 @@ def combine_wrapper(pndata_scdata_pnid):
 
 def main():
     # First, create PyTorch versions of  raw proteinnet files for convenience
-    pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
-                                 args.training_set)
+    pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, args.training_set)
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
-    sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
-                                                   args.casp_version,
-                                                   args.training_set,
-                                                   args.limit,
-                                                   args.proteinnet_in)
+    sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out, args.casp_version, args.training_set,
+                                                   args.limit, args.proteinnet_in)
 
     # For debugging errors
     # sc_data = load_data("../data/sidechainnet/seq-only_casp12_100.pt")
 
     # Finally, unify the sidechain data with ProteinNet
-    sidechainnet = combine_datasets(args.proteinnet_out, sc_data,
-                                    args.training_set)
+    sidechainnet = combine_datasets(args.proteinnet_out, sc_data, args.training_set)
 
-    save_data(sidechainnet, os.path.join(args.sidechainnet_out,
-                                         f"sidechainnet_{args.casp_version}"
-                                         f"_{args.training_set}.pt"))
+    save_data(sidechainnet,
+              os.path.join(args.sidechainnet_out, f"sidechainnet_{args.casp_version}"
+                           f"_{args.training_set}.pt"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Constructs SidechainNet.")
-    parser.add_argument('proteinnet_in', type=str,
-                        help='Path to ProteinNet raw records directory.')
-    parser.add_argument('--proteinnet_out', '-po', type=str,
+    parser.add_argument('proteinnet_in', type=str, help='Path to ProteinNet raw records directory.')
+    parser.add_argument('--proteinnet_out',
+                        '-po',
+                        type=str,
                         help='Where to save parsed, raw ProteinNet.',
                         default="../data/proteinnet/")
-    parser.add_argument('--sidechainnet_out', '-so', type=str,
+    parser.add_argument('--sidechainnet_out',
+                        '-so',
+                        type=str,
                         help='Where to save SidechainNet.',
                         default="../data/sidechainnet/")
-    parser.add_argument('-l', '--limit', type=int, default=None,
-                        help='Limit size of training set for debugging.')
-    parser.add_argument("--pdb_dir", default=os.path.expanduser("~/pdb/"),
+    parser.add_argument('-l', '--limit', type=int, default=None, help='Limit size of training set for debugging.')
+    parser.add_argument("--pdb_dir",
+                        default=os.path.expanduser("~/pdb/"),
                         type=str,
                         help="Location to download PDB files for ProDy.")
-    parser.add_argument('--training_set', type=int, default=100,
+    parser.add_argument('--training_set',
+                        type=int,
+                        default=100,
                         help='Which \'thinning\' of the ProteinNet training '
                         'set to parse. {30,50,70,90,95,100}. Default 100.')
     args = parser.parse_args()
