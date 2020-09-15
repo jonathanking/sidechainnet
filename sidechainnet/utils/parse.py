@@ -220,9 +220,8 @@ def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
     relevant_training_file = os.path.join(proteinnet_out_dir,
                                           train_file.replace(".pkl", "_ids.txt"))
     relevant_id_files = [
-        relevant_training_file,
-        os.path.join(proteinnet_out_dir, "validation_ids.txt"),
-        os.path.join(proteinnet_out_dir, "testing_ids.txt")
+        os.path.join(proteinnet_out_dir, "testing_ids.txt"),
+        os.path.join(proteinnet_out_dir, "validation_ids.txt"), relevant_training_file
     ]
     relevant_ids = []
     for fname in relevant_id_files:
