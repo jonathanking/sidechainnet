@@ -119,8 +119,15 @@ def shorten_ends(s1, s2, s1_ang, s1_crd):
     return s1, s1_ang, s1_crd
 
 
-def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
-                           second_try=False, third_try=False):
+def merge(aligner,
+          pn_seq,
+          my_seq,
+          ang,
+          crd,
+          pn_mask,
+          pnid,
+          second_try=False,
+          third_try=False):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
@@ -140,13 +147,17 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
         # were residues observed that were not present in the ProteinNet
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
-        my_seq, ang, crd = shorten_ends(my_seq, pn_seq,  ang, crd)
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
-                                      second_try=True)
+        my_seq, ang, crd = shorten_ends(my_seq, pn_seq, ang, crd)
+        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, second_try=True)
 
     elif n_alignments == 0 and second_try and not third_try:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
-        mask, a0, ang, crd, warning = merge(aligner, pn_seq, my_seq, pn_mask, pnid, third_try=True)
+        mask, a0, ang, crd, warning = merge(aligner,
+                                            pn_seq,
+                                            my_seq,
+                                            pn_mask,
+                                            pnid,
+                                            third_try=True)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return mask, a0, ang, crd, warning
 
@@ -196,7 +207,8 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid,
                 best_idx = i
             if not best_alignment:
                 best_alignment = a0
-            if masks_match(pn_mask, computed_mask) or assert_mask_gaps_are_correct(computed_mask, crd):
+            if masks_match(pn_mask, computed_mask) or assert_mask_gaps_are_correct(
+                    computed_mask, crd):
                 found_a_match = True
                 best_mask = computed_mask
                 best_alignment = a0
@@ -382,14 +394,16 @@ def assert_mask_gaps_are_correct(mask, coordinates):
         coordinates: numpy array (L x 14 x 3) of atomic coordinates
 
     Returns:
-        True iff the mask is supported by the structure.
+        True iff the mask is supported by the structure. If False, also returns length
+        of the offending Ca-Ca distance.
     """
     CA_IDX = 1
     if mask.count("-") == 0:
-        return True
+        return True, 0
 
-    assert mask.count("+") == len(coordinates) // NUM_COORDS_PER_RES, \
-        "The number of coordinates must match the number of matched residues."
+    # This should never happen
+    if mask.count("+") != len(coordinates) // NUM_COORDS_PER_RES:
+        return False, 0
 
     # First, build a nested list that holds all contiguous regions of the data
     # according to the mask
@@ -417,8 +431,7 @@ def assert_mask_gaps_are_correct(mask, coordinates):
         for cur_res in coord_contig[1:]:
             cur_ca = cur_res[CA_IDX]
             if np.linalg.norm(cur_ca - prev_ca) > PRODY_CA_DIST * 1.85:
-                return False
+                return False, np.linalg.norm(cur_ca - prev_ca)
             prev_ca = cur_ca.copy()
 
-    return True
-
+    return True, 0

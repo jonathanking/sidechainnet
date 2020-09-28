@@ -41,10 +41,15 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
 
-    mask, alignment, ang, crd, warning = merge(aligner, pn_entry["primary"],
-                                               # sc_entry,
-                                               sc_entry["seq"], sc_entry["ang"],
-                                               sc_entry["crd"], pn_entry["mask"], pnid)
+    mask, alignment, ang, crd, warning = merge(
+        aligner,
+        pn_entry["primary"],
+        # sc_entry,
+        sc_entry["seq"],
+        sc_entry["ang"],
+        sc_entry["crd"],
+        pn_entry["mask"],
+        pnid)
     new_entry = {}
 
     if alignment:
@@ -52,8 +57,9 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["seq"] = pn_entry["primary"]
         new_entry["evo"] = pn_entry["evolutionary"]
 
-        correct_gaps = assert_mask_gaps_are_correct(mask, crd)
+        correct_gaps, bad_gap_len = assert_mask_gaps_are_correct(mask, crd)
         if not correct_gaps:
+            print(f"{pnid} had a bad gap with len {bad_gap_len:.2f}.")
             return {}, "bad gaps"
 
         # We may need to add padding where specified by the mask
@@ -64,10 +70,14 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         l = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
-                if len(v) // NUM_COORDS_PER_RES != l: return {}, "failed"
-                assert len(v) // NUM_COORDS_PER_RES == l, f"{k} does not have correct length {l} (is {len(v) // NUM_COORDS_PER_RES})."
+                if len(v) // NUM_COORDS_PER_RES != l:
+                    return {}, "failed"
+                assert len(
+                    v
+                ) // NUM_COORDS_PER_RES == l, f"{k} does not have correct length {l} (is {len(v) // NUM_COORDS_PER_RES})."
             else:
-                if len(v) != l: return {}, "failed"
+                if len(v) != l:
+                    return {}, "failed"
                 assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
 
     return new_entry, warning
@@ -112,13 +122,16 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         "multiple alignments, found matching mask, many alignments": [],
         "single alignment, mask mismatch, mismatch used in alignment": [],
         "multiple alignments, mask mismatch, mismatch used in alignment": [],
-              "multiple alignments, mask mismatch, many alignments, mismatch used in alignment": [],
+        "multiple alignments, mask mismatch, many alignments, mismatch used in alignment":
+            [],
         "single alignment, found matching mask, mismatch used in alignment": [],
         "multiple alignments, found matching mask, mismatch used in alignment": [],
-              "multiple alignments, found matching mask, many alignments, mismatch used in alignment": [],
+        "multiple alignments, found matching mask, many alignments, mismatch used in alignment":
+            [],
         "mismatch used in alignment": [],
         "too many wrong AAs, mismatch used in alignment": [],
-        'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment': [],
+        'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment':
+            [],
         'bad gaps': []
     }
 
@@ -184,7 +197,8 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         for failed_id in errors["mismatch used in alignment"]:
             f.write(f"{failed_id}\n")
     with open("errors/COMBINED_MANY-WRONGAA.txt", "w") as f:
-        for failed_id in errors['too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
+        for failed_id in errors[
+                'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
             f.write(f"{failed_id}\n")
     with open("errors/BAD_GAPS.txt", "w") as f:
         for failed_id in errors['bad gaps']:
@@ -212,10 +226,8 @@ def main():
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
     sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
-                                                   args.casp_version,
-                                                   args.training_set,
-                                                   args.limit,
-                                                   args.proteinnet_in)
+                                                   args.casp_version, args.training_set,
+                                                   args.limit, args.proteinnet_in)
 
     # For debugging errors
     # sc_data = load_data("../data/sidechainnet/seq-only_casp12_100.pkl")
