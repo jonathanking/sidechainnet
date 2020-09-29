@@ -248,9 +248,8 @@ def parse_astral_summary_file(lines):
     return d
 
 
-def get_chain_from_astral_id(astral_id, d):
-    """
-    Given an ASTRAL ID and the ASTRAL->PDB/chain mapping dictionary,
+def get_chain_from_astral_id(astral_id, d, match_proteinnet_chainA_sep2020=True):
+    """Given an ASTRAL ID and the ASTRAL->PDB/chain mapping dictionary,
     this function attempts to return the relevant, parsed ProDy object.
     """
     pdbid, chain = d[astral_id]
@@ -258,7 +257,7 @@ def get_chain_from_astral_id(astral_id, d):
                              f"{pdbid}."
     chain, resnums = chain.split(":")
 
-    if astral_id == "d4qrye_":
+    if astral_id == "d4qrye_" or match_proteinnet_chainA_sep2020:
         chain = "A"
 
     a = pr.parsePDB(pdbid, chain=chain)
