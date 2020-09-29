@@ -81,7 +81,8 @@ class ProteinErrors(object):
                 descr = self.name_to_descr[name]
                 if total_processed:
                     percent = f"{'(' + str(int(len(count_list) / total_processed * 100)) + '%)'}"
-                    print(f"{name + ':':<25}{str(len(count_list)):^8} {percent:^6} {descr}")
+                    print(
+                        f"{name + ':':<25}{str(len(count_list)):^8} {percent:^6} {descr}")
                 else:
                     print(f"{name + ':':<25}{len(count_list):^8}{descr}")
         print("")

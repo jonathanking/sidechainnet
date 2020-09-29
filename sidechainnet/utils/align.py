@@ -18,6 +18,10 @@ from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
 def init_basic_aligner(allow_mismatches=False):
     """ Returns an aligner with minimal assumptions about gaps."""
     a = Align.PairwiseAligner()
+    if allow_mismatches:
+        a.mismatch_score = -1
+        a.gap_score = -3
+        a.target_gap_score = -np.inf
     if not allow_mismatches:
         a.mismatch = -np.inf
         a.mismatch_score = -np.inf
@@ -119,15 +123,7 @@ def shorten_ends(s1, s2, s1_ang, s1_crd):
     return s1, s1_ang, s1_crd
 
 
-def merge(aligner,
-          pn_seq,
-          my_seq,
-          ang,
-          crd,
-          pn_mask,
-          pnid,
-          second_try=False,
-          third_try=False):
+def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
     """
     Returns True iff when pn_seq and my_seq are aligned, the resultant mask
     is the same as reported by ProteinNet. Also returns the computed_mask that
@@ -142,33 +138,46 @@ def merge(aligner,
     except OverflowError:
         n_alignments = 50
 
-    if n_alignments == 0 and not second_try and not third_try:
+    if n_alignments == 0 and attempt_number == 0:
+        # Use aligner with a typical set of assumptions.
+        aligner = init_aligner()
+        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=1)
+
+    if n_alignments == 0 and attempt_number == 1:
         # If there appear to be no alignments, it may be the case that there
         # were residues observed that were not present in the ProteinNet
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
         my_seq, ang, crd = shorten_ends(my_seq, pn_seq, ang, crd)
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, second_try=True)
+        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=2)
 
-    elif n_alignments == 0 and second_try and not third_try:
+    if n_alignments == 0 and attempt_number == 2:
+        # Try making very few assumptions about gaps before allowing mismatches/gaps in
+        # the target sequence.
+        aligner = init_basic_aligner(allow_mismatches=True)
+        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=3)
+
+    elif n_alignments == 0 and attempt_number == 3:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
         mask, a0, ang, crd, warning = merge(aligner,
                                             pn_seq,
                                             my_seq,
+                                            ang,
+                                            crd,
                                             pn_mask,
                                             pnid,
-                                            third_try=True)
+                                            attempt_number=4)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return mask, a0, ang, crd, warning
 
-    elif n_alignments == 0 and third_try:
+    elif n_alignments == 0 and attempt_number == 4:
         warning = "failed"
         return None, None, ang, crd, warning
 
     elif n_alignments == 1:
         a0 = a[0]
         computed_mask = get_mask_from_alignment(a0)
-        if third_try:
+        if attempt_number == 4:
             if computed_mask.count("X") + computed_mask.count(".") > 5:
                 warning = "too many wrong AAs"
             computed_mask = computed_mask.replace("X", "+").replace(".", "+")
@@ -193,12 +202,12 @@ def merge(aligner,
         found_a_match = False
         best_alignment = None
         best_idx = 0
-        has_many_alignments = n_alignments >= 50
+        has_many_alignments = n_alignments >= 200
         for i, a0 in enumerate(a):
-            if has_many_alignments and i >= 50:
+            if has_many_alignments and i >= 200:
                 break
             computed_mask = get_mask_from_alignment(a0)
-            if third_try:
+            if attempt_number == 4:
                 if computed_mask.count("X") + computed_mask.count(".") > 5:
                     warning = "too many wrong AAs"
                 computed_mask = computed_mask.replace("X", "+").replace(".", "+")
@@ -208,7 +217,7 @@ def merge(aligner,
             if not best_alignment:
                 best_alignment = a0
             if masks_match(pn_mask, computed_mask) or assert_mask_gaps_are_correct(
-                    computed_mask, crd):
+                    computed_mask, crd)[0]:
                 found_a_match = True
                 best_mask = computed_mask
                 best_alignment = a0
