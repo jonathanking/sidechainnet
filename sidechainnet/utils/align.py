@@ -339,7 +339,7 @@ def expand_data_with_mask(data, mask):
 
     new_data = []
     for m in mask:
-        if m == "+":
+        if m == "+" or m == ".":
             new_data.append(next(data))
         elif m == "-":
             new_data.append(blank.copy())
@@ -426,7 +426,7 @@ def assert_mask_gaps_are_correct(mask, coordinates):
                 coord_contigs.append(cur_contig.copy())
                 cur_contig = []
             continue
-        elif m == "+":
+        else:
             cur_contig.append(next(coord_iter))
     if cur_contig != []:
         coord_contigs.append(cur_contig.copy())
