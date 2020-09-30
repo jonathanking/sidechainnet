@@ -11,7 +11,7 @@ from multiprocessing import Pool, cpu_count
 import prody as pr
 from tqdm import tqdm
 
-from sidechainnet.utils.align import merge, expand_data_with_mask, assert_mask_gaps_are_correct, init_basic_aligner, init_aligner, binary_mask_to_str
+from sidechainnet.utils.align import merge, expand_data_with_mask, assert_mask_gaps_are_correct, binary_mask_to_str
 
 pr.confProDy(verbosity="none")
 
@@ -96,6 +96,8 @@ def manually_correct_mask(pnid, pn_entry, mask):
 
 
 def needs_manual_adjustment(pnid):
+    """Declares a list of pnids that should be handled manually due to eggregious
+    differences between observed and expected seqeuences and masks. """
     if pnid in [
             "4PGI_1_A", "3CMG_1_A", "4ARW_1_A", "4Z08_1_A", "2PLV_1_1", "4PG7_1_A",
             "2O24_1_A", "5I4N_1_A", "4RYK_1_A", "1CS4_3_C", "3SRY_1_A", "2AV4_1_A",
@@ -140,11 +142,6 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         pn_data.update(d)
     del d
 
-    # For debugging errors
-    # error_file = "/Users/jonathanking/Downloads/errorssidechain/COMBINED.txt"
-    # with open(error_file, "r") as f:
-    #     error_ids = f.read().splitlines(keepends=False)
-
     errors = {
         "failed": [],
         "single alignment, mask mismatch": [],
@@ -168,8 +165,6 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         'needs manual adjustment': []
     }
 
-    # aligner = init_aligner()
-    # # for pnid in error_ids:
     with Pool(cpu_count()) as p:
         tuples = (get_tuple(pn_data, sc_data, pnid) for pnid in sc_data.keys())
         results_warnings = list(
@@ -177,13 +172,6 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
                  total=len(sc_data.keys()),
                  dynamic_ncols=True))
 
-    # results_warnings = []
-    # list_to_use = ['3J9M_79_AY']  #list(sc_data.keys())[47_700:]
-    # for tuple in (get_tuple(pn_data, sc_data, pnid) for pnid in list_to_use):
-    #     print(tuple[-1])
-    #     results_warnings.append(combine_wrapper(tuple))
-
-    # for pnid in tqdm(sc_data.keys(), dynamic_ncols=True):
     for (combined_result, warning), pnid in zip(results_warnings, sc_data.keys()):
         if combined_result:
             pn_data[pnid] = combined_result
@@ -270,11 +258,6 @@ def main():
     sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
                                                    args.casp_version, args.training_set,
                                                    args.limit, args.proteinnet_in)
-
-    # pnids = open("~/dev_sidech/errors/BAD_GAPS.txt", "r").read().splitlines()
-
-    # For debugging errors
-    # sc_data = load_data("../data/sidechainnet/seq-only_casp12_100.pkl")
 
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet = combine_datasets(args.proteinnet_out, sc_data, args.training_set)

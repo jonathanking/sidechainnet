@@ -271,6 +271,9 @@ def get_chain_from_astral_id(astral_id, d, match_proteinnet_chainA_sep2020=True)
     return a
 
 
+# Defines a list of ASTRAL IDs that may have been parsed incorrectly in ProteinNet.
+# For instance, several ASTRAL IDs in ProteinNet contain sequences for chain A, even
+# though the ASTRAL ID specifies a different chain.
 FULL_ASTRAL_IDS_INCORRECTLY_PARSED = [
     '1EU3_d1eu3a1', '1FPO_d1fpoc1', '1GL9_d1gl9c1', '1GQ3_d1gq3b2', '1N2A_d1n2ab2',
     '1N9W_d1n9wb2', '1NSA_d1nsaa2', '1NYR_d1nyrb3', '1RQ2_d1rq2b1', '1SA0_d1sa0c2',
