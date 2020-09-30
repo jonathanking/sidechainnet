@@ -172,7 +172,9 @@ def replace_nonstdaas(residues):
         "SEP": "SER",
         "TPO": "THR",
         "PTR": "TYR",
-        "XLE": "LEU"
+        "XLE": "LEU",
+        "4FB": "PRO",
+        "MLY": "LYS"  # N-dimethyl-lysine
     }
 
     for r in residues:

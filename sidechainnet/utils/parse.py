@@ -257,8 +257,9 @@ def get_chain_from_astral_id(astral_id, d, match_proteinnet_chainA_sep2020=True)
                              f"{pdbid}."
     chain, resnums = chain.split(":")
 
-    if astral_id == "d4qrye_" or match_proteinnet_chainA_sep2020:
+    if astral_id == "d4qrye_" or astral_id in ASTRAL_IDS_INCORRECTLY_PARSED:
         chain = "A"
+        resnums = ""
 
     a = pr.parsePDB(pdbid, chain=chain)
     if resnums != "":
@@ -268,3 +269,19 @@ def get_chain_from_astral_id(astral_id, d, match_proteinnet_chainA_sep2020=True)
         else:
             a = a.select(f"resnum {resnums.replace('-', ' to ')}")
     return a
+
+
+FULL_ASTRAL_IDS_INCORRECTLY_PARSED = [
+    '1EU3_d1eu3a1', '1FPO_d1fpoc1', '1GL9_d1gl9c1', '1GQ3_d1gq3b2', '1N2A_d1n2ab2',
+    '1N9W_d1n9wb2', '1NSA_d1nsaa2', '1NYR_d1nyrb3', '1RQ2_d1rq2b1', '1SA0_d1sa0c2',
+    '1UYV_d1uyvb2', '1V8O_d1v8oc1', '1V8P_d1v8pc1', '1XES_d1xesd1', '1XP4_d1xp4d2',
+    '1Z2B_d1z2bc2', '2AL1_d2al1b1', '2AUA_d2auab1', '2E0A_d2e0ab2', '2QJJ_d2qjjd2',
+    '2RCY_d2rcye1', '2V83_d2v83c2', '2WLJ_d2wljb1', '2Z9I_d2z9ic1', '3EQV_d3eqvb1',
+    '3GFT_d3gftf1', '3GLJ_d3glja1', '3OMZ_d3omzc2', '3OYT_d3oytb2', '3PUW_d3puwb2',
+    '3R3L_d3r3lc2', '3UGX_d3ugxd2', '4KLY_d4klye1', '4L4J_d4l4jb1', '4M9A_d4m9ad1',
+    '4OCR_d4ocrl2', '5CTB_d5ctbc2'
+]
+
+ASTRAL_IDS_INCORRECTLY_PARSED = [
+    aid.split("_")[1] for aid in FULL_ASTRAL_IDS_INCORRECTLY_PARSED
+]

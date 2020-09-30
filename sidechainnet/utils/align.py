@@ -137,6 +137,8 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
         n_alignments = len(a)
     except OverflowError:
         n_alignments = 50
+        warning = "failed"
+        return None, None, ang, crd, warning
 
     if n_alignments == 0 and attempt_number == 0:
         # Use aligner with a typical set of assumptions.
@@ -216,8 +218,9 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
                 best_idx = i
             if not best_alignment:
                 best_alignment = a0
-            if masks_match(pn_mask, computed_mask) or assert_mask_gaps_are_correct(
-                    computed_mask, crd)[0]:
+            # if masks_match(pn_mask, computed_mask) or assert_mask_gaps_are_correct(
+            #         computed_mask, crd)[0]:
+            if assert_mask_gaps_are_correct(computed_mask, crd, pnid)[0]:
                 found_a_match = True
                 best_mask = computed_mask
                 best_alignment = a0
@@ -395,7 +398,7 @@ def manually_adjust_data(pnid, sc_entry):
     return sc_entry
 
 
-def assert_mask_gaps_are_correct(mask, coordinates):
+def assert_mask_gaps_are_correct(mask, coordinates, pnid=""):
     """ Returns True if the structure supports the mask.
 
     Args:
@@ -433,6 +436,7 @@ def assert_mask_gaps_are_correct(mask, coordinates):
 
     # Once the contiguous regions are reported, we check that the distance
     # between all alpha-carbons is less than ProDy's cutoff (4.1 Angstrom)
+    resnum = 1
     for coord_contig in coord_contigs:
         if len(coord_contig) == 1:
             continue
@@ -440,7 +444,10 @@ def assert_mask_gaps_are_correct(mask, coordinates):
         for cur_res in coord_contig[1:]:
             cur_ca = cur_res[CA_IDX]
             if np.linalg.norm(cur_ca - prev_ca) > PRODY_CA_DIST * 1.85:
+                # if pnid != "":
+                #     print(f"{pnid} bad gap at resnum {resnum}")
                 return False, np.linalg.norm(cur_ca - prev_ca)
             prev_ca = cur_ca.copy()
+            resnum += 1
 
     return True, 0

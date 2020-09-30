@@ -11,12 +11,12 @@ from multiprocessing import Pool, cpu_count
 import prody as pr
 from tqdm import tqdm
 
-from sidechainnet.utils.align import merge, expand_data_with_mask, assert_mask_gaps_are_correct, init_basic_aligner, init_aligner
+from sidechainnet.utils.align import merge, expand_data_with_mask, assert_mask_gaps_are_correct, init_basic_aligner, init_aligner, binary_mask_to_str
 
 pr.confProDy(verbosity="none")
 
 from sidechainnet.utils.download import download_sidechain_data, load_data, save_data
-from sidechainnet.utils.parse import parse_raw_proteinnet
+from sidechainnet.utils.parse import parse_raw_proteinnet, FULL_ASTRAL_IDS_INCORRECTLY_PARSED
 from sidechainnet.utils.align import init_aligner, manually_adjust_data
 from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 
@@ -40,6 +40,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
               "As of May 2020, it is not included in ProteinNet.")
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
+    if needs_manual_adjustment(pnid):
+        return {}, "needs manual adjustment"
 
     mask, alignment, ang, crd, warning = merge(
         aligner,
@@ -57,12 +59,13 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["seq"] = pn_entry["primary"]
         new_entry["evo"] = pn_entry["evolutionary"]
 
-        correct_gaps, bad_gap_len = assert_mask_gaps_are_correct(mask, crd)
+        correct_gaps, bad_gap_len = assert_mask_gaps_are_correct(mask, crd, pnid)
         if not correct_gaps:
             print(f"{pnid} had a bad gap with len {bad_gap_len:.2f}.")
             return {}, "bad gaps"
 
         # We may need to add padding where specified by the mask
+        mask = manually_correct_mask(pnid, pn_entry, mask)
         new_entry["ang"] = expand_data_with_mask(ang, mask)
         new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["msk"] = mask
@@ -81,6 +84,35 @@ def combine(pn_entry, sc_entry, aligner, pnid):
                 assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
 
     return new_entry, warning
+
+
+def manually_correct_mask(pnid, pn_entry, mask):
+    if pnid == "3TDN_1_A":
+        # In this case, the default mask from ProteinNet was actually correct. The
+        # protein's sequence has two equal scoring alignments, but the aligners typically
+        # pick the "incorrect" one.
+        mask = binary_mask_to_str(pn_entry['mask'])
+    return mask
+
+
+def needs_manual_adjustment(pnid):
+    if pnid in [
+            "4PGI_1_A", "3CMG_1_A", "4ARW_1_A", "4Z08_1_A", "2PLV_1_1", "4PG7_1_A",
+            "2O24_1_A", "5I4N_1_A", "4RYK_1_A", "1CS4_3_C", "3SRY_1_A", "2AV4_1_A",
+            "3GW7_1_A", "1TQ5_1_A", "5DND_1_A", "4YCU_1_A", "1VRZ_1_A", "1RRX_1_A",
+            "2XUV_1_A", "2CFO_1_A", "5DNC_1_A", "2WTS_1_A", "4JQI_3_L", "2H9W_1_A",
+            "5DNE_1_A", "3RN8_1_A", "4RQF_2_A", "2FLQ_1_A", "3IPN_1_A", "3GP3_1_A",
+            "2Q6P_1_A", "4O2D_1_A", "2XXX_1_A", "3AB4_2_B", "2PLV_1_1", "4UQQ_1_A",
+            "2DTJ_1_A", "4ORN_1_A", "4PG7_1_A", "2XXR_1_A", "3IG5_1_A", "3FPH_1_A",
+            "2O24_1_A", "4RQE_1_A", "2LIG_1_A", "4XMR_1_A", "1CT9_1_A", "1KL1_1_A",
+            "3Q1X_1_A", "1II5_1_A", "2XII_1_A", "3SRY_1_A", "4YCW_1_A", "3ZDQ_1_A",
+            "1YJS_1_A", "4CVK_1_A", "2VSQ_1_A", "3P47_1_A", "4D57_1_A", "3WVN_1_A",
+            "2XXU_1_A", "3VSC_1_A", "3S1T_1_A", "2AV4_1_A", "3RNN_1_A", "1WNU_1_A",
+            "4BDL_1_A", "3J9M_79_AY"
+    ]:
+        return True
+    else:
+        return False
 
 
 def combine_datasets(proteinnet_out, sc_data, training_set):
@@ -132,17 +164,24 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         "too many wrong AAs, mismatch used in alignment": [],
         'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment':
             [],
-        'bad gaps': []
+        'bad gaps': [],
+        'needs manual adjustment': []
     }
 
-    aligner = init_aligner()
-    # for pnid in error_ids:
+    # aligner = init_aligner()
+    # # for pnid in error_ids:
     with Pool(cpu_count()) as p:
         tuples = (get_tuple(pn_data, sc_data, pnid) for pnid in sc_data.keys())
         results_warnings = list(
             tqdm(p.imap(combine_wrapper, tuples),
                  total=len(sc_data.keys()),
                  dynamic_ncols=True))
+
+    # results_warnings = []
+    # list_to_use = ['3J9M_79_AY']  #list(sc_data.keys())[47_700:]
+    # for tuple in (get_tuple(pn_data, sc_data, pnid) for pnid in list_to_use):
+    #     print(tuple[-1])
+    #     results_warnings.append(combine_wrapper(tuple))
 
     # for pnid in tqdm(sc_data.keys(), dynamic_ncols=True):
     for (combined_result, warning), pnid in zip(results_warnings, sc_data.keys()):
@@ -154,6 +193,9 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
             errors[warning].append(pnid)
 
     # Record ProteinNet IDs that could not be combined or exhibited warnings
+    with open("errors/NEEDS_ADJUSTMENT.txt", "w") as f:
+        for failed_id in errors["needs manual adjustment"]:
+            f.write(f"{failed_id}\n")
     with open("errors/COMBINED_ERRORS.txt", "w") as f:
         for failed_id in errors["failed"]:
             f.write(f"{failed_id}\n")
@@ -228,6 +270,8 @@ def main():
     sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
                                                    args.casp_version, args.training_set,
                                                    args.limit, args.proteinnet_in)
+
+    # pnids = open("~/dev_sidech/errors/BAD_GAPS.txt", "r").read().splitlines()
 
     # For debugging errors
     # sc_data = load_data("../data/sidechainnet/seq-only_casp12_100.pkl")
