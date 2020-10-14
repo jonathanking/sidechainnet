@@ -105,9 +105,9 @@ class StructureBuilder(object):
             self.build()
 
         if not self.pdb_creator:
-            from sidechainnet.structure.PDB_Creator import PDB_Creator
-            self.pdb_creator = PDB_Creator(self.coords.numpy(),
-                                           self.get_seq_as_str())
+            from sidechainnet.structure.PdbCreator import PdbCreator
+            self.pdb_creator = PdbCreator(self.coords.numpy(),
+                                          self.get_seq_as_str())
 
         self.pdb_creator.save_pdb(path, title)
 

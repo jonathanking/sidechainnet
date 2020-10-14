@@ -116,7 +116,7 @@ In addition to the data itself, this repository also provides several utilities:
 - `sidechainnet.get_dataloaders` (uses `sidechainnet.utils.dataset.BinnedProteinDataset` and `sidechainnet.utils.dataset.SimilarLengthBatchSampler`)
     - By using these together to create a PyTorch Dataloader, we can handle the batching of SidechainNet data intelligently and increase training speed.
      - Each batch contains proteins of similar lengths but the average length for a batch is chosen at random from a bin. Using batches of similar lengths allows the computation of DRMSD to be parallelized effectively and improves performance.
-- `PDB_Creator`
+- `PdbCreator`
     - Generates structure files (`.pdb`) from model predictions.
     - Also enables the creation of 3D-object files (`.gltf`) in order to log this data using Weights and Biases ([example](https://app.wandb.ai/koes-group/protein-transformer/reports/Evaluating-the-Impact-of-Sequence-Convolutions-and-Embeddings-on-Protein-Structure-Prediction--Vmlldzo2OTg4Nw)).
 - Miscelaneous utilities for training protein structure prediction models

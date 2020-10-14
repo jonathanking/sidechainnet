@@ -12,7 +12,7 @@ from sidechainnet.structure.Structure import nerf
 from sidechainnet.structure.StructureBuilder import StructureBuilder
 
 
-class PDB_Creator(object):
+class PdbCreator(object):
     """
     A class for creating PDB files given an atom mapping and coordinate set.
     The general idea is that if any model is capable of predicting a set of
@@ -257,18 +257,18 @@ def generate_pdbs_from_debug_dataset():
     ang, ang_gap = data["ang"]
     crd, crd_gap = data["crd"]
 
-    creator_from_crd = PDB_Creator(crd, seq=seq)
+    creator_from_crd = PdbCreator(crd, seq=seq)
     creator_from_crd.save_pdb("from_crd.pdb")
 
-    creator_from_crd_gap = PDB_Creator(crd_gap, seq=seq_gap)
+    creator_from_crd_gap = PdbCreator(crd_gap, seq=seq_gap)
     creator_from_crd_gap.save_pdb("from_crd_gap.pdb")
 
     crd_from_ang = get_coordinates_from_numpy_data(seq, ang)
-    creator_from_ang = PDB_Creator(crd_from_ang, seq=seq)
+    creator_from_ang = PdbCreator(crd_from_ang, seq=seq)
     creator_from_ang.save_pdb("from_ang.pdb")
 
     crd_from_ang_gap = get_coordinates_from_numpy_data(seq_gap, ang_gap)
-    creator_from_ang_gap = PDB_Creator(crd_from_ang_gap, seq=seq_gap)
+    creator_from_ang_gap = PdbCreator(crd_from_ang_gap, seq=seq_gap)
     creator_from_ang_gap.save_pdb("from_ang_gap.pdb")
 
 
