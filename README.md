@@ -33,8 +33,10 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 <sup>⸸</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
-## Downloading SidechainNet data
+## Installation
+To run this code, it's recommended to first perform a developmental install of the package with pip in your current environment with `pip install -e .`. This will install the `sidechainnet` package in your environment.
 
+## Downloading Data
 For every existing ProteinNet dataset, a corresponding SidechainNet dataset has been created and can be downloaded via [Box](https://www.youtube.com/watch?v=dQw4w9WgXcQ). 
 
 There are separate datasets for each available CASP competition (CASP 7-12) as well as each "thinning" of the data as described by ProteinNet (`30, 50, 70, 90, 95, 100%`). A thinning represents the same dataset but has been clustered and downsampled to reduce its size. Thinnings marked as `100` contain the complete dataset.
