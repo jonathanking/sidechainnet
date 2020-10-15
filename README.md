@@ -137,7 +137,7 @@ If you are only interested in using and interacting with SidechainNet data, plea
 - Biopython
 - numpy
 - scipy
-- PyTorch
+- [PyTorch](https://pytorch.org/get-started/locally/)
 - tqdm
 
 
