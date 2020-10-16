@@ -8,6 +8,7 @@ Mohammed AlQuraishi.
 from ._version import get_versions
 # Add imports here
 from .create import *
+from .structure.StructureBuilder import StructureBuilder
 
 versions = get_versions()
 __version__ = versions['version']

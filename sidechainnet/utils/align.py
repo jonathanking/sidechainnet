@@ -11,7 +11,7 @@ Date : 3/09/2020
 import numpy as np
 from Bio import Align
 
-from sidechainnet.utils.build_info import NUM_COORDS_PER_RES, PRODY_CA_DIST
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, PRODY_CA_DIST
 from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
 
 
@@ -88,7 +88,8 @@ def masks_match(pn, new):
         # alignment, but there are some additional gaps, this is acceptable.
         new_gap_locs = locate_char("-", new)
         pn_gap_locs = locate_char("-", pn)
-        pn_gaps_still_present = all([pn_gap in new_gap_locs for pn_gap in pn_gap_locs])
+        pn_gaps_still_present = all(
+            [pn_gap in new_gap_locs for pn_gap in pn_gap_locs])
         return pn_gaps_still_present
     else:
         return False
@@ -143,7 +144,14 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
     if n_alignments == 0 and attempt_number == 0:
         # Use aligner with a typical set of assumptions.
         aligner = init_aligner()
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=1)
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     pn_mask,
+                     pnid,
+                     attempt_number=1)
 
     if n_alignments == 0 and attempt_number == 1:
         # If there appear to be no alignments, it may be the case that there
@@ -151,16 +159,31 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
         my_seq, ang, crd = shorten_ends(my_seq, pn_seq, ang, crd)
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=2)
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     pn_mask,
+                     pnid,
+                     attempt_number=2)
 
     if n_alignments == 0 and attempt_number == 2:
         # Try making very few assumptions about gaps before allowing mismatches/gaps in
         # the target sequence.
         aligner = init_basic_aligner(allow_mismatches=True)
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=3)
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     pn_mask,
+                     pnid,
+                     attempt_number=3)
 
     elif n_alignments == 0 and attempt_number == 3:
-        aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
+        aligner = init_aligner(allow_target_gaps=True,
+                               allow_target_mismatches=True)
         mask, a0, ang, crd, warning = merge(aligner,
                                             pn_seq,
                                             my_seq,
@@ -185,7 +208,8 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
             computed_mask = computed_mask.replace("X", "+").replace(".", "+")
         if not masks_match(pn_mask, computed_mask):
             if "astral" in determine_pnid_type(pnid):
-                pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace("-", "_")]
+                pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace(
+                    "-", "_")]
                 if "A" not in chain:
                     # This suggests that ProteinNet made a mistake and parsed
                     # chain A when they should have parsed the correct chain.
@@ -212,7 +236,8 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
             if attempt_number == 4:
                 if computed_mask.count("X") + computed_mask.count(".") > 5:
                     warning = "too many wrong AAs"
-                computed_mask = computed_mask.replace("X", "+").replace(".", "+")
+                computed_mask = computed_mask.replace("X",
+                                                      "+").replace(".", "+")
             if not best_mask:
                 best_mask = computed_mask
                 best_idx = i
@@ -390,7 +415,8 @@ def manually_adjust_data(pnid, sc_entry):
     # on a different segment. We can manually remove this data here before
     # proceeding with alignment.
     # https://github.com/prody/ProDy/issues/1045
-    if "5FXN" in pnid and len(sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
+    if "5FXN" in pnid and len(
+            sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
         sc_entry["seq"] = sc_entry["seq"][:-2]
         sc_entry["ang"] = sc_entry["ang"][:-2]
         sc_entry["crd"] = sc_entry["crd"][:-NUM_COORDS_PER_RES * 2]

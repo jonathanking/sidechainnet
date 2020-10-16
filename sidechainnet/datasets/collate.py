@@ -5,7 +5,7 @@ import torch.utils.data
 from sidechainnet.datasets.batch_sampler import SimilarLengthBatchSampler
 from sidechainnet.datasets.protein_dataset import ProteinDataset, BinnedProteinDataset
 from sidechainnet.utils.sequence import VOCAB
-from sidechainnet.utils.build_info import NUM_COORDS_PER_RES
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
@@ -100,9 +100,10 @@ def prepare_dataloaders(data,
                                                    collate_fn=paired_collate_fn)
         valid_loaders[split] = valid_loader
 
-    test_loader = torch.utils.data.DataLoader(ProteinDataset(seqs=data['test']['seq'],
-                                                             crds=data['test']['crd'],
-                                                             angs=data['test']['ang']),
+    test_loader = torch.utils.data.DataLoader(ProteinDataset(
+        seqs=data['test']['seq'],
+        crds=data['test']['crd'],
+        angs=data['test']['ang']),
                                               num_workers=num_workers,
                                               batch_size=batch_size,
                                               collate_fn=paired_collate_fn)
