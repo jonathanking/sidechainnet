@@ -1,8 +1,7 @@
 import numpy as np
-import pymol
 import torch
-import wandb
 from prody import calcTransformation
+import py3Dmol
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 import sidechainnet
@@ -13,55 +12,46 @@ from sidechainnet.structure.StructureBuilder import StructureBuilder
 
 
 class PdbCreator(object):
-    """
-    A class for creating PDB files given an atom mapping and coordinate set.
-    The general idea is that if any model is capable of predicting a set of
-    coordinates and mapping between those coordinates and residue/atom names,
-    then this object can be use to transform that output into a PDB file.
+    """Creates a PDB file given a protein's atomic coordinates and sequence.  
+    
+    The general idea is that if any model is capable of predicting a set of coordinates 
+    and mapping between those coordinates and residue/atom names, then this object can 
+    be use to transform that output into a PDB file. 
 
     The Python format string was taken from http://cupnet.net/pdb-format/.
     """
 
-    def __init__(self,
-                 coords,
-                 seq=None,
-                 mapping=None,
-                 atoms_per_res=NUM_COORDS_PER_RES):
+    def __init__(self, coords, seq, atoms_per_res=NUM_COORDS_PER_RES):
+        """Initializes a PdbCreator.
+        
+        Args:
+            coords: A numpy matrix of shape (L x N) x 3, where L is the protein sequence
+                length and N is the number of atoms per residue in the coordinate set.
+            seq: A length L string representing the protein sequence with  one character
+                per amino acid.
+            atoms_per_res: The number of atoms recorded per residue. This must be the
+                same for every residue.
         """
-        Input:
-            coords: (L x N) x 3 where L is the protein sequence len and N
-                    is the number of atoms/residue in the coordinate set
-                    (atoms_per_res).
-            mapping: length L list of list of atom names per residue,
-                     i.e. (RES -> [ATOM_NAMES_FOR_RES])
-        Output:
-            saves PDB file to disk
-        """
+        if len(seq) != coords.shape[0] / atoms_per_res:
+            raise ValueError(
+                "The sequence length must match the coordinate length and contain 1 "
+                "letter AA codes." + str(coords.shape[0] / atoms_per_res) + " " +
+                str(len(seq)))
+        if coords.shape[0] % atoms_per_res != 0:
+            raise AssertionError(f"Coords is not divisible by {atoms_per_res}. "
+                                 f"{coords.shape}")
+        if atoms_per_res != 14:
+            raise ValueError(
+                "Values for atoms_per_res other than 14 are currently not supported.")
 
         self.coords = coords
-        if seq and not mapping:
-            if len(seq) == coords.shape[0] / atoms_per_res:
-                raise AssertionError(
-                    "The sequence length must match the coordinate length and contain 1 "
-                    "letter AA codes." + str(coords.shape[0] / atoms_per_res) +
-                    " " + str(len(seq)))
-            else:
-                self.seq = seq
-                self.mapping = self._make_mapping_from_seq()
-        elif not seq and not mapping:
-            raise Exception("Please provide a seq or a mapping.")
-        elif mapping and not seq:
-            self.mapping = mapping
-            self.seq = self._get_seq_from_mapping()
-        assert type(self.mapping[0][0]) == str and len(
-            self.mapping[0]
-            [0]) == 1, "1 letter AA codes must be used in the mapping."
+        self.seq = seq
+        self.mapping = self._make_mapping_from_seq()
         self.atoms_per_res = atoms_per_res
-        self.format_str = (
-            "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   "
-            "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}")
-        self.atom_nbr = 1
-        self.res_nbr = 1
+
+        # PDB Formatting Information
+        self.format_str = ("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}"
+                           "{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}")
         self.defaults = {
             "alt_loc": "",
             "chain_id": "",
@@ -71,29 +61,23 @@ class PdbCreator(object):
             "element_sym": "",
             "charge": ""
         }
-
-        if self.coords.shape[0] % self.atoms_per_res != 0:
-            raise AssertionError(f"Coords is not divisible by {atoms_per_res}. "
-                                 f"{self.coords.shape}")
+        self.title = "Untitled"
+        self.atom_nbr = 1
+        self.res_nbr = 1
+        self._pdb_str = ""
+        self._pdb_body_lines = []
+        self._pdb_lines = []
 
     def _coord_generator(self):
-        """
-        A generator that yields ATOMS_PER_RES atoms at a time from self.coords.
-        """
+        """A generator that iteratively yields self.atoms_per_res atoms at a time."""
         coord_idx = 0
         while coord_idx < self.coords.shape[0]:
             yield self.coords[coord_idx:coord_idx + self.atoms_per_res]
             coord_idx += self.atoms_per_res
 
-    def _get_line_for_atom(self,
-                           res_name,
-                           atom_name,
-                           atom_coords,
-                           missing=False):
-        """
-        Returns the 'ATOM...' line in PDB format for the specified atom. If
-        missing, this function should have special, but not yet determined,
-        behavior.
+    def _get_line_for_atom(self, res_name, atom_name, atom_coords, missing=False):
+        """Returns the 'ATOM...' line in PDB format for the specified atom. If missing, 
+        this function should have special, but not yet determined, behavior. 
         """
         if missing:
             occupancy = 0
@@ -101,59 +85,48 @@ class PdbCreator(object):
             occupancy = self.defaults["occupancy"]
         return self.format_str.format(
             "ATOM", self.atom_nbr, atom_name, self.defaults["alt_loc"],
-            ONE_TO_THREE_LETTER_MAP[res_name], self.defaults["chain_id"],
-            self.res_nbr, self.defaults["insertion_code"], atom_coords[0],
-            atom_coords[1], atom_coords[2], occupancy,
-            self.defaults["temp_factor"], atom_name[0], self.defaults["charge"])
+            ONE_TO_THREE_LETTER_MAP[res_name], self.defaults["chain_id"], self.res_nbr,
+            self.defaults["insertion_code"], atom_coords[0], atom_coords[1],
+            atom_coords[2], occupancy, self.defaults["temp_factor"], atom_name[0],
+            self.defaults["charge"])
 
     def _get_lines_for_residue(self, res_name, atom_names, coords):
-        """
-        Returns PDB-formated lines for all atoms in this residue. Calls
-        get_line_for_atom.
+        """Returns a list of PDB-formatted lines for all atoms in a single residue. 
+        
+        Calls get_line_for_atom. 
         """
         residue_lines = []
         for atom_name, atom_coord in zip(atom_names, coords):
-            # TODO: what to do in the PDB file if atom is missing?
-            if atom_name is "PAD" or np.isnan(
-                    atom_coord).sum() > 0 or atom_coord.sum() == 0:
+            if (atom_name == "PAD" or np.isnan(atom_coord).sum() > 0 or
+                    atom_coord.sum() == 0):
                 continue
-            # if np.isnan(atom_coord).sum() > 0:
-            #     residue_lines.append(self.get_line_for_atom(res_name, atom_name, atom_coord,
-            #     missing=True))
-            #     self.atom_nbr += 1
-            #     continue
-            residue_lines.append(
-                self._get_line_for_atom(res_name, atom_name, atom_coord))
+            residue_lines.append(self._get_line_for_atom(res_name, atom_name, atom_coord))
             self.atom_nbr += 1
         return residue_lines
 
     def _get_lines_for_protein(self):
+        """Returns a list of PDB-formatted lines for all residues in this protein. 
+        
+        Calls get_lines_for_residue. 
         """
-        Returns PDB-formated lines for all residues in this protein. Calls
-        get_lines_for_residue.
-        """
-        self.lines = []
+        self._pdb_body_lines = []
         self.res_nbr = 1
         self.atom_nbr = 1
         mapping_coords = zip(self.mapping, self._coord_generator())
         for (res_name, atom_names), res_coords in mapping_coords:
-            self.lines.extend(
+            self._pdb_body_lines.extend(
                 self._get_lines_for_residue(res_name, atom_names, res_coords))
             self.res_nbr += 1
-        return self.lines
+        return self._pdb_body_lines
 
     @staticmethod
     def _make_header(title):
-        """
-        Returns the PDB header.
-        """
+        """Return a string representing the PDB header."""
         return f"REMARK  {title}"
 
     @staticmethod
     def _make_footer():
-        """
-        Returns the PDB footer.
-        """
+        """Return a string representing the PDB footer."""
         return "TER\nEND          \n"
 
     def _make_mapping_from_seq(self):
@@ -166,21 +139,31 @@ class PdbCreator(object):
             mapping.append((residue, ATOM_MAP_14[residue]))
         return mapping
 
-    def save_pdb(self, path, title="test"):
+    def get_pdb_string(self, title=None):
+        if not title:
+            title = self.title
+
+        if self._pdb_str:
+            return self._pdb_str
+        self._get_lines_for_protein()
+        self._pdb_lines = [self._make_header(title)
+                          ] + self._pdb_body_lines + [self._make_footer()]
+        self._pdb_str = "\n".join(self._pdb_lines)
+        return self._pdb_str
+
+    def save_pdb(self, path, title="UntitledProtein"):
         """
         Given a file path and title, this function generates the PDB lines,
         then writes them to a file.
         """
-        self._get_lines_for_protein()
-        self.lines = [self._make_header(title)
-                     ] + self.lines + [self._make_footer()]
         with open(path, "w") as outfile:
-            outfile.write("\n".join(self.lines))
+            outfile.write(self.get_pdb_string(title))
 
     def save_gltf(self, path, title="test", create_pdb=False):
         """
         This function first creates a PDB file, then converts it to a GLTF
-        (3D Object) file. Used for visualizign with Weights and Biases. """
+        (3D Object) file. Used for visualizing with Weights and Biases. """
+        import pymol
         assert ".gltf" in path, "requested filepath must end with '.gtlf'."
         if create_pdb:
             self.save_pdb(path.replace(".gltf", ".pdb"), title)
@@ -189,63 +172,12 @@ class PdbCreator(object):
         pymol.cmd.save(path, quiet=True)
         pymol.cmd.delete("all")
 
-    def save_gltfs(self,
-                   path1,
-                   path2,
-                   gltf_out_path,
-                   make_pse=False,
-                   pse_out_path="",
-                   make_png=False):
-        """
-        This function first creates a PDB file, then converts it to a GLTF
-        (3D Object) file. Used for visualizign with Weights and Biases. """
-        assert ".pdb" in path1, "requested filepaths must end with '.pdb'."
-        pymol.cmd.load(path1, "true")
-        pymol.cmd.load(path2, "pred")
-        pymol.cmd.color("marine", "true")
-        pymol.cmd.color("oxygen", "pred")
-        rmsd, _, _, _, _, _, _ = pymol.cmd.align("true", "pred", quiet=True)
-        try:
-            pymol.cmd.save(gltf_out_path, f"{wandb.run.step:05}.gltf")
-        except TypeError:
-            # Addresses an issue where the PyMol scene may not be setup correctly
-            pymol.cmd.delete("all")
-            return
 
-        # Align and save PSE
-        if make_pse:
-            pymol.cmd.show("lines")
-            pymol.cmd.save(pse_out_path, quiet=True)
-            pymol.cmd.save(pse_out_path.replace(".pse", ".pdb"), quiet=True)
-        if make_png:
-            pymol.cmd.png(gltf_out_path.replace("gltf", "png"),
-                          width=400,
-                          ray=0)
-
-        pymol.cmd.delete("all")
-
-    def _get_seq_from_mapping(self):
-        """
-        Returns the protein sequence in 1-letter AA codes.
-        """
-        return "".join([m[0] for m in self.mapping])
-
-
-if NUM_COORDS_PER_RES == 13:
-    ATOM_MAP_13 = {}
-    for one_letter in ONE_TO_THREE_LETTER_MAP.keys():
-        ATOM_MAP_13[one_letter] = ["N", "CA", "C"] + list(
-            SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
-        ATOM_MAP_13[one_letter].extend(["PAD"] *
-                                       (13 - len(ATOM_MAP_13[one_letter])))
-
-if NUM_COORDS_PER_RES == 14:
-    ATOM_MAP_14 = {}
-    for one_letter in ONE_TO_THREE_LETTER_MAP.keys():
-        ATOM_MAP_14[one_letter] = ["N", "CA", "C", "O"] + list(
-            SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
-        ATOM_MAP_14[one_letter].extend(["PAD"] *
-                                       (14 - len(ATOM_MAP_14[one_letter])))
+ATOM_MAP_14 = {}
+for one_letter in ONE_TO_THREE_LETTER_MAP.keys():
+    ATOM_MAP_14[one_letter] = ["N", "CA", "C", "O"] + list(
+        SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
+    ATOM_MAP_14[one_letter].extend(["PAD"] * (14 - len(ATOM_MAP_14[one_letter])))
 
 
 def generate_pdbs_from_debug_dataset():
@@ -320,15 +252,8 @@ if __name__ == "__main__":
     # TODO do several predictions, add PDB name
     # TODO add ability to predict given model checkpoint
     # TODO CUDA isn't playing nice
+    
+    
 
-    # make_debug_structure_dataset()
-    # generate_pdbs_from_debug_dataset()
-
-    d = torch.load(
-        "/home/jok120/protein-transformer/data/proteinnet/casp12_200216_30.pt")
-    seq = d["train"]["seq"][10]
-    ang = d["train"]["ang"][10]
-    # ang = inverse_trig_transform(torch.tensor(ang, dtype=torch.float32))[:,
-    #                                                                      0, :]
-    sb = StructureBuilder(seq, ang)
-    sb.to_pdb("200210b.pdb")
+    make_debug_structure_dataset()
+    generate_pdbs_from_debug_dataset()

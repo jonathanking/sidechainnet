@@ -18,17 +18,14 @@ class StructureBuilder(object):
     """
 
     def __init__(self, seq, ang, device=torch.device("cpu")):
-        """
-        Initialize a StructureBuilder for a single protein.
+        """Initialize a StructureBuilder for a single protein.
 
-        Parameters
-        ----------
-        seq : Tensor
-            An integer tensor (L) (without padding) that represents the protein's amino acid sequence.
-        ang : Tensor
-            An angle tensor (L X NUM_PREDICTED_ANGLES) that contain's all of the protein's interior angles.
-        device : device
-            The device on which to build the structure.
+        Args:
+            seq: An integer tensor or a string of length L that represents the protein's
+                amino acid sequence.
+            ang: A float tensor (L X NUM_PREDICTED_ANGLES) that contains all of the 
+                protein's interior angles.
+            device: An optional torch device on which to build the structure.
         """
         if type(seq) == str:
             seq = torch.tensor([VOCAB._char2int[s] for s in seq])
@@ -46,13 +43,13 @@ class StructureBuilder(object):
     def __len__(self):
         return len(self.seq)
 
-    def iter_resname_angs(self, start=0):
+    def _iter_resname_angs(self, start=0):
         for resname, angles in zip(self.seq[start:], self.ang[start:]):
             yield resname, angles
 
-    def build_first_two_residues(self):
+    def _build_first_two_residues(self):
         """ Constructs the first two residues of the protein. """
-        resname_ang_iter = self.iter_resname_angs()
+        resname_ang_iter = self._iter_resname_angs()
         first_resname, first_ang = next(resname_ang_iter)
         second_resname, second_ang = next(resname_ang_iter)
         first_res = ResidueBuilder(first_resname,
@@ -79,14 +76,14 @@ class StructureBuilder(object):
         present.
         """
         # Build the first and second residues, a special case
-        first, second = self.build_first_two_residues()
+        first, second = self._build_first_two_residues()
 
         # Combine the coordinates and build the rest of the protein
         self.coords = first.stack_coords() + second.stack_coords()
 
         # Build the rest of the structure
         prev_res = second
-        for i, (resname, ang) in enumerate(self.iter_resname_angs(start=2)):
+        for i, (resname, ang) in enumerate(self._iter_resname_angs(start=2)):
             res = ResidueBuilder(resname, ang, prev_res=prev_res, next_res=None)
             self.coords += res.build()
             prev_res = res
@@ -95,21 +92,39 @@ class StructureBuilder(object):
 
         return self.coords
 
-    def get_seq_as_str(self):
+    def _get_seq_as_str(self):
         if not self.seq_as_str:
             self.seq_as_str = VOCAB.ints2str(map(int, self.seq))
         return self.seq_as_str
-
-    def to_pdb(self, path, title="pred"):
+    
+    def _initialize_coordinates_and_PdbCreator(self):
         if len(self.coords) == 0:
             self.build()
 
         if not self.pdb_creator:
             from sidechainnet.structure.PdbCreator import PdbCreator
-            self.pdb_creator = PdbCreator(self.coords.numpy(),
-                                          self.get_seq_as_str())
+            self.pdb_creator = PdbCreator(self.coords.numpy(), self._get_seq_as_str())
 
+    def to_pdb(self, path, title="pred"):
+        self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_pdb(path, title)
+        
+    def to_gltf(self, path, title="pred"):
+        self._initialize_coordinates_and_PdbCreator()
+        self.pdb_creator.save_gltf(path, title)
+        
+    def to_3Dmol(self, style=None, **kwargs):
+        import py3Dmol
+        if not style:
+            style = {'cartoon': {}, 'stick':{'radius' : .15}}
+        self._initialize_coordinates_and_PdbCreator()
+        
+        view = py3Dmol.view(**kwargs)
+        view.addModel(self.pdb_creator.get_pdb_string(), 'pdb')
+        if style:
+            view.setStyle(style)
+        view.zoomTo()
+        return view
 
 
 class ResidueBuilder(object):
@@ -120,18 +135,16 @@ class ResidueBuilder(object):
                  prev_res,
                  next_res,
                  device=torch.device("cpu")):
-        """Initialize a residue builder. If prev_{bb, ang} are None, then this
-        is the first residue.
+        """Initialize a residue builder for building a residue's coordinates from angles.  
+        
+        If prev_{bb, ang} are None, then this is the first residue. 
 
-        Parameters
-        ----------
-        name : Tensor
-            The integer amino acid code for this residue.
-        angles : Tensor
-            Angle tensor containing necessary angles to define this residue.
-        prev_bb : Tensor, None
+        Args:
+            name: The integer amino acid code for this residue.
+            angles: A float tensor containing necessary angles to define this residue.
+            prev_bb: Tensor, None
             Coordinate tensor (3 x 3) of previous residue, upon which this residue is extending.
-        prev_ang : Tensor, None
+            prev_ang : Tensor, None
             Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon which this residue is extending.
         """
         assert type(name) == torch.Tensor, "Expected integer AA code." + str(
@@ -273,14 +286,30 @@ def get_residue_build_iter(res, build_dictionary):
 
 
 if __name__ == '__main__':
-    a = get_residue_build_iter("ALA", SC_BUILD_INFO)
-    b = get_residue_build_iter("ARG", SC_BUILD_INFO)
-    c = get_residue_build_iter("TYR", SC_BUILD_INFO)
-    for i in a:
-        print(i)
-    print("Arginine:")
-    for i in b:
-        print(f"\t{i}")
-    print("Tyrosine:")
-    for i in c:
-        print(f"\t{i}")
+    # a = get_residue_build_iter("ALA", SC_BUILD_INFO)
+    # b = get_residue_build_iter("ARG", SC_BUILD_INFO)
+    # c = get_residue_build_iter("TYR", SC_BUILD_INFO)
+    # for i in a:
+    #     print(i)
+    # print("Arginine:")
+    # for i in b:
+    #     print(f"\t{i}")
+    # print("Tyrosine:")
+    # for i in c:
+    #     print(f"\t{i}")
+    import pickle
+
+    def load_data(path):
+        with open(path, "rb") as f:
+            data = pickle.load(f)
+        return data
+
+
+    d = load_data(
+        "/home/jok120/dev_sidechainnet/data/sidechainnet/sidechainnet_casp12_100.pkl")
+
+    angles = d['2KZQ_1_A']['ang']
+    sequence  = d['2KZQ_1_A']['seq']
+
+    sb = StructureBuilder(sequence, angles)
+    sb.to_pdb("test01.pdb")
