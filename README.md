@@ -1,3 +1,5 @@
+_!! Note: At this moment, SidechainNet's API is being finalized and documentation may be incorrect. 10/16/2020 !!_
+
 SidechainNet
 ==============================
 [//]: # (Badges)
