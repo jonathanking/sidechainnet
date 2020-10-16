@@ -13,6 +13,8 @@ from tqdm import tqdm
 
 from sidechainnet.utils.align import merge, expand_data_with_mask, assert_mask_gaps_are_correct, binary_mask_to_str
 
+from sidechainnet.utils.errors import write_errors_to_files
+
 pr.confProDy(verbosity="none")
 
 from sidechainnet.utils.download import download_sidechain_data, load_data, save_data
@@ -43,15 +45,9 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if needs_manual_adjustment(pnid):
         return {}, "needs manual adjustment"
 
-    mask, alignment, ang, crd, warning = merge(
-        aligner,
-        pn_entry["primary"],
-        # sc_entry,
-        sc_entry["seq"],
-        sc_entry["ang"],
-        sc_entry["crd"],
-        pn_entry["mask"],
-        pnid)
+    mask, alignment, ang, crd, warning = merge(aligner, pn_entry["primary"],
+                                               sc_entry["seq"], sc_entry["ang"],
+                                               sc_entry["crd"], pn_entry["mask"], pnid)
     new_entry = {}
 
     if alignment:
@@ -142,29 +138,6 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
         pn_data.update(d)
     del d
 
-    errors = {
-        "failed": [],
-        "single alignment, mask mismatch": [],
-        "multiple alignments, mask mismatch": [],
-        "multiple alignments, mask mismatch, many alignments": [],
-        "multiple alignments, found matching mask": [],
-        "multiple alignments, found matching mask, many alignments": [],
-        "single alignment, mask mismatch, mismatch used in alignment": [],
-        "multiple alignments, mask mismatch, mismatch used in alignment": [],
-        "multiple alignments, mask mismatch, many alignments, mismatch used in alignment":
-            [],
-        "single alignment, found matching mask, mismatch used in alignment": [],
-        "multiple alignments, found matching mask, mismatch used in alignment": [],
-        "multiple alignments, found matching mask, many alignments, mismatch used in alignment":
-            [],
-        "mismatch used in alignment": [],
-        "too many wrong AAs, mismatch used in alignment": [],
-        'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment':
-            [],
-        'bad gaps': [],
-        'needs manual adjustment': []
-    }
-
     with Pool(cpu_count()) as p:
         tuples = (get_tuple(pn_data, sc_data, pnid) for pnid in sc_data.keys())
         results_warnings = list(
@@ -172,67 +145,7 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
                  total=len(sc_data.keys()),
                  dynamic_ncols=True))
 
-    for (combined_result, warning), pnid in zip(results_warnings, sc_data.keys()):
-        if combined_result:
-            pn_data[pnid] = combined_result
-        else:
-            del pn_data[pnid]
-        if warning:
-            errors[warning].append(pnid)
-
-    # Record ProteinNet IDs that could not be combined or exhibited warnings
-    with open("errors/NEEDS_ADJUSTMENT.txt", "w") as f:
-        for failed_id in errors["needs manual adjustment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_ERRORS.txt", "w") as f:
-        for failed_id in errors["failed"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_1ALN_MISMATCH.txt", "w") as f:
-        for failed_id in errors["single alignment, mask mismatch"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MISMATCH.txt", "w") as f:
-        for failed_id in errors["multiple alignments, mask mismatch"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MISMATCH_MANY.txt", "w") as f:
-        for failed_id in errors["multiple alignments, mask mismatch, many alignments"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_1ALN_MISMATCH_WRONGAA.txt", "w") as f:
-        for failed_id in errors[
-                "single alignment, mask mismatch, mismatch used in alignment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MISMATCH_WRONGAA.txt", "w") as f:
-        for failed_id in errors[
-                "multiple alignments, mask mismatch, mismatch used in alignment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MISMATCH_MANY_WRONGAA.txt", "w") as f:
-        for failed_id in errors[
-            "multiple alignments, mask mismatch, many alignments, mismatch used in " \
-            "alignment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_1ALN_MATCH_WRONGAA.txt", "w") as f:
-        for failed_id in errors[
-                "single alignment, found matching mask, mismatch used in alignment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MATCH_WRONGAA.txt", "w") as f:
-        for failed_id in errors[
-                "multiple alignments, found matching mask, mismatch used in alignment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_M-ALN_MATCH_MANY_WRONGAA.txt", "w") as f:
-        for failed_id in errors[
-            "multiple alignments, found matching mask, many alignments, mismatch used " \
-            "in " \
-            "alignment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_WRONGAA-only.txt", "w") as f:
-        for failed_id in errors["mismatch used in alignment"]:
-            f.write(f"{failed_id}\n")
-    with open("errors/COMBINED_MANY-WRONGAA.txt", "w") as f:
-        for failed_id in errors[
-                'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
-            f.write(f"{failed_id}\n")
-    with open("errors/BAD_GAPS.txt", "w") as f:
-        for failed_id in errors['bad gaps']:
-            f.write(f"{failed_id}\n")
+    pn_data, errors = write_errors_to_files(pn_data, results_warnings, sc_data.keys())
 
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
           f"{len(errors['failed'])} IDs failed to combine successfully.")

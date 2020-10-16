@@ -201,3 +201,95 @@ def report_errors(pnids_errorcodes, total_pnids):
                   f"different model number than the one specified by "
                   f"ProteinNet. See errors/MODIFIED_MODEL_WARNING.txt for "
                   f"a list of these proteins.")
+
+
+def write_errors_to_files(pn_data, results_warnings, pnids):
+
+    # Define error dictionary for recording errors
+    errors = {  
+        "failed": [], 
+        "single alignment, mask mismatch": [],
+        "multiple alignments, mask mismatch": [],
+        "multiple alignments, mask mismatch, many alignments": [],
+        "multiple alignments, found matching mask": [],
+        "multiple alignments, found matching mask, many alignments": [],
+        "single alignment, mask mismatch, mismatch used in alignment": [],
+        "multiple alignments, mask mismatch, mismatch used in alignment": [],
+        "multiple alignments, mask mismatch, many alignments, mismatch used in "
+        "alignment": [], 
+        "single alignment, found matching mask, mismatch used in alignment": [],
+        "multiple alignments, found matching mask, mismatch used in alignment": [],
+        "multiple alignments, found matching mask, many alignments, mismatch used in alignment":
+            [], 
+        "mismatch used in alignment": [],
+        "too many wrong AAs, mismatch used in alignment": [],
+        'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment':
+            [],
+        'bad gaps': [],
+        'needs manual adjustment': []
+    }
+
+    # Delete/update ProteinNet entries depending on their ability to merge w/SidechainNet.
+    for (combined_result, warning), pnid in zip(results_warnings, pnids):
+        if combined_result:
+            pn_data[pnid] = combined_result
+        else:
+            del pn_data[pnid]
+        if warning:
+            errors[warning].append(pnid)
+
+    # Record ProteinNet IDs that could not be combined or exhibited warnings
+    with open("errors/NEEDS_ADJUSTMENT.txt", "w") as f:
+        for failed_id in errors["needs manual adjustment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_ERRORS.txt", "w") as f:
+        for failed_id in errors["failed"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_1ALN_MISMATCH.txt", "w") as f:
+        for failed_id in errors["single alignment, mask mismatch"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH.txt", "w") as f:
+        for failed_id in errors["multiple alignments, mask mismatch"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH_MANY.txt", "w") as f:
+        for failed_id in errors["multiple alignments, mask mismatch, many alignments"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_1ALN_MISMATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+                "single alignment, mask mismatch, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+                "multiple alignments, mask mismatch, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MISMATCH_MANY_WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+            "multiple alignments, mask mismatch, many alignments, mismatch used in " \
+            "alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_1ALN_MATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+                "single alignment, found matching mask, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MATCH_WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+                "multiple alignments, found matching mask, mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_M-ALN_MATCH_MANY_WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+            "multiple alignments, found matching mask, many alignments, mismatch used " \
+            "in " \
+            "alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_WRONGAA-only.txt", "w") as f:
+        for failed_id in errors["mismatch used in alignment"]:
+            f.write(f"{failed_id}\n")
+    with open("errors/COMBINED_MANY-WRONGAA.txt", "w") as f:
+        for failed_id in errors[
+                'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment']:
+            f.write(f"{failed_id}\n")
+    with open("errors/BAD_GAPS.txt", "w") as f:
+        for failed_id in errors['bad gaps']:
+            f.write(f"{failed_id}\n")
+            
+    return pn_data, errors
