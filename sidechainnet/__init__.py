@@ -7,7 +7,6 @@ Mohammed AlQuraishi.
 # Handle versioneer
 from ._version import get_versions
 # Add imports here
-from .create import *
 from .structure.StructureBuilder import StructureBuilder
 
 versions = get_versions()

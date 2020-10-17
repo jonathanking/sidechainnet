@@ -5,22 +5,25 @@ A direct extension of ProteinNet by Mohammed AlQuraishi.
 """
 import argparse
 import os
+import pickle
 import re
 from multiprocessing import Pool, cpu_count
 
+import numpy as np
 import prody as pr
 from tqdm import tqdm
 
 from sidechainnet.utils.align import merge, expand_data_with_mask, assert_mask_gaps_are_correct, binary_mask_to_str
 
 from sidechainnet.utils.errors import write_errors_to_files
+from sidechainnet.utils.organize import create_empty_dictionary, validate_data_dict, organize_data, load_data, save_data
 
 pr.confProDy(verbosity="none")
 
-from sidechainnet.utils.download import download_sidechain_data, load_data, save_data
+from sidechainnet.utils.download import download_sidechain_data, VALID_SPLITS
 from sidechainnet.utils.parse import parse_raw_proteinnet, FULL_ASTRAL_IDS_INCORRECTLY_PARSED
 from sidechainnet.utils.align import init_aligner, manually_adjust_data
-from sidechainnet.utils.measure import NUM_COORDS_PER_RES
+from sidechainnet.utils.measure import NUM_COORDS_PER_RES, GLOBAL_PAD_CHAR
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
@@ -173,12 +176,16 @@ def main():
                                                    args.limit, args.proteinnet_in)
 
     # Finally, unify the sidechain data with ProteinNet
-    sidechainnet = combine_datasets(args.proteinnet_out, sc_data, args.training_set)
+    sidechainnet_raw = combine_datasets(args.proteinnet_out, sc_data, args.training_set)
 
-    save_data(
-        sidechainnet,
-        os.path.join(args.sidechainnet_out, f"sidechainnet_{args.casp_version}_"
-                     f"{args.training_set}.pkl"))
+    sidechainnet_outfile = os.path.join(
+        args.sidechainnet_out,
+        f"sidechainnet_{args.casp_version}_{args.training_set}.pkl")
+    sidechainnet = organize_data(sidechainnet_raw, args.proteinnet_out, args.casp_version)
+    save_data(sidechainnet, sidechainnet_outfile)
+    print(
+        f"SidechainNet for {args.casp_version.upper()} written to {sidechainnet_outfile}."
+    )
 
 
 if __name__ == "__main__":

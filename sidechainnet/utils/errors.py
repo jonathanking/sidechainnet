@@ -237,7 +237,8 @@ def write_errors_to_files(pn_data, results_warnings, pnids):
             del pn_data[pnid]
         if warning:
             errors[warning].append(pnid)
-
+    
+    # TODO check for entries that still have 'primary' instead of 'seq', did they not get deleted? 
     # Record ProteinNet IDs that could not be combined or exhibited warnings
     with open("errors/NEEDS_ADJUSTMENT.txt", "w") as f:
         for failed_id in errors["needs manual adjustment"]:

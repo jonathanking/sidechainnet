@@ -50,6 +50,8 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
     """
+    from sidechainnet.utils.organize import load_data
+    from sidechainnet.utils.organize import organize_data
     # Initalize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
@@ -70,7 +72,7 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
 
     # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
-    save_data(sc_data, output_path)
+    organize_data(sc_data, output_path)
     report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
     # Clean up working directory
@@ -335,88 +337,6 @@ def unpack_processed_results(results, pnids):
     return all_ohs, all_angs, all_crds, all_ids
 
 
-def validate_data_dict(data):
-    """
-    Performs several checks on dictionary before saving.
-    """
-    # Assert size of each data subset matches
-    train_len = len(data["train"]["seq"])
-    test_len = len(data["test"]["seq"])
-    items_recorded = ["seq", "ang", "ids", "crd"]
-    for num_items, subset in zip([train_len, test_len], ["train", "test"]):
-        assert all([l == num_items for l in map(len, [data[subset][k] for k in
-                                                      items_recorded])]), f"{subset} lengths " \
-                                                                          f"don't match."
-
-    for split in VALID_SPLITS:
-        valid_len = len(data[f"valid-{split}"]["seq"])
-        assert all([
-            l == valid_len
-            for l in map(len, [data[f"valid-{split}"][k] for k in ["ang", "ids", "crd"]])
-        ]), "Valid lengths don't match."
-
-
-def create_data_dict(train_seq, test_seq, train_ang, test_ang, train_crd, test_crd,
-                     train_ids, test_ids, all_validation_data):
-    """
-    Given split data along with the query information that generated it, this function saves the
-    data as a Python dictionary, which is then saved to disk using torch.save.
-    See commit  d1935a0869720f85c00824f3aecbbfc6b947711c for a method that saves all relevant
-    information.
-    """
-    # Sort data
-    train_ang, train_seq, train_crd, train_ids = sort_data(train_ang, train_seq,
-                                                           train_crd, train_ids)
-    test_ang, test_seq, test_crd, test_ids = sort_data(test_ang, test_seq, test_crd,
-                                                       test_ids)
-
-    # Create a dictionary data structure, using the sin/cos transformed angles
-    data = {
-        "train": {
-            "seq": train_seq,
-            "ang": angle_list_to_sin_cos(train_ang),
-            "ids": train_ids,
-            "crd": train_crd
-        },
-        "test": {
-            "seq": test_seq,
-            "ang": angle_list_to_sin_cos(test_ang),
-            "ids": test_ids,
-            "crd": test_crd
-        },
-        "settings": {
-            "max_len": max(map(len, train_seq + test_seq)),
-            "pad_char": GLOBAL_PAD_CHAR
-        },
-        "description": {f"ProteinNet {CASP_VERSION.upper()}"},
-        # To parse date later, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
-        "date": datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")
-    }
-    max_val_len = 0
-    for split, (seq_val, ang_val, crd_val, ids_val) in all_validation_data.items():
-        ang_val, seq_val, crd_val, ids_val = sort_data(ang_val, seq_val, crd_val, ids_val)
-        data[f"valid-{split}"] = {}
-        data[f"valid-{split}"]["seq"] = seq_val
-        data[f"valid-{split}"]["ang"] = angle_list_to_sin_cos(ang_val)
-        data[f"valid-{split}"]["crd"] = crd_val
-        data[f"valid-{split}"]["ids"] = ids_val
-        max_split_len = max(data["settings"]["max_len"], max(map(len, seq_val)))
-        max_val_len = max_split_len if max_split_len > max_val_len else max_val_len
-    data["settings"]["max_len"] = max(
-        list(map(len, train_seq + test_seq)) + [max_val_len])
-
-    data["settings"]["bin-data"] = bin_sequence_data(train_seq, maxlen=MAX_SEQ_LEN)
-    data["settings"]["angle_means"] = compute_angle_means(data)
-    validate_data_dict(data)
-    return data
-
-
-def compute_angle_means(data):
-    """ Computes and retuns the mean of the training data angle matrices. """
-    train_angles_sincos = np.concatenate(data["train"]["ang"])
-    means = np.nanmean(train_angles_sincos, axis=0)
-    return means
-
 
 def add_proteinnetID_to_idx_mapping(data):
     """
@@ -434,26 +354,6 @@ def add_proteinnetID_to_idx_mapping(data):
     return data
 
 
-def sort_data(angs, seqs, crds, ids):
-    """
-    Sorts inputs by length, with shortest first.
-    """
-    sorted_len_indices = [
-        a[0] for a in sorted(enumerate(angs), key=lambda x: x[1].shape[0], reverse=False)
-    ]
-    seqs = [seqs[i] for i in sorted_len_indices]
-    crds = [crds[i] for i in sorted_len_indices]
-    angs = [angs[i] for i in sorted_len_indices]
-    ids = [ids[i] for i in sorted_len_indices]
-
-    return angs, seqs, crds, ids
 
 
-def load_data(path):
-    with open(path, "rb") as f:
-        return pickle.load(f)
 
-
-def save_data(data, path):
-    with open(path, "wb") as f:
-        return pickle.dump(data, f)

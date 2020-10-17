@@ -1,0 +1,160 @@
+"""Contains methods for organizing SidechainNet data into a Python dictionary."""
+import datetime
+import os
+import pickle
+
+import numpy as np
+
+from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.utils.sequence import bin_sequence_data
+
+
+def validate_data_dict(data):
+    """Performs several sanity checks on the data dict before saving."""
+    # Assert size of each data subset matches
+    train_len = len(data["train"]["seq"])
+    test_len = len(data["test"]["seq"])
+    items_recorded = ["seq", "ang", "ids", "crd", "msk", "evo"]
+    for num_items, subset in zip([train_len, test_len], ["train", "test"]):
+        assert all([
+            l == num_items for l in map(len, [data[subset][k] for k in items_recorded])
+        ]), f"{subset} lengths don't match."
+
+    for split in VALID_SPLITS:
+        valid_len = len(data[f"valid-{split}"]["seq"])
+        assert all([
+            l == valid_len
+            for l in map(len, [data[f"valid-{split}"][k] for k in ["ang", "ids", "crd"]])
+        ]), "Valid lengths don't match."
+
+
+def create_empty_dictionary(casp_version):
+    """Creates an empty SidechainNet dictionary ready to hold SidechainNet data."""
+    basic_data_entries = {
+        "seq": [],
+        "ang": [],
+        "ids": [],
+        "evo": [],
+        "msk": [],
+        "crd": []
+    }
+
+    data = {
+        "train": basic_data_entries.copy(),
+        "test": basic_data_entries.copy(),
+        # To parse date, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
+        "date": datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"),
+        "description": f"ProteinNet {casp_version.upper()}",
+        "settings": {}
+    }
+
+    validation_subdict = {
+        f"valid-{split}": basic_data_entries.copy() for split in VALID_SPLITS
+    }
+    data.update(validation_subdict)
+
+    return data
+
+
+def get_proteinnetIDs_by_split(proteinnet_dir):
+    """Returns a dict of ProteinNet IDs organized by data split (train/test/valid)."""
+    pn_files = [
+        os.path.join(proteinnet_dir, f"training_100_ids.txt"),
+        os.path.join(proteinnet_dir, f"validation_ids.txt"),
+        os.path.join(proteinnet_dir, f"testing_ids.txt")
+    ]
+
+    def parse_ids(filepath):
+        with open(filepath, "r") as f:
+            _ids = f.read().splitlines()
+        return _ids
+
+    ids = {
+        'train': parse_ids(pn_files[0]),
+        "valid": parse_ids(pn_files[1]),
+        "test": parse_ids(pn_files[2])
+    }
+    return ids
+
+
+def organize_data(scnet_data, proteinnet_dir, casp_version):
+    """Given an unsorted Sidechainnet data dict, organizes into ProteinNet data splits.
+    
+    Args:
+        scnet_data: A dictionary mapping ProteinNet ids (pnids) to data recorded by
+            SidechainNet ('seq', 'ang', 'crd', 'evo', 'msk').
+        proteinnet_dir: A string representing the path to where the preprocessed 
+            ProteinNet files are stored.
+        casp_version: A string describing the CASP version of this dataset.
+    
+    Returns:
+        A Python dictionary containing SidechainNet data, but this time, organized
+        and divided into the data splits specified by ProteinNet.
+    """
+    # TODO add bin_sequence_data ?
+
+    # First, we need to determine which pnids belong to which data split.
+    ids = get_proteinnetIDs_by_split(proteinnet_dir)
+
+    # Next, we create the empty dictionary for storing the data, organized by data splits
+    organized_data = create_empty_dictionary(casp_version)
+
+    # Now, we organize the data by its data splits
+    for split in ["train", "test", "valid"]:
+        for pnid in ids[split]:
+            if pnid not in scnet_data:
+                continue
+            if 'primary' in scnet_data[pnid]:
+                print(f"{pnid} had 'primary'  key.")
+                del scnet_data[pnid]
+                continue
+            realsplit = f"valid-{pnid.split('#')[0]}" if split == "valid" else split
+            organized_data[realsplit]['seq'].append(scnet_data[pnid]['seq'])
+            organized_data[realsplit]['ang'].append(scnet_data[pnid]['ang'])
+            organized_data[realsplit]['crd'].append(scnet_data[pnid]['crd'])
+            organized_data[realsplit]['msk'].append(scnet_data[pnid]['msk'])
+            organized_data[realsplit]['evo'].append(scnet_data[pnid]['evo'])
+            organized_data[realsplit]['ids'].append(pnid)
+
+    # Sort each split of data by length, ascending
+    for split in ["train", "test"] + [f"valid-{vs}" for vs in VALID_SPLITS]:
+        organized_data[split] = sort_datasplit(organized_data[split])
+
+    # Add settings
+    organized_data["settings"]["n_proteins"] = len(scnet_data)
+    organized_data["settings"]["angle_means"] = np.nanmean(np.concatenate(
+        organized_data["train"]["ang"]),
+                                                           axis=0)
+    organized_data["settings"]["lengths"] = np.sort(
+        np.asarray(list(map(len, (v['seq'] for k, v in scnet_data.items())))))
+    organized_data['settings']['max_length'] = organized_data["settings"]["lengths"].max()
+
+    validate_data_dict(organized_data)
+
+    return organized_data
+
+
+def save_data(data, path):
+    """Saves an organized SidechainNet data dict to a given, local filepath."""
+    with open(path, "wb") as f:
+        return pickle.dump(data, f)
+
+
+def load_data(path):
+    """Loads SidechainNet data dict from a given, local filepath."""
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
+def sort_datasplit(split):
+    """Sorts a single split of the SidechainNet data dict by ascending length."""
+    sorted_len_indices = [
+        a[0]
+        for a in sorted(enumerate(split['seq']), key=lambda x: len(x[1]), reverse=False)
+    ]
+
+    for datatype in split.keys():
+        split[datatype] = [split[datatype][i] for i in sorted_len_indices]
+
+    return split
