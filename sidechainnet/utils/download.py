@@ -50,8 +50,7 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
     """
-    from sidechainnet.utils.organize import load_data
-    from sidechainnet.utils.organize import organize_data
+    from sidechainnet.utils.organize import load_data, save_data, organize_data
     # Initalize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
@@ -72,7 +71,7 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
 
     # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
-    organize_data(sc_data, output_path)
+    save_data(sc_data, output_path)
     report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
     # Clean up working directory

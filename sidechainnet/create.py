@@ -42,7 +42,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     """
     if "secondary" in pn_entry:
         print("WARNING: secondary structure information is not yet supported. "
-              "As of May 2020, it is not included in ProteinNet.")
+              "As of October 2020, it is not included in ProteinNet.")
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
     if needs_manual_adjustment(pnid):
@@ -148,11 +148,11 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
                  total=len(sc_data.keys()),
                  dynamic_ncols=True))
 
-    pn_data, errors = write_errors_to_files(pn_data, results_warnings, sc_data.keys())
+    combined_data, errors = write_errors_to_files(results_warnings, sc_data.keys())
 
     print(f"Finished unifying sidechain information with ProteinNet data.\n"
           f"{len(errors['failed'])} IDs failed to combine successfully.")
-    return pn_data
+    return combined_data
 
 
 def get_tuple(pndata, scdata, pnid):
@@ -171,12 +171,15 @@ def main():
                                  args.training_set)
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
-    sc_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
-                                                   args.casp_version, args.training_set,
-                                                   args.limit, args.proteinnet_in)
+    sc_only_data, sc_filename = download_sidechain_data(pnids,
+                                                        args.sidechainnet_out,
+                                                        args.casp_version,
+                                                        args.training_set, args.limit,
+                                                        args.proteinnet_in)
 
     # Finally, unify the sidechain data with ProteinNet
-    sidechainnet_raw = combine_datasets(args.proteinnet_out, sc_data, args.training_set)
+    sidechainnet_raw = combine_datasets(args.proteinnet_out, sc_only_data,
+                                        args.training_set)
 
     sidechainnet_outfile = os.path.join(
         args.sidechainnet_out,

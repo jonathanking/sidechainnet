@@ -203,7 +203,9 @@ def report_errors(pnids_errorcodes, total_pnids):
                   f"a list of these proteins.")
 
 
-def write_errors_to_files(pn_data, results_warnings, pnids):
+def write_errors_to_files(results_warnings, pnids):
+    
+    combined_data = {}
 
     # Define error dictionary for recording errors
     errors = {  
@@ -232,9 +234,7 @@ def write_errors_to_files(pn_data, results_warnings, pnids):
     # Delete/update ProteinNet entries depending on their ability to merge w/SidechainNet.
     for (combined_result, warning), pnid in zip(results_warnings, pnids):
         if combined_result:
-            pn_data[pnid] = combined_result
-        else:
-            del pn_data[pnid]
+            combined_data[pnid] = combined_result
         if warning:
             errors[warning].append(pnid)
     
@@ -293,4 +293,4 @@ def write_errors_to_files(pn_data, results_warnings, pnids):
         for failed_id in errors['bad gaps']:
             f.write(f"{failed_id}\n")
             
-    return pn_data, errors
+    return combined_data, errors
