@@ -17,7 +17,7 @@ class StructureBuilder(object):
     ignore this atom for now.
     """
 
-    def __init__(self, seq, ang, device=torch.device("cpu")):
+    def __init__(self, seq, ang=None, coords=None, device=torch.device("cpu")):
         """Initialize a StructureBuilder for a single protein.
 
         Args:
@@ -27,24 +27,40 @@ class StructureBuilder(object):
                 protein's interior angles.
             device: An optional torch device on which to build the structure.
         """
-        if type(seq) == str:
-            seq = torch.tensor([VOCAB._char2int[s] for s in seq])
+        # Validate input data
+        if (ang is None and coords is None) or (ang is not None and coords is not None):
+            raise ValueError(
+                "You must provide exactly one of either coordinates or angles.")
+        if ang is not None and np.any(np.all(np.isnan(ang), axis=1)):
+            missing_loc = np.where(np.all(np.isnan(ang), axis=1))
+            raise ValueError(f"Building atomic coordinates from angles is not supported "
+                             f"for structures with missing residues. Missing residues = "
+                             f"{list(missing_loc[0])}. Protein structures with missing "
+                             "residues are only supported if built directly from "
+                             "coordinates (also supported by StructureBuilder).")
+        if coords is not None:
+            self.coords = coords
+            self.coord_type = "numpy" if type(coords) is np.ndarray else 'torch'
+        else:
+            self.coords = []
+            self.coord_type = "numpy" if type(ang) is np.ndarray else 'torch'
+
         self.seq = seq
         self.ang = ang
         self.device = device
-        self.coords = []
+
         self.prev_ang = None
         self.prev_bb = None
         self.next_bb = None
 
         self.pdb_creator = None
-        self.seq_as_str = None
+        self.integer_coded_seq = np.asarray([VOCAB._char2int[s] for s in seq])
 
     def __len__(self):
         return len(self.seq)
 
     def _iter_resname_angs(self, start=0):
-        for resname, angles in zip(self.seq[start:], self.ang[start:]):
+        for resname, angles in zip(self.integer_coded_seq[start:], self.ang[start:]):
             yield resname, angles
 
     def _build_first_two_residues(self):
@@ -52,16 +68,13 @@ class StructureBuilder(object):
         resname_ang_iter = self._iter_resname_angs()
         first_resname, first_ang = next(resname_ang_iter)
         second_resname, second_ang = next(resname_ang_iter)
-        first_res = ResidueBuilder(first_resname,
-                                   first_ang,
-                                   prev_res=None,
-                                   next_res=None)
+        first_res = ResidueBuilder(first_resname, first_ang, prev_res=None, next_res=None)
         second_res = ResidueBuilder(second_resname,
                                     second_ang,
                                     prev_res=first_res,
                                     next_res=None)
 
-        # After building both backbones, use the second residue's N to build the first's CB
+        # After building both backbones use the second residue's N to build the first's CB
         first_res.build_bb()
         second_res.build()
         first_res.next_res = second_res
@@ -88,37 +101,38 @@ class StructureBuilder(object):
             self.coords += res.build()
             prev_res = res
 
-        self.coords = torch.stack(self.coords)
+        if self.coord_type == 'torch':
+            self.coords = torch.stack(self.coords)
+        else:
+            self.coords = np.stack(self.coords)
 
         return self.coords
 
-    def _get_seq_as_str(self):
-        if not self.seq_as_str:
-            self.seq_as_str = VOCAB.ints2str(map(int, self.seq))
-        return self.seq_as_str
-    
     def _initialize_coordinates_and_PdbCreator(self):
         if len(self.coords) == 0:
             self.build()
 
         if not self.pdb_creator:
             from sidechainnet.structure.PdbCreator import PdbCreator
-            self.pdb_creator = PdbCreator(self.coords.numpy(), self._get_seq_as_str())
+            if self.coord_type == 'numpy':
+                self.pdb_creator = PdbCreator(self.coords, self.seq)
+            else:
+                self.pdb_creator = PdbCreator(self.coords.numpy(), self.seq)
 
     def to_pdb(self, path, title="pred"):
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_pdb(path, title)
-        
+
     def to_gltf(self, path, title="pred"):
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_gltf(path, title)
-        
+
     def to_3Dmol(self, style=None, **kwargs):
         import py3Dmol
         if not style:
-            style = {'cartoon': {}, 'stick':{'radius' : .15}}
+            style = {'cartoon': {}, 'stick': {'radius': .15}}
         self._initialize_coordinates_and_PdbCreator()
-        
+
         view = py3Dmol.view(**kwargs)
         view.addModel(self.pdb_creator.get_pdb_string(), 'pdb')
         if style:
@@ -129,12 +143,7 @@ class StructureBuilder(object):
 
 class ResidueBuilder(object):
 
-    def __init__(self,
-                 name,
-                 angles,
-                 prev_res,
-                 next_res,
-                 device=torch.device("cpu")):
+    def __init__(self, name, angles, prev_res, next_res, device=torch.device("cpu")):
         """Initialize a residue builder for building a residue's coordinates from angles.  
         
         If prev_{bb, ang} are None, then this is the first residue. 
@@ -147,8 +156,9 @@ class ResidueBuilder(object):
             prev_ang : Tensor, None
             Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon which this residue is extending.
         """
-        assert type(name) == torch.Tensor, "Expected integer AA code." + str(
-            name.shape) + str(type(name))
+        if type(name) != np.int64 or type(name) != torch.Tensor:
+            raise ValueError("Expected integer AA code." + str(name.shape) +
+                             str(type(name)))
         if type(angles) == np.ndarray:
             angles = torch.tensor(angles, dtype=torch.float32)
         self.name = name
@@ -172,9 +182,7 @@ class ResidueBuilder(object):
         if self.prev_res is None:
             self.bb = self.init_bb()
         else:
-            pts = [
-                self.prev_res.bb[0], self.prev_res.bb[1], self.prev_res.bb[2]
-            ]
+            pts = [self.prev_res.bb[0], self.prev_res.bb[1], self.prev_res.bb[2]]
             for j in range(4):
                 if j == 0:
                     # Placing N
@@ -195,8 +203,7 @@ class ResidueBuilder(object):
                     # Placing O
                     t = torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"])
                     b = BB_BUILD_INFO["BONDLENS"]["c-o"]
-                    dihedral = self.ang[
-                        1] - np.pi  # opposite to psi of current residue
+                    dihedral = self.ang[1] - np.pi  # opposite to psi of current residue
 
                 next_pt = nerf(pts[-3], pts[-2], pts[-1], b, t, dihedral)
                 pts.append(next_pt)
@@ -211,8 +218,7 @@ class ResidueBuilder(object):
                               device=self.device)
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
         cy = torch.sin(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]['ca-c']
-        c = ca + torch.tensor(
-            [cx, cy, 0], device=self.device, dtype=torch.float32)
+        c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32)
         o = nerf(n, ca, c, torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"]),
                  torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"]),
                  self.ang[1] - np.pi)  # opposite to current residue's psi
@@ -234,8 +240,9 @@ class ResidueBuilder(object):
             self.pts["C-"] = self.prev_res.bb[2]
 
         last_torsion = None
-        for i, (bond_len, angle, torsion, atom_names) in enumerate(
-                get_residue_build_iter(self.name, SC_BUILD_INFO)):
+        for i, (bond_len, angle, torsion,
+                atom_names) in enumerate(get_residue_build_iter(self.name,
+                                                                SC_BUILD_INFO)):
             # Select appropriate 3 points to build from
             if self.next_res and i == 0:
                 a, b, c = self.pts["N+"], self.pts["C"], self.pts["CA"]
@@ -281,8 +288,7 @@ def get_residue_build_iter(res, build_dictionary):
         torch.tensor(t, dtype=torch.float32) if t not in ["p", "i"] else t
         for t in r["torsion-vals"]
     ]
-    return iter(
-        zip(bvals, avals, tvals, [t.split("-") for t in r["torsion-names"]]))
+    return iter(zip(bvals, avals, tvals, [t.split("-") for t in r["torsion-names"]]))
 
 
 if __name__ == '__main__':
@@ -304,12 +310,11 @@ if __name__ == '__main__':
             data = pickle.load(f)
         return data
 
-
     d = load_data(
         "/home/jok120/dev_sidechainnet/data/sidechainnet/sidechainnet_casp12_100.pkl")
 
     angles = d['2KZQ_1_A']['ang']
-    sequence  = d['2KZQ_1_A']['seq']
+    sequence = d['2KZQ_1_A']['seq']
 
     sb = StructureBuilder(sequence, angles)
     sb.to_pdb("test01.pdb")
