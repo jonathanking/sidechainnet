@@ -73,9 +73,6 @@ def combine(pn_entry, sc_entry, aligner, pnid):
             if k == "crd":
                 if len(v) // NUM_COORDS_PER_RES != l:
                     return {}, "failed"
-                assert len(
-                    v
-                ) // NUM_COORDS_PER_RES == l, f"{k} does not have correct length {l} (is {len(v) // NUM_COORDS_PER_RES})."
             else:
                 if len(v) != l:
                     return {}, "failed"
