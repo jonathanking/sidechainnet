@@ -60,7 +60,6 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
         correct_gaps, bad_gap_len = assert_mask_gaps_are_correct(mask, crd, pnid)
         if not correct_gaps:
-            print(f"{pnid} had a bad gap with len {bad_gap_len:.2f}.")
             return {}, "bad gaps"
 
         # We may need to add padding where specified by the mask
