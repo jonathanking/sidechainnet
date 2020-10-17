@@ -1,7 +1,7 @@
 import numpy as np
 import torch.utils
 
-from sidechainnet.datasets.collate import MAX_SEQ_LEN
+from sidechainnet.dataloaders.collate import MAX_SEQ_LEN
 from sidechainnet.utils.sequence import VOCAB, ProteinVocabulary
 
 

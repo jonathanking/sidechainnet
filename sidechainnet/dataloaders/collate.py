@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import torch.utils.data
 
-from sidechainnet.datasets.batch_sampler import SimilarLengthBatchSampler
-from sidechainnet.datasets.protein_dataset import ProteinDataset, BinnedProteinDataset
+from sidechainnet.dataloaders.batch_sampler import SimilarLengthBatchSampler
+from sidechainnet.dataloaders.protein_dataset import ProteinDataset, BinnedProteinDataset
 from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN

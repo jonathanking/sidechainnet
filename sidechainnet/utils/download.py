@@ -336,7 +336,6 @@ def unpack_processed_results(results, pnids):
     return all_ohs, all_angs, all_crds, all_ids
 
 
-
 def add_proteinnetID_to_idx_mapping(data):
     """
     Given an already processes ProteinNet data dictionary, this function adds
@@ -351,8 +350,3 @@ def add_proteinnetID_to_idx_mapping(data):
 
     data["pnids"] = d
     return data
-
-
-
-
-
