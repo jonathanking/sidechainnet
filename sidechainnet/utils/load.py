@@ -66,8 +66,9 @@ def download_sidechainnet(casp_version, thinning, scn_dir):
 def load_dict(local_path):
     """Loads a pickled dictionary."""
     with open(local_path, "rb") as f:
-        return pickle.load(f)
-
+        d = pickle.load(f)
+    print(f"SidechainNet was loaded from {local_path}.")
+    return d
 
 def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
     """Loads SidechainNet as a Python dictionary.
@@ -88,7 +89,6 @@ def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
         organized by data splits (train, test, valid-X).    
     """
     local_path = get_local_sidechainnet_path(casp_version, thinning, scn_dir)
-    print(local_path)
     if not local_path:
         print(f"SidechainNet was not found in {scn_dir}.")
         # Download SidechainNet if it does not exist locally

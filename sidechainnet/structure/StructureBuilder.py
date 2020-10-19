@@ -88,6 +88,10 @@ class StructureBuilder(object):
         for the first residue in the sequence in order to place its CB, if
         present.
         """
+        # If a StructureBuilder does not have angles, build returns its coordinates
+        if self.ang is None:
+            return self.coords
+        
         # Build the first and second residues, a special case
         first, second = self._build_first_two_residues()
 
