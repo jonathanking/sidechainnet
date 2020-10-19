@@ -383,7 +383,8 @@ def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
     elif arccos_input_raw < -1 and np.abs(arccos_input_raw) - 1 < eps:
         arccos_input = -1
     else:
-        raise ArithmeticError("Numerical issue with input to arccos.")
+        raise ArithmeticError(
+            "Input to arccos is outside of acceptable [-1, 1] domain +/- 1e-6.")
     rad = np.arccos(arccos_input)
     if not porm == 0:
         rad = rad * porm
