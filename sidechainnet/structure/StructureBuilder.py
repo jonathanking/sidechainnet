@@ -265,8 +265,8 @@ class ResidueBuilder(object):
         return self.sc
 
     def stack_coords(self):
-        self.coords = self.bb + self.sc + (NUM_COORDS_PER_RES - \
-                                           len(self.bb) - len(self.sc)) * [self.coordinate_padding]
+        self.coords = self.bb + self.sc + (NUM_COORDS_PER_RES - len(self.bb) -
+                                           len(self.sc)) * [self.coordinate_padding]
         return self.coords
 
     def __repr__(self):
@@ -292,17 +292,6 @@ def get_residue_build_iter(res, build_dictionary):
 
 
 if __name__ == '__main__':
-    # a = get_residue_build_iter("ALA", SC_BUILD_INFO)
-    # b = get_residue_build_iter("ARG", SC_BUILD_INFO)
-    # c = get_residue_build_iter("TYR", SC_BUILD_INFO)
-    # for i in a:
-    #     print(i)
-    # print("Arginine:")
-    # for i in b:
-    #     print(f"\t{i}")
-    # print("Tyrosine:")
-    # for i in c:
-    #     print(f"\t{i}")
     import pickle
 
     def load_data(path):
