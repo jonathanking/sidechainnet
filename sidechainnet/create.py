@@ -135,6 +135,7 @@ def main():
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
                                  args.training_set)
+    pnids = pnids[:args.limit]  # Limit the length of the list for debugging
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
     sc_only_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,

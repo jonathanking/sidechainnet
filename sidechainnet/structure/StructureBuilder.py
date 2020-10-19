@@ -31,8 +31,8 @@ class StructureBuilder(object):
         if (ang is None and coords is None) or (ang is not None and coords is not None):
             raise ValueError(
                 "You must provide exactly one of either coordinates or angles.")
-        if ang is not None and np.any(np.all(np.isnan(ang), axis=1)):
-            missing_loc = np.where(np.all(np.isnan(ang), axis=1))
+        if ang is not None and np.any(np.all(ang==0, axis=1)):
+            missing_loc = np.where(np.all(ang==0, axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "

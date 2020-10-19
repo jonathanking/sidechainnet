@@ -80,6 +80,9 @@ def nerf(a, b, c, l, theta, chi):
     res = c + torch.mm(M, d).squeeze()
     return res.squeeze()
 
+def determine_missing_positions(ang_or_coord_matrix):
+    """Uses GLOBAL_PAD_CHAR to determine location of missing atoms or residues."""
+    raise NotImplementedError
 
 def deg2rad(angle):
     """

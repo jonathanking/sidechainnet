@@ -123,9 +123,8 @@ def organize_data(scnet_data, proteinnet_dir, casp_version):
 
     # Add settings
     organized_data["settings"]["n_proteins"] = len(scnet_data)
-    organized_data["settings"]["angle_means"] = np.nanmean(np.concatenate(
-        organized_data["train"]["ang"]),
-                                                           axis=0)
+    organized_data["settings"]["angle_means"] = compute_angle_means(
+        organized_data['train']['ang'])
     organized_data["settings"]["lengths"] = np.sort(
         np.asarray(list(map(len, (v['seq'] for k, v in scnet_data.items())))))
     organized_data['settings']['max_length'] = organized_data["settings"]["lengths"].max()
@@ -133,6 +132,13 @@ def organize_data(scnet_data, proteinnet_dir, casp_version):
     validate_data_dict(organized_data)
 
     return organized_data
+
+
+def compute_angle_means(angle_list):
+    """Computes mean of angle matrices in a Python list ignoring all-zero rows."""
+    angles = np.concatenate(angle_list)
+    angles = angles[~(angles == 0).all(axis=1)]
+    return angles.mean()
 
 
 def save_data(data, path):

@@ -13,6 +13,7 @@ from Bio import Align
 
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, PRODY_CA_DIST
 from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
 
 def init_basic_aligner(allow_mismatches=False):
@@ -300,24 +301,6 @@ def binary_mask_to_str(m):
     return "".join(m)
 
 
-def unmask_seq(ang, seq):
-    """
-    Given an angle array that is padded with np.nans, applies this padding to
-    the sequence, and returns the sequence without any padding. This means
-    that the input sequence contains residues that may be missing, while the
-    returned sequence contains only observed residues.
-    """
-    mask = np.logical_not(np.isnan(ang).all(axis=-1))
-    new_seq = ""
-    for m, s in zip(mask, seq):
-        if m:
-            new_seq += s
-        else:
-            continue
-
-    return new_seq
-
-
 def coordinate_iterator(coords, atoms_per_res):
     """Iterates over coordinates in a numpy array grouped by residue.
 
@@ -363,7 +346,7 @@ def expand_data_with_mask(data, mask):
         data = iter(data)
         blank = np.empty((size,))
 
-    blank[:] = np.nan
+    blank[:] = GLOBAL_PAD_CHAR
 
     new_data = []
     for m in mask:
