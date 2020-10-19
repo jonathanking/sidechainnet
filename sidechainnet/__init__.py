@@ -1,11 +1,12 @@
 """
 SideChainNet
-A protein structure prediction data set that includes side chain information. A direct extension of ProteinNet by
-Mohammed AlQuraishi.
+A protein structure prediction data set that includes sidechain information. Directly 
+extends ProteinNet by Mohammed AlQuraishi.
 """
 
 # Handle versioneer
 from ._version import get_versions
+
 # Add imports here
 from .structure.StructureBuilder import StructureBuilder
 from .utils.load import load

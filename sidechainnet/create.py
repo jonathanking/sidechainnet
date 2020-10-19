@@ -131,6 +131,11 @@ def get_tuple(pndata, scdata, pnid):
     return pndata[pnid], scdata[pnid], pnid
 
 
+def format_sidechainnet_path(casp_version, training_split):
+    """Returns a string representing a .pkl file for a CASP version and training set."""
+    return f"sidechainnet_casp{casp_version}_{training_split}.pkl"
+
+
 def main():
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
@@ -148,7 +153,7 @@ def main():
 
     sidechainnet_outfile = os.path.join(
         args.sidechainnet_out,
-        f"sidechainnet_{args.casp_version}_{args.training_set}.pkl")
+        format_sidechainnet_path(args.casp_version, args.training_set))
     sidechainnet = organize_data(sidechainnet_raw, args.proteinnet_out, args.casp_version)
     save_data(sidechainnet, sidechainnet_outfile)
     print(
@@ -187,12 +192,12 @@ if __name__ == "__main__":
                         'set to parse. {30,50,70,90,95,100}. Default 30.')
     args = parser.parse_args()
 
-    match = re.search(r"casp\d+", args.proteinnet_in, re.IGNORECASE)
+    match = re.search(r"casp(\d+)", args.proteinnet_in, re.IGNORECASE)
     if not match:
         raise argparse.ArgumentError("The input_dir does not contain 'caspX'. "
                                      "Please ensure the raw files are enclosed "
                                      "in a path that contains the CASP version"
                                      " i.e. 'casp12'.")
-    args.casp_version = match.group(0)
+    args.casp_version = match.group(1)
 
     main()

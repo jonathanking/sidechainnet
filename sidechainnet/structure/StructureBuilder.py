@@ -156,7 +156,7 @@ class ResidueBuilder(object):
             prev_ang : Tensor, None
             Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon which this residue is extending.
         """
-        if type(name) != np.int64 or type(name) != torch.Tensor:
+        if type(name) != np.int64 and type(name) != torch.Tensor:
             raise ValueError("Expected integer AA code." + str(name.shape) +
                              str(type(name)))
         if type(angles) == np.ndarray:
