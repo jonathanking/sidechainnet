@@ -36,7 +36,7 @@ del ASTRAL_SUMMARY
 
 
 def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set,
-                            limit, proteinnet_in):
+                            limit, proteinnet_in, regenerate_scdata=False):
     """Downloads the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
@@ -46,11 +46,13 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
         training_set: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
         limit: An integer describing maximum number of proteins to process
         proteinnet_in: A string representing the path to processed proteinnet.
+        regenerate_scdata: Boolean, if True then recreate the sidechain-only data even if
+            it already exists.
 
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
     """
-    from sidechainnet.utils.organize import load_data, save_data, organize_data
+    from sidechainnet.utils.organize import load_data, save_data
     # Initalize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
@@ -60,7 +62,7 @@ def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_
         os.mkdir(sidechainnet_out_dir)
 
     # Simply load sidechain data if it has already been processed.
-    if os.path.exists(output_path):
+    if os.path.exists(output_path) and not regenerate_scdata:
         print(f"Sidechain information already preprocessed ({output_path}).")
         return load_data(output_path), output_path
 

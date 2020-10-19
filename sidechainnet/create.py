@@ -141,7 +141,8 @@ def main():
     sc_only_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
                                                         args.casp_version,
                                                         args.training_set, args.limit,
-                                                        args.proteinnet_in)
+                                                        args.proteinnet_in,
+                                                        args.regenerate_scdata)
 
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet_raw = combine_datasets(args.proteinnet_out, sc_only_data,
@@ -186,6 +187,11 @@ if __name__ == "__main__":
                         default=30,
                         help='Which \'thinning\' of the ProteinNet training '
                         'set to parse. {30,50,70,90,95,100}. Default 30.')
+    parser.add_argument(
+        '--regenerate_scdata',
+        action="store_true",
+        help=('If True, then regenerate the sidechain-only data even if it already exists'
+              ' locally.'))
     args = parser.parse_args()
 
     match = re.search(r"casp\d+", args.proteinnet_in, re.IGNORECASE)
