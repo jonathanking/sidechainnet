@@ -138,7 +138,7 @@ def compute_angle_means(angle_list):
     """Computes mean of angle matrices in a Python list ignoring all-zero rows."""
     angles = np.concatenate(angle_list)
     angles = angles[~(angles == 0).all(axis=1)]
-    return angles.mean()
+    return angles.mean(axis=0)
 
 
 def save_data(data, path):
