@@ -1,14 +1,7 @@
 import numpy as np
-import torch
-from prody import calcTransformation
-import py3Dmol
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
-import sidechainnet
-from sidechainnet.structure.Structure import angles_to_coords
-from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES
-from sidechainnet.structure.Structure import nerf
-from sidechainnet.structure.StructureBuilder import StructureBuilder
+from sidechainnet.structure.build_info import SC_BUILD_INFO, NUM_COORDS_PER_RES
 
 
 class PdbCreator(object):
@@ -178,16 +171,3 @@ for one_letter in ONE_TO_THREE_LETTER_MAP.keys():
     ATOM_MAP_14[one_letter] = ["N", "CA", "C", "O"] + list(
         SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
     ATOM_MAP_14[one_letter].extend(["PAD"] * (14 - len(ATOM_MAP_14[one_letter])))
-
-
-
-if __name__ == "__main__":
-    # TODO don't reimplement dataloader?
-    # TODO do several predictions, add PDB name
-    # TODO add ability to predict given model checkpoint
-    # TODO CUDA isn't playing nice
-    
-    
-
-    make_debug_structure_dataset()
-    generate_pdbs_from_debug_dataset()
