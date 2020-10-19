@@ -4,7 +4,7 @@ from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 from sidechainnet.structure.build_info import SC_BUILD_INFO, NUM_COORDS_PER_RES
 
 
-class PdbCreator(object):
+class PdbBuilder(object):
     """Creates a PDB file given a protein's atomic coordinates and sequence.  
     
     The general idea is that if any model is capable of predicting a set of coordinates 
@@ -14,8 +14,8 @@ class PdbCreator(object):
     The Python format string was taken from http://cupnet.net/pdb-format/.
     """
 
-    def __init__(self, coords, seq, atoms_per_res=NUM_COORDS_PER_RES):
-        """Initializes a PdbCreator.
+    def __init__(self, seq, coords, atoms_per_res=NUM_COORDS_PER_RES):
+        """Initializes a PdbBuilder.
         
         Args:
             coords: A numpy matrix of shape (L x N) x 3, where L is the protein sequence

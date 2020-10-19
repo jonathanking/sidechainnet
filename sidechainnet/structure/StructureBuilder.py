@@ -117,11 +117,11 @@ class StructureBuilder(object):
             self.build()
 
         if not self.pdb_creator:
-            from sidechainnet.structure.PdbCreator import PdbCreator
+            from sidechainnet.structure.PdbBuilder import PdbBuilder
             if self.coord_type == 'numpy':
-                self.pdb_creator = PdbCreator(self.coords, self.seq)
+                self.pdb_creator = PdbBuilder(self.seq, self.coords)
             else:
-                self.pdb_creator = PdbCreator(self.coords.numpy(), self.seq)
+                self.pdb_creator = PdbBuilder(self.seq, self.coords.numpy())
 
     def to_pdb(self, path, title="pred"):
         self._initialize_coordinates_and_PdbCreator()
