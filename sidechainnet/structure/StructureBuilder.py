@@ -130,7 +130,7 @@ class StructureBuilder(object):
     def to_3Dmol(self, style=None, **kwargs):
         import py3Dmol
         if not style:
-            style = {'cartoon': {}, 'stick': {'radius': .15}}
+            style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
         self._initialize_coordinates_and_PdbCreator()
 
         view = py3Dmol.view(**kwargs)
