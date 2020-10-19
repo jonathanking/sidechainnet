@@ -391,3 +391,7 @@ def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
         return rad
     else:
         return rad * rad2deg
+
+
+# Re-assign ProDy's built-in getDihedral function to account for overflow.
+pr.measure.measure.getDihedral = get_dihedral
