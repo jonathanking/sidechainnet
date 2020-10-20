@@ -10,24 +10,23 @@ SidechainNet is a protein structure prediction dataset that directly extends [Pr
 Specifically, SidechainNet adds measurements for protein angles and coordinates that describe the complete, all-atom protein structure (backbone *and* sidechain, excluding hydrogens) instead of the protein [backbone](https://foldit.fandom.com/wiki/Protein_backbone) alone.
 
 **This repository provides the following:**
-1. SidechainNet datasets stored as pickled Python dictionaries.
+1. SidechainNet datasets stored as pickled Python dictionaries (accessible via `sidechainnet.load`).
 2. Methods for loading and batching SidechainNet data efficiently in PyTorch. 
-3. Methods for generating structure files (`.pdb`, `.gltf`) from model predictions.
-4. A PyTorch implementation of AlQuraishi's "Recurrent Geometric Network"<sup>2</sup> modified to be capable of predicting all-atom protein structures. 
+3. Methods for generating protein structure visualizations (`.pdb`, [`3Dmol`](http://3dmol.csb.pitt.edu), `.gltf`) from model predictions.
  
  **Summary of SidechainNet data**
  
-| ProteinNet | SidechainNet | Entry | Dimensionality* | Label in SidechainNet data |
-| :---: | :---: | :---: | :---: |  :---: |
-| X | X | Primary sequence | *L x 1* | `seq` |
-| X | X | Secondary Structure^ | *L x 8* |  `sec` |
-| X | X | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` |
-| X | X | Missing residue mask | *L x 1* |  `msk` |
-| X | X | Backbone coordinates | *L x 4<sup>⸸</sup> x 3* |  `crd`, subset `[0:4]` |
-|  | X | Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` |
-|  | X | Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` |
-|  | X | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |
-|  | X | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |
+| Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
+| :---: | :---: |  :---: | :---: | :---: | 
+| Primary sequence | *L x 1* | `seq` | X | X | 
+| Secondary Structure^ | *L x 8* |  `sec` | X | X | 
+| [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` | X | X | 
+| Missing residue mask | *L x 1* |  `msk` | X | X | 
+| Backbone coordinates | *L x 4<sup>⸸</sup> x 3* |  `crd`, subset `[0:4]` | X | X | 
+| Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` | . | X | 
+| Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` | . | X | 
+| Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` | . | X | 
+| Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` | . | X | 
 
 **L* reperesents the length of any given protein in the dataset.
 
@@ -39,7 +38,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 To run this code, it's recommended to first perform a developmental install of the package with pip in your current environment with `pip install -e .`. This will install the `sidechainnet` package in your environment.
 
 ## Downloading Data
-For every existing ProteinNet dataset, a corresponding SidechainNet dataset has been created and can be downloaded via [Box](https://www.youtube.com/watch?v=dQw4w9WgXcQ). 
+For every existing ProteinNet dataset, a corresponding SidechainNet dataset has been created and can be accessed via `sidechainnet.load`. 
 
 There are separate datasets for each available CASP competition (CASP 7-12) as well as each "thinning" of the data as described by ProteinNet (`30, 50, 70, 90, 95, 100%`). A thinning represents the same dataset but has been clustered and downsampled to reduce its size. Thinnings marked as `100` contain the complete dataset.
 
