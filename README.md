@@ -23,10 +23,10 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` | X | X | 
 | Missing residue mask | *L x 1* |  `msk` | X | X | 
 | Backbone coordinates | *L x 4<sup>\*\*</sup> x 3* |  `crd`, subset `[0:4]` | X | X | 
-| Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` | . | X | 
-| Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` | . | X | 
-| Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` | . | X | 
-| Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` | . | X | 
+| Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` |  | X | 
+| Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` |  | X | 
+| Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |  | X | 
+| Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X | 
 
 **L* reperesents the length of any given protein in the dataset.
 
