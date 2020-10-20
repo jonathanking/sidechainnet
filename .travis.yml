@@ -1,51 +1,38 @@
 language: python
-
-# Run jobs on container-based infrastructure, can be overridden per job
-
 matrix:
   include:
-    # Extra includes for OSX since python language is not available by default on OSX
-    - os: osx
-      language: generic
-      env: PYTHON_VER=3.6
-    - os: osx
-      language: generic
-      env: PYTHON_VER=3.7
-
-
-    - os: linux
-      language: generic  # No need to set Python version since its conda
-      env: PYTHON_VER=3.6
-    - os: linux
-      language: generic
-      env: PYTHON_VER=3.7
-
-
+  # Extra includes for OSX since python language is not available by default on OSX
+  - os: osx
+    language: generic
+    env: PYTHON_VER=3.6
+  - os: osx
+    language: generic
+    env: PYTHON_VER=3.7
+  - os: linux
+    language: generic  # No need to set Python version since its conda
+    env: PYTHON_VER=3.6
+  - os: linux
+    language: generic
+    env: PYTHON_VER=3.7
 before_install:
-    # Additional info about the build
+# Additional info about the build
   - uname -a
   - df -h
   - ulimit -a
-
-    # Install the Python environment
   - source devtools/travis-ci/before_install.sh
   - python -V
-
 install:
-
-    # Create test environment for package
+  # Create test environment for package
   - python devtools/scripts/create_conda_env.py -n=test -p=$PYTHON_VER devtools/conda-envs/test_env.yaml
-    # Activate the test environment
+  # Activate the test environment
   - conda activate test
-    # Build and install package
+  # Build and install package
   - python setup.py develop --no-deps
-
-
 script:
   - pytest -v --cov=sidechainnet sidechainnet/tests/
-
 notifications:
-    email: false
-
+  email: false
+  slack:
+    secure: VY2iMLLOBMU61c5I1mYMLoFy8OSvsdyJZ4JFx1EBgK45UsFH51LGyKAUwedwcvM+17iD84arJDcCopn3dZUw5p3N/z+Q4kieMRQUBmdPHjn+wFYR0v4bFJwJ6h4HxSp5ij9CSHWJqWR9+xNOruaYDklJbA+xwOA9CZOabrQzO1llM7nyV/TDu+i4MdirElb3qFxXNvRw7QA8PwFNctFs6iOWL9IpHsywFBouo2tY2lZz9ZZwquTFCLp0BtKO8l89kR0Uv42PdW7JSy/RgpFE0Bw7yaqoc6YGkCOxb3prUAmre2ZGBwjdwd5QywNlinjRP+Fy5UOOfh6DkKJeOhgwgtTi57be7wiHLZT1CF2x6uNdOkj63xw0XAvr2ZsOz9on0t7v3o4MUYv9I+zZm+jksFCxQ8M/Vun19Mrn1TkTb96FnJyKG988+pPB1rvtAt5Yz+Px4IAIHw7IfYe7747/M3ycYS47Tullya2zOK57XJ9BmLrbTSs0+ERqz9IbRgNA8mSISUNr/FqMIDXANV1mIGuG8exEc6H9PnXHaGUVNZnibIJ0b9eOvEO51s6CI+MC/H9RZbDId16jFWO5QjD0r8km7G0QqZADb4DV+whiPtl2PBHPz3tsdXGZsSCbVRpQiMJLW+A2/MKkoRC1bZZrNKpr6Dud8PfXOeGNTSVBSi0=
 after_success:
-  - codecov
+- codecov
