@@ -2,86 +2,195 @@ import numpy as np
 import torch
 import torch.utils.data
 
-from sidechainnet.dataloaders.batch_sampler import SimilarLengthBatchSampler
-from sidechainnet.dataloaders.protein_dataset import ProteinDataset, BinnedProteinDataset
+from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatchSampler
+from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
 from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
-def paired_collate_fn(insts):
+def get_collate_fn(aggregate_input,
+                   return_masks=False,
+                   seqs_as_onehot=None):
+    """Returns a collate function for collating ProteinDataset batches.
+    
+    Args:
+        aggregate_input: Boolean. If true, combine input items (seq, pssms) into a single
+            tensor, as opposed to separate tensors.
+        return_masks: Boolean. If true, return the sequence masks marking missing residues
+            along with the other data types when iterating.
+        seqs_as_onehot: Boolean or None. If None, sequences are represented as one-hot
+            vectors during aggregation or represented as integer sequences when not
+            aggregated. The user may also specify True if they would like one-hot vectors
+            returned iff aggregate_input is False.
+    
+    Returns:
+        A collate function capable of collating batches from a ProteinDataset.
     """
-    This function creates mini-batches (3-tuples) of sequence, angle and
-    coordinate Tensors. insts is a list of tuples, each containing one src
-    seq, and target angles and coordindates.
-    """
-    sequences, angles, coords = list(zip(*insts))
-    sequences = collate_fn(sequences, sequences=True, max_seq_len=MAX_SEQ_LEN)
-    angles = collate_fn(angles, max_seq_len=MAX_SEQ_LEN)
-    coords = collate_fn(coords, coords=True, max_seq_len=MAX_SEQ_LEN)
-    return sequences, angles, coords
 
+    if seqs_as_onehot == False and aggregate_input:
+        raise ValueError("Sequences must be represented as one-hot vectors if model input"
+                         " is to be aggregated.")
 
-def collate_fn(insts, coords=False, sequences=False, max_seq_len=None):
-    """
-    Given a list of tuples to be stitched together into a batch, this function
-    pads each instance to the max seq length in batch and returns a batch
-    Tensor.
-    """
-    max_batch_len = max(len(inst) for inst in insts)
-    batch = []
-    for inst in insts:
-        if sequences:
-            z = np.ones((max_batch_len - len(inst))) * VOCAB.pad_id
+    if seqs_as_onehot is None:
+        if aggregate_input:
+            seqs_as_onehot = True
         else:
-            z = np.zeros((max_batch_len - len(inst), inst.shape[-1]))
-        c = np.concatenate((inst, z), axis=0)
-        batch.append(c)
-    batch = np.array(batch)
+            seqs_as_onehot = False
 
-    # Trim batch to be less than maximum length
-    if coords:
-        batch = batch[:, :max_seq_len * NUM_COORDS_PER_RES]
-    else:
-        batch = batch[:, :max_seq_len]
+    def collate_fn(insts):
+        """Collates items extracted from a ProteinDataset, returning all items separately.
+        
+        Args:
+            insts: A list of tuples, each containing one pnid, sequence, mask, pssm, 
+                angle, and coordinate extracted from a corresponding ProteinDataset.
+            aggregate_input: A boolean that, if True, aggregates the 'model input' 
+                components of the data, or the data items (seqs, pssms) from which 
+                coordinates and angles are predicted.
+        
+        Returns:
+            A tuple of the same information provided in the input, where each data type 
+            has been extracted in a list of its own. In other words, the returned tuple 
+            has one list for each of (pnids, seqs, msks, pssms, angs, crds). Each item in
+            each list is padded to the maximum length of sequences in the batch.
+                 
+        """
+        # Instead of working with a list of tuples, we extract out each category of info
+        # so it can be padded and re-provided to the user.
+        pnids, sequences, masks, pssms, angles, coords, = list(zip(*insts))
+        max_batch_len = max(len(s) for s in sequences)
 
-    if sequences:
+        padded_seqs = pad_for_batch(sequences,
+                                    max_batch_len,
+                                    'seq',
+                                    seqs_as_onehot=seqs_as_onehot)
+        padded_msks = pad_for_batch(masks, max_batch_len, 'msk')
+        padded_pssms = pad_for_batch(pssms, max_batch_len, 'pssm')
+        padded_angs = pad_for_batch(angles, max_batch_len, 'ang')
+        padded_crds = pad_for_batch(coords, max_batch_len, 'crd')
+
+        # Non-aggregated model input
+        if not aggregate_input and not return_masks:
+            return pnids, padded_seqs, padded_pssms, padded_angs, padded_crds
+        elif not aggregate_input and return_masks:
+            return pnids, padded_seqs, padded_msks, padded_pssms, padded_angs, padded_crds
+
+        # Aggregated model input
+        elif aggregate_input:
+            model_input = torch.cat([padded_seqs.float(), padded_pssms], dim=-1)
+
+            if return_masks:
+                return pnids, model_input, padded_msks, padded_angs, padded_crds
+            else:
+                # Default return value, no masks
+                return pnids, model_input, padded_angs, padded_crds
+
+    return collate_fn
+
+
+def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
+    """Pads a list of items to batch_length using values dependent on the item type.
+    
+    Args:
+        items: List of items to pad (i.e. sequences or masks represented as arrays of 
+            numbers, angles, coordinates, pssms).
+        batch_length: The integer maximum length of any of the items in the input. All 
+            items are padded so that their length matches this number.
+        type: A string ('seq', 'msk', 'pssm', 'ang', 'crd') reperesenting the type of
+            data included in items.
+    
+    Returns:
+         A padded list of the input items, all independently converted to Torch tensors.
+    """
+    batch = []
+    if type == "seq":
+        # Sequences are padded with a specific VOCAB pad character
+        for seq in items:
+            z = np.ones((batch_length - len(seq))) * VOCAB.pad_id
+            c = np.concatenate((seq, z), axis=0)
+            batch.append(c)
+        batch = np.array(batch)
+        batch = batch[:, :MAX_SEQ_LEN]
         batch = torch.LongTensor(batch)
-    else:
+        if seqs_as_onehot:
+            batch = torch.nn.functional.one_hot(batch, len(VOCAB))
+    elif type == "msk":
+        # Mask sequences (1 if present, 0 if absent) are padded with 0s
+        for msk in items:
+            z = np.zeros((batch_length - len(msk)))
+            c = np.concatenate((msk, z), axis=0)
+            batch.append(c)
+        batch = np.array(batch)
+        batch = batch[:, :MAX_SEQ_LEN]
+        batch = torch.LongTensor(batch)
+    elif type in ["pssm", "ang"]:
+        # Mask other features with 0-vectors of a matching shape
+        for item in items:
+            z = np.zeros((batch_length - len(item), item.shape[-1]))
+            c = np.concatenate((item, z), axis=0)
+            batch.append(c)
+        batch = np.array(batch)
+        batch = batch[:, :MAX_SEQ_LEN]
+        batch = torch.FloatTensor(batch)
+    elif type == "crd":
+        for item in items:
+            z = np.zeros((batch_length * NUM_COORDS_PER_RES - len(item), item.shape[-1]))
+            c = np.concatenate((item, z), axis=0)
+            batch.append(c)
+        batch = np.array(batch)
+        # There are multiple rows per res, so we allow the coord matrix to be larger
+        batch = batch[:, :MAX_SEQ_LEN * NUM_COORDS_PER_RES]
         batch = torch.FloatTensor(batch)
 
     return batch
 
 
 def prepare_dataloaders(data,
-                        batch_size,
+                        aggregate_model_input,
+                        batch_size=32,
                         num_workers=1,
+                        return_masks=False,
+                        seq_as_onehot=None,
+                        use_dynamic_batch_size=True,
                         optimize_for_cpu_parallelism=False,
                         train_eval_downsample=0.1):
     """
     Using the pre-processed data, stored in a nested Python dictionary, this
     function returns train, validation, and test set dataloaders with 2 workers
     each. Note that there are multiple validation sets in ProteinNet.
+    
+    Args:
+        data: A dictionary storing the entirety of a SidechainNet version (i.e. CASP 12).
+            It must be organized in the manner described in this code's README, or in the
+            paper.
+        aggregate_model_input: A boolean that, if True, yields batches of (protein_id,
+            model_input, true_angles, true_coordinates) when iterating over the returned
+            PyTorch DataLoader. If False, this expands the model_input variable into 
+            its components (sequence, mask pssm).
+        batch_size: Batch size to use when yielding batches from a DataLoader.
     """
-    train_dataset = BinnedProteinDataset(seqs=data['train']['seq'],
-                                         crds=data['train']['crd'],
-                                         angs=data['train']['ang'])
+    collate_fn = get_collate_fn(aggregate_model_input,
+                                return_masks=return_masks,
+                                seqs_as_onehot=seq_as_onehot)
+
+    train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         num_workers=num_workers,
-        collate_fn=paired_collate_fn,
+        collate_fn=collate_fn,
         batch_sampler=SimilarLengthBatchSampler(
             train_dataset,
             batch_size,
-            dynamic_batch=batch_size * MAX_SEQ_LEN,
+            dynamic_batch=batch_size *
+            data['settings']['lengths'].mean() if use_dynamic_batch_size else None,
             optimize_batch_for_cpus=optimize_for_cpu_parallelism,
         ))
 
     train_eval_loader = torch.utils.data.DataLoader(
         train_dataset,
         num_workers=num_workers,
-        collate_fn=paired_collate_fn,
+        collate_fn=collate_fn,
         batch_sampler=SimilarLengthBatchSampler(
             train_dataset,
             batch_size,
@@ -92,20 +201,39 @@ def prepare_dataloaders(data,
     valid_loaders = {}
     for split in VALID_SPLITS:
         valid_loader = torch.utils.data.DataLoader(ProteinDataset(
-            seqs=data[f'valid-{split}']['seq'],
-            crds=data[f'valid-{split}']['crd'],
-            angs=data[f'valid-{split}']['ang']),
+            data[f'valid-{split}'], f'valid-{split}', data['settings'], data['date']),
                                                    num_workers=num_workers,
                                                    batch_size=batch_size,
-                                                   collate_fn=paired_collate_fn)
+                                                   collate_fn=collate_fn)
         valid_loaders[split] = valid_loader
 
-    test_loader = torch.utils.data.DataLoader(ProteinDataset(
-        seqs=data['test']['seq'],
-        crds=data['test']['crd'],
-        angs=data['test']['ang']),
+    test_loader = torch.utils.data.DataLoader(ProteinDataset(data['test'], 'test',
+                                                             data['settings'],
+                                                             data['date']),
                                               num_workers=num_workers,
                                               batch_size=batch_size,
-                                              collate_fn=paired_collate_fn)
+                                              collate_fn=collate_fn)
 
-    return train_loader, train_eval_loader, valid_loaders, test_loader
+    dataloaders = {
+        'train': train_loader,
+        'train-eval': train_eval_loader,
+        'test': test_loader
+    }
+    dataloaders.update({f'valid-{split}': valid_loaders[split] for split in VALID_SPLITS})
+
+    return dataloaders
+
+
+if __name__ == "__main__":
+    import sidechainnet as scn
+    from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
+    d = scn.load(12,
+                 30,
+                 scn_dir="/home/jok120/dev_sidechainnet/data/sidechainnet",
+                 with_pytorch="dataloaders",
+                 aggregate_model_input=False,
+                 batch_size=4,
+                 num_workers=1)
+    for batch in d['train']:
+        print(batch)
+        break

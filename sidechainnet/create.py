@@ -156,10 +156,11 @@ def main():
     sidechainnet_outfile = os.path.join(
         args.sidechainnet_out,
         format_sidechainnet_path(args.casp_version, args.training_set))
-    sidechainnet = organize_data(sidechainnet_raw, args.proteinnet_out, args.casp_version)
+    sidechainnet = organize_data(sidechainnet_raw, args.proteinnet_out, args.casp_version,
+                                 args.training_set)
     save_data(sidechainnet, sidechainnet_outfile)
     print(
-        f"SidechainNet for {args.casp_version.upper()} written to {sidechainnet_outfile}."
+        f"SidechainNet for CASP {args.casp_version} written to {sidechainnet_outfile}."
     )
 
 

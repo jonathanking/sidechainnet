@@ -85,9 +85,11 @@ class ProteinVocabulary(object):
     Represents the 'vocabulary' of amino acids for encoding a protein sequence.
     Includes pad, sos, eos, and unknown characters as well as the 20 standard
     amino acids.
+    # TODO disable pad character for training
     """
 
-    def __init__(self, add_sos_eos=False):
+    def __init__(self, add_sos_eos=False, include_unknown_char=False):
+        self.include_unknown_char = include_unknown_char
         self.pad_char = "_"  # Pad character
         self.unk_char = "?"  # unknown character
         self.sos_char = "<"  # SOS character
@@ -105,7 +107,8 @@ class ProteinVocabulary(object):
             self.add(aa)
 
         self.add(self.pad_char)
-        self.add(self.unk_char)
+        if include_unknown_char:
+            self.add(self.unk_char)
         if add_sos_eos:
             self.add(self.sos_char)
             self.add(self.eos_char)
@@ -115,7 +118,10 @@ class ProteinVocabulary(object):
         self.eos_id = self[self.eos_char]
 
     def __getitem__(self, aa):
-        return self._char2int.get(aa, self._char2int[self.unk_char])
+        if self.include_unknown_char:
+            return self._char2int.get(aa, self._char2int[self.unk_char])
+        else:
+            return self._char2int.get(aa, self._char2int[self.pad_char])
 
     def __contains__(self, aa):
         return aa in self._char2int

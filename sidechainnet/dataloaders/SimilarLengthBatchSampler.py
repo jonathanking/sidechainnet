@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.utils
+from sidechainnet.utils.download import MAX_SEQ_LEN
 
 
 class SimilarLengthBatchSampler(torch.utils.data.Sampler):
@@ -23,6 +24,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                  batch_size,
                  dynamic_batch,
                  optimize_batch_for_cpus,
+                 bins='auto',
                  downsample=None,
                  use_largest_bin=False,
                  repeat_train=None):
@@ -35,13 +37,50 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         self.use_largest_bin = use_largest_bin
         self.repeat_train = repeat_train if repeat_train else 1
 
+        self._init_histogram_bins(bins)
+
+    def _init_histogram_bins(self, bins):
+        # Compute length-based histogram bins and probabilities
+        self.lens = []
+        for s in self.data_source._seqs:
+            if len(s) <= MAX_SEQ_LEN:
+                self.lens.append(len(s))
+            else:
+                self.lens.append(MAX_SEQ_LEN)
+
+        self.hist_counts, self.hist_bins = np.histogram(self.lens, bins=bins)
+        # Make each bin define the rightmost value in each bin, ie '( , ]'.
+        self.hist_bins = self.hist_bins[1:]
+        self.bin_probs = self.hist_counts / self.hist_counts.sum()
+        self.bin_map = {}
+
+        # Compute a mapping from bin number to a list of dataset indices, i.e.:
+        #                        { 0: [0, 1, ... 67],
+        #                          1: [68, 69, ... 98],
+        #                          ...
+        #                          }
+        # In the batch generation procedure, a sequence length bin is drawn first,
+        # then proteins are selected at random from the list of indices. Each bin has
+        # proteins of similar length.
+        seq_i = 0
+        bin_j = 0
+        while seq_i < len(self.data_source._seqs):
+            if self.lens[seq_i] <= self.hist_bins[bin_j]:
+                try:
+                    self.bin_map[bin_j].append(seq_i)
+                except KeyError:
+                    self.bin_map[bin_j] = [seq_i]
+                seq_i += 1
+            else:
+                bin_j += 1
+
     def __len__(self):
         # If batches are dynamically sized to contain the same number of
         # residues then the approximate number of batches is the total number
         # of residues in the dataset divided by the size of the dynamic batch.
 
         if self.dynamic_batch:
-            numerator = sum(self.data_source.lens) * self.repeat_train
+            numerator = sum(self.lens) * self.repeat_train
             divisor = self.dynamic_batch
         else:
             numerator = len(self.data_source) * self.repeat_train
@@ -58,25 +97,22 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
             i = 0
             while i < len(self):
                 if self.use_largest_bin:
-                    bin = len(self.data_source.hist_bins) - 1
+                    bin = len(self.hist_bins) - 1
                 else:
-                    bin = np.random.choice(range(len(self.data_source.hist_bins)),
-                                           p=self.data_source.bin_probs)
+                    bin = np.random.choice(range(len(self.hist_bins)), p=self.bin_probs)
                 if self.dynamic_batch:
                     # Make the batch size a multiple of the number of available
                     # CPUs for fast DRMSD loss computation
                     if self.optimize_batch_for_cpus:
-                        largest_possible = int(self.dynamic_batch /
-                                               self.data_source.hist_bins[bin])
+                        largest_possible = int(self.dynamic_batch / self.hist_bins[bin])
                         this_batch_size = max(
                             1, largest_possible - (largest_possible % self.cpu_count))
                     else:
                         this_batch_size = max(
-                            1, int(self.dynamic_batch / self.data_source.hist_bins[bin]))
+                            1, int(self.dynamic_batch / self.hist_bins[bin]))
                 else:
                     this_batch_size = self.batch_size
-                yield np.random.choice(self.data_source.bin_map[bin],
-                                       size=this_batch_size)
+                yield np.random.choice(self.bin_map[bin], size=this_batch_size)
                 i += 1
 
         return batch_generator()
