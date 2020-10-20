@@ -45,7 +45,7 @@ def create_empty_dictionary(casp_version):
         "train": copy.deepcopy(basic_data_entries),
         "test": copy.deepcopy(basic_data_entries),
         # To parse date, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
-        "date": datetime.datetime.now().strftime("%I:%M%p %B %d, %Y"),
+        "date": datetime.datetime.now().strftime("%I:%M%p %b %d, %Y"),
         "settings": dict()
     }
 

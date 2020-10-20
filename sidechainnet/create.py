@@ -160,7 +160,7 @@ def main():
                                  args.training_set)
     save_data(sidechainnet, sidechainnet_outfile)
     print(
-        f"SidechainNet for {args.casp_version.upper()} written to {sidechainnet_outfile}."
+        f"SidechainNet for CASP {args.casp_version} written to {sidechainnet_outfile}."
     )
 
 
