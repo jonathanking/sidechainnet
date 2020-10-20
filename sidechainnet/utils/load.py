@@ -27,7 +27,7 @@ def copyfileobj(fsrc, fdst, length=0, chunks=0.):
     fdst_write = fdst.write
     if chunks:
         pbar = tqdm.tqdm(total=int(chunks),
-                         desc='Downloading file chunks (over-estimated)',
+                         desc='Downloading file chunks (estimated)',
                          unit='chunk',
                          dynamic_ncols=True)
     while True:
@@ -61,7 +61,8 @@ def download_sidechainnet(casp_version, thinning, scn_dir):
     """Downloads the specified version of Sidechainnet."""
     # Prepare destination paths for downloading
     if format_sidechainnet_path(casp_version, thinning) not in BOXURLS:
-        raise FileNotFoundError("The requested file is currently unavailable.")
+        raise FileNotFoundError(
+            "The requested file is currently unavailable. Please check back later.")
     outfile_path = os.path.join(scn_dir, format_sidechainnet_path(casp_version, thinning))
     os.makedirs(os.path.dirname(outfile_path), exist_ok=True)
     print("Downloading from", BOXURLS[format_sidechainnet_path(casp_version, thinning)])
@@ -87,6 +88,10 @@ def load(casp_version=12,
          with_pytorch=None,
          aggregate_model_input=True,
          batch_size=32,
+         return_masks=False,
+         aggregate_masks=False,
+         seq_as_onehot=None,
+         use_dynamic_batch_size=True,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2):
@@ -123,7 +128,7 @@ def load(casp_version=12,
 
     # By default, the load function returns a dictionary
     if not with_pytorch:
-        return scn_dict 
+        return scn_dict
 
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
@@ -131,6 +136,9 @@ def load(casp_version=12,
             aggregate_model_input=aggregate_model_input,
             batch_size=batch_size,
             num_workers=num_workers,
+            return_masks=return_masks,
+            seq_as_onehot=seq_as_onehot,
+            use_dynamic_batch_size=use_dynamic_batch_size,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
             train_eval_downsample=train_eval_downsample)
 
@@ -151,7 +159,7 @@ BOXURLS = {
     "sidechainnet_casp12_95.pkl":
         "https://pitt.box.com/shared/static/s82n4wcadrwa1bllnj8ygaxcbw8xqrjt.pkl",
     "sidechainnet_casp12_100.pkl":
-        "",
+        "https://pitt.box.com/shared/static/7dh68fsbxyhfhssf1ih0ff85kpedurz0.pkl",
 
     # CASP 11
     "sidechainnet_casp11_30.pkl":
