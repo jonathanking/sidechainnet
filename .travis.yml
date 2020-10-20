@@ -7,13 +7,13 @@ matrix:
     env: PYTHON_VER=3.6
   - os: osx
     language: generic
-    env: PYTHON_VER=3.7
+    env: PYTHON_VER=3.9
   - os: linux
     language: generic  # No need to set Python version since its conda
     env: PYTHON_VER=3.6
   - os: linux
     language: generic
-    env: PYTHON_VER=3.7
+    env: PYTHON_VER=3.9
 before_install:
 # Additional info about the build
   - uname -a
