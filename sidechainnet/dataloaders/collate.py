@@ -102,5 +102,10 @@ def prepare_dataloaders(data,
                                               num_workers=num_workers,
                                               batch_size=batch_size,
                                               collate_fn=paired_collate_fn)
+    
+    dataloaders = {'train': train_loader,
+                   'train-eval': train_eval_loader,
+                   'test': test_loader}
+    dataloaders.update({f'valid-{split}': valid_loaders[split] for split in VALID_SPLITS})
 
-    return train_loader, train_eval_loader, valid_loaders, test_loader
+    return dataloaders
