@@ -16,7 +16,7 @@ def get_local_sidechainnet_path(casp_version, thinning, scn_dir):
         return None
 
 
-def copyfileobj(fsrc, fdst, length=0, chunks=100.):
+def copyfileobj(fsrc, fdst, length=0, chunks=0.):
     """copy data from file-like object fsrc to file-like object fdst.
     Modified from shutil.copyfileobj."""
     # Localize variable access to minimize overhead.
@@ -24,23 +24,30 @@ def copyfileobj(fsrc, fdst, length=0, chunks=100.):
         length = 64 * 1024
     fsrc_read = fsrc.read
     fdst_write = fdst.write
-    pbar = tqdm.tqdm(total=chunks,
-                     desc='Downloading file chunks (over-estimated)',
-                     unit='chunk',
-                     dynamic_ncols=True)
+    if chunks:
+        pbar = tqdm.tqdm(total=int(chunks),
+                         desc='Downloading file chunks (over-estimated)',
+                         unit='chunk',
+                         dynamic_ncols=True)
     while True:
         buf = fsrc_read(length)
         if not buf:
             break
         fdst_write(buf)
-        pbar.update()
+        if chunks:
+            pbar.update()
 
 
 def download(url, file_name):
     """Downloads a file at a given URL to a specified local file_name with shutil."""
     # File length can only be approximated from the resulting GET, unfortunately
     r = requests.get(url, stream=True)
-    l = int(r.headers['X-Original-Content-Length'])
+    if 'Content-Length' in r.headers:
+        l = int(r.headers['Content-Length'])
+    elif 'X-Original-Content-Length' in r.headers:
+        l = int(r.headers['X-Original-Content-Length'])
+    else:
+        l = 0
     r.raw.decode_content = True
     with open(file_name, 'wb') as f:
         copyfileobj(r.raw, f, chunks=(l / (64. * 1024)))
@@ -91,7 +98,7 @@ def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
     """
     local_path = get_local_sidechainnet_path(casp_version, thinning, scn_dir)
     if not local_path:
-        print(f"SidechainNet was not found in {scn_dir}.")
+        print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
         # Download SidechainNet if it does not exist locally
         local_path = download_sidechainnet(casp_version, thinning, scn_dir)
 
