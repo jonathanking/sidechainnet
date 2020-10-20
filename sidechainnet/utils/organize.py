@@ -44,8 +44,7 @@ def create_empty_dictionary(casp_version):
         "train": basic_data_entries.copy(),
         "test": basic_data_entries.copy(),
         # To parse date, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
-        "date": datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y"),
-        "description": f"ProteinNet {casp_version.upper()}",
+        "date": datetime.datetime.now().strftime("%I:%M%p %B %d, %Y"),
         "settings": {}
     }
 
@@ -125,6 +124,9 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
         organized_data[split] = sort_datasplit(organized_data[split])
 
     # Add settings
+    organized_data["description"] = f"SidechainNet {casp_version}"
+    organized_data["settings"]["casp_version"] = int(casp_version)
+    organize_data["settings"]["thinning"] = int(thinning)
     organized_data["settings"]["n_proteins"] = len(scnet_data)
     organized_data["settings"]["angle_means"] = compute_angle_means(
         organized_data['train']['ang'])

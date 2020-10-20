@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import torch.utils.data
 
-from sidechainnet.dataloaders.batch_sampler import SimilarLengthBatchSampler
-from sidechainnet.dataloaders.protein_dataset import ProteinDataset, BinnedProteinDataset
+from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatchSampler
+from sidechainnet.dataloaders.ProteinDataset import ProteinDataset, BinnedProteinDataset
 from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
@@ -63,9 +63,7 @@ def prepare_dataloaders(data,
     function returns train, validation, and test set dataloaders with 2 workers
     each. Note that there are multiple validation sets in ProteinNet.
     """
-    train_dataset = BinnedProteinDataset(seqs=data['train']['seq'],
-                                         crds=data['train']['crd'],
-                                         angs=data['train']['ang'])
+    train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -92,18 +90,15 @@ def prepare_dataloaders(data,
     valid_loaders = {}
     for split in VALID_SPLITS:
         valid_loader = torch.utils.data.DataLoader(ProteinDataset(
-            seqs=data[f'valid-{split}']['seq'],
-            crds=data[f'valid-{split}']['crd'],
-            angs=data[f'valid-{split}']['ang']),
+            data[f'valid-{split}'], f'valid-{split}', data['settings'], data['date']),
                                                    num_workers=num_workers,
                                                    batch_size=batch_size,
                                                    collate_fn=paired_collate_fn)
         valid_loaders[split] = valid_loader
 
-    test_loader = torch.utils.data.DataLoader(ProteinDataset(
-        seqs=data['test']['seq'],
-        crds=data['test']['crd'],
-        angs=data['test']['ang']),
+    test_loader = torch.utils.data.DataLoader(ProteinDataset(data['test'], 'test',
+                                                             data['settings'],
+                                                             data['date']),
                                               num_workers=num_workers,
                                               batch_size=batch_size,
                                               collate_fn=paired_collate_fn)
