@@ -24,7 +24,9 @@ class ProteinDataset(torch.utils.data.Dataset):
         self._seqs = [VOCAB.str2ints(s, add_sos_eos) for s in scn_data_split['seq']]
         self._angs = scn_data_split['ang']
         self._crds = scn_data_split['crd']
-        self._msks = scn_data_split['msk']
+        self._msks = [
+            [1 if m == "+" else 0 for m in mask] for mask in scn_data_split['msk']
+        ]
         self._evos = scn_data_split['evo']
         self._ids = scn_data_split['ids']
 
@@ -58,8 +60,8 @@ class ProteinDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
 
-        return self._ids[idx], self._seqs[idx], self._angs[idx], self._crds[
-            idx], self._evos[idx], self._msks[idx]
+        return self._ids[idx], self._seqs[idx], self._msks[idx], self._evos[
+            idx], self._angs[idx], self._crds[idx],
 
     def __str__(self):
         """Describes this dataset to the user."""

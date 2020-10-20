@@ -6,6 +6,7 @@ import requests
 import tqdm
 
 from sidechainnet.create import format_sidechainnet_path
+from sidechainnet.dataloaders.collate import prepare_dataloaders
 
 
 def get_local_sidechainnet_path(casp_version, thinning, scn_dir):
@@ -59,6 +60,8 @@ def download(url, file_name):
 def download_sidechainnet(casp_version, thinning, scn_dir):
     """Downloads the specified version of Sidechainnet."""
     # Prepare destination paths for downloading
+    if format_sidechainnet_path(casp_version, thinning) not in BOXURLS:
+        raise FileNotFoundError("The requested file is currently unavailable.")
     outfile_path = os.path.join(scn_dir, format_sidechainnet_path(casp_version, thinning))
     os.makedirs(os.path.dirname(outfile_path), exist_ok=True)
     print("Downloading from", BOXURLS[format_sidechainnet_path(casp_version, thinning)])
@@ -78,7 +81,15 @@ def load_dict(local_path):
     return d
 
 
-def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
+def load(casp_version=12,
+         thinning=30,
+         scn_dir="./sidechainnet",
+         with_pytorch=None,
+         aggregate_model_input=True,
+         batch_size=32,
+         num_workers=2,
+         optimize_for_cpu_parallelism=False,
+         train_eval_downsample=.2):
     """Loads SidechainNet as a Python dictionary.
     
     Args:
@@ -90,7 +101,13 @@ def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
         scn_dir: A string representing a local path to store the SidechainNet data files.
             By default, the data will be stored in the current directory, under a sub-
             directory title 'sidechainnet'.
-        
+        with_pytorch: Optional string argument specifying whether or not to load the
+            SidechainNet data as PyTorch "dataloaders". This is the most convenient way
+            to access the data for machine learning methods.
+        aggregate_model_input: A boolean that, if True, yields batches of (protein_id,
+            model_input, true_angles, true_coordinates) when iterating over the returned
+            PyTorch DataLoader. If False, this expands the model_input variable into 
+            its components (sequence, mask pssm).
     
     Returns:
         By default, this method returns a Python dictionary that contains SidechainNet
@@ -102,7 +119,22 @@ def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
         # Download SidechainNet if it does not exist locally
         local_path = download_sidechainnet(casp_version, thinning, scn_dir)
 
-    return load_dict(local_path)
+    scn_dict = load_dict(local_path)
+
+    # By default, the load function returns a dictionary
+    if not with_pytorch:
+        return scn_dict 
+
+    if with_pytorch == "dataloaders":
+        return prepare_dataloaders(
+            scn_dict,
+            aggregate_model_input=aggregate_model_input,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
+            train_eval_downsample=train_eval_downsample)
+
+    return
 
 
 # TODO: Finish uploading files to Box for distribution
@@ -111,13 +143,13 @@ BOXURLS = {
     "sidechainnet_casp12_30.pkl":
         "https://pitt.box.com/shared/static/11qn4922x22fdxycuv7f2vxjfkplxihz.pkl",
     "sidechainnet_casp12_50.pkl":
-        "https://pitt.box.com/shared/static/2ux5agaejvvvtzjdvl6mts5uk89q77v9.pkl",
+        "https://pitt.box.com/shared/static/pt5p1xh5z9sfst5zfd2u54o6f91kb8vg.pkl",
     "sidechainnet_casp12_70.pkl":
-        "",
+        "https://pitt.box.com/shared/static/y1ekdkhtm2f3e5ggxnmed4ar74wj4d6s.pkl",
     "sidechainnet_casp12_90.pkl":
-        "",
+        "https://pitt.box.com/shared/static/1p8er43his3t9z3bi2s9dtfr3nn2ia4s.pkl",
     "sidechainnet_casp12_95.pkl":
-        "",
+        "https://pitt.box.com/shared/static/s82n4wcadrwa1bllnj8ygaxcbw8xqrjt.pkl",
     "sidechainnet_casp12_100.pkl":
         "",
 
