@@ -8,7 +8,7 @@ dependencies:
   - numpy
   - scipy
   - tqdm
-  - torch
+  - pytorch-cpu
 
     # Testing
   - pytest
