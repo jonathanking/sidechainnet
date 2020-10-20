@@ -46,20 +46,15 @@ class ProteinDataset(torch.utils.data.Dataset):
             a[0] for a in sorted(
                 enumerate(self._angs), key=lambda x: x[1].shape[0], reverse=reverse_sort)
         ]
-        self._seqs = [self._angs[i] for i in sorted_len_indices]
+        self._seqs = [self._seqs[i] for i in sorted_len_indices]
         self._angs = [self._angs[i] for i in sorted_len_indices]
         self._crds = [self._crds[i] for i in sorted_len_indices]
         self._msks = [self._msks[i] for i in sorted_len_indices]
         self._evos = [self._evos[i] for i in sorted_len_indices]
         self._ids = [self._ids[i] for i in sorted_len_indices]
 
-    @property
-    def n_insts(self):
-        """ Property for dataset size """
-        return len(self._seqs)
-
     def __len__(self):
-        return self.n_insts
+        return len(self._seqs)
 
     def __getitem__(self, idx):
 

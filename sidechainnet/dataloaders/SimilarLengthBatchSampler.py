@@ -36,13 +36,18 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         self.downsample = downsample
         self.use_largest_bin = use_largest_bin
         self.repeat_train = repeat_train if repeat_train else 1
-        
+
         self._init_histogram_bins(bins)
-    
+
     def _init_histogram_bins(self, bins):
         # Compute length-based histogram bins and probabilities
-        self.lens = list(
-            map(lambda x: len(x) if len(x) <= MAX_SEQ_LEN else MAX_SEQ_LEN, self._seqs))
+        self.lens = []
+        for s in self.data_source._seqs:
+            if len(s) <= MAX_SEQ_LEN:
+                self.lens.append(len(s))
+            else:
+                self.lens.append(MAX_SEQ_LEN)
+
         self.hist_counts, self.hist_bins = np.histogram(self.lens, bins=bins)
         # Make each bin define the rightmost value in each bin, ie '( , ]'.
         self.hist_bins = self.hist_bins[1:]
@@ -59,7 +64,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         # proteins of similar length.
         seq_i = 0
         bin_j = 0
-        while seq_i < len(self._seqs):
+        while seq_i < len(self.data_source._seqs):
             if self.lens[seq_i] <= self.hist_bins[bin_j]:
                 try:
                     self.bin_map[bin_j].append(seq_i)
@@ -68,7 +73,6 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                 seq_i += 1
             else:
                 bin_j += 1
-        
 
     def __len__(self):
         # If batches are dynamically sized to contain the same number of

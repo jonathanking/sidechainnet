@@ -3,7 +3,7 @@ import torch
 import torch.utils.data
 
 from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatchSampler
-from sidechainnet.dataloaders.ProteinDataset import ProteinDataset, BinnedProteinDataset
+from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
 from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
