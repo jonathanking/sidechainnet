@@ -147,6 +147,7 @@ def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
 
 def prepare_dataloaders(data,
                         aggregate_model_input,
+                        collate_fn=None,
                         batch_size=32,
                         num_workers=1,
                         return_masks=False,
@@ -169,9 +170,10 @@ def prepare_dataloaders(data,
             its components (sequence, mask pssm).
         batch_size: Batch size to use when yielding batches from a DataLoader.
     """
-    collate_fn = get_collate_fn(aggregate_model_input,
-                                return_masks=return_masks,
-                                seqs_as_onehot=seq_as_onehot)
+    if collate_fn is None:
+        collate_fn = get_collate_fn(aggregate_model_input,
+                                    return_masks=return_masks,
+                                    seqs_as_onehot=seq_as_onehot)
 
     train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
 
