@@ -55,11 +55,11 @@ def download_sidechainnet(casp_version, thinning, scn_dir):
     outfile_path = os.path.join(scn_dir, format_sidechainnet_path(casp_version, thinning))
     os.makedirs(os.path.dirname(outfile_path), exist_ok=True)
     print("Downloading from", BOXURLS[format_sidechainnet_path(casp_version, thinning)])
-    
+
     # Use a data-agnostic tool for downloading URL data from Box to a specified local file
     download(BOXURLS[format_sidechainnet_path(casp_version, thinning)], outfile_path)
     print(f"Downloaded SidechainNet to {outfile_path}.")
-    
+
     return outfile_path
 
 
@@ -69,6 +69,7 @@ def load_dict(local_path):
         d = pickle.load(f)
     print(f"SidechainNet was loaded from {local_path}.")
     return d
+
 
 def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
     """Loads SidechainNet as a Python dictionary.
@@ -99,8 +100,87 @@ def load(casp_version=12, thinning=30, scn_dir="./sidechainnet"):
 
 # TODO: Finish uploading files to Box for distribution
 BOXURLS = {
+    # CASP 12
+    "sidechainnet_casp12_30.pkl":
+        "https://pitt.box.com/shared/static/11qn4922x22fdxycuv7f2vxjfkplxihz.pkl",
     "sidechainnet_casp12_50.pkl":
         "https://pitt.box.com/shared/static/2ux5agaejvvvtzjdvl6mts5uk89q77v9.pkl",
-    "sidechainnet_casp12_30.pkl":
-        "https://pitt.box.com/shared/static/2ux5agaejvvvtzjdvl6mts5uk89q77v9.pkl"
+    "sidechainnet_casp12_70.pkl":
+        "",
+    "sidechainnet_casp12_90.pkl":
+        "",
+    "sidechainnet_casp12_95.pkl":
+        "",
+    "sidechainnet_casp12_100.pkl":
+        "",
+
+    # CASP 11
+    "sidechainnet_casp11_30.pkl":
+        "",
+    "sidechainnet_casp11_50.pkl":
+        "",
+    "sidechainnet_casp11_70.pkl":
+        "",
+    "sidechainnet_casp11_90.pkl":
+        "",
+    "sidechainnet_casp11_95.pkl":
+        "",
+    "sidechainnet_casp11_100.pkl":
+        "",
+
+    # CASP 10
+    "sidechainnet_casp10_30.pkl":
+        "",
+    "sidechainnet_casp10_50.pkl":
+        "",
+    "sidechainnet_casp10_70.pkl":
+        "",
+    "sidechainnet_casp10_90.pkl":
+        "",
+    "sidechainnet_casp10_95.pkl":
+        "",
+    "sidechainnet_casp10_100.pkl":
+        "",
+
+    # CASP 9
+    "sidechainnet_casp9_30.pkl":
+        "",
+    "sidechainnet_casp9_50.pkl":
+        "",
+    "sidechainnet_casp9_70.pkl":
+        "",
+    "sidechainnet_casp9_90.pkl":
+        "",
+    "sidechainnet_casp9_95.pkl":
+        "",
+    "sidechainnet_casp9_100.pkl":
+        "",
+
+    # CASP 8
+    "sidechainnet_casp8_30.pkl":
+        "",
+    "sidechainnet_casp8_50.pkl":
+        "",
+    "sidechainnet_casp8_70.pkl":
+        "",
+    "sidechainnet_casp8_90.pkl":
+        "",
+    "sidechainnet_casp8_95.pkl":
+        "",
+    "sidechainnet_casp8_100.pkl":
+        "",
+
+    # CASP 7
+    "sidechainnet_casp7_30.pkl":
+        "",
+    "sidechainnet_casp7_50.pkl":
+        "",
+    "sidechainnet_casp7_70.pkl":
+        "",
+    "sidechainnet_casp7_90.pkl":
+        "",
+    "sidechainnet_casp7_95.pkl":
+        "",
+    "sidechainnet_casp7_100.pkl":
+        ""
 }
