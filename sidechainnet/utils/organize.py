@@ -1,4 +1,5 @@
 """Contains methods for organizing SidechainNet data into a Python dictionary."""
+import copy
 import datetime
 import os
 import pickle
@@ -41,15 +42,15 @@ def create_empty_dictionary(casp_version):
     }
 
     data = {
-        "train": basic_data_entries.copy(),
-        "test": basic_data_entries.copy(),
+        "train": copy.deepcopy(basic_data_entries),
+        "test": copy.deepcopy(basic_data_entries),
         # To parse date, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
         "date": datetime.datetime.now().strftime("%I:%M%p %B %d, %Y"),
-        "settings": {}
+        "settings": dict()
     }
 
     validation_subdict = {
-        f"valid-{split}": basic_data_entries.copy() for split in VALID_SPLITS
+        f"valid-{split}": copy.deepcopy(basic_data_entries) for split in VALID_SPLITS
     }
     data.update(validation_subdict)
 
@@ -126,7 +127,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     # Add settings
     organized_data["description"] = f"SidechainNet {casp_version}"
     organized_data["settings"]["casp_version"] = int(casp_version)
-    organize_data["settings"]["thinning"] = int(thinning)
+    organized_data["settings"]["thinning"] = int(thinning)
     organized_data["settings"]["n_proteins"] = len(scnet_data)
     organized_data["settings"]["angle_means"] = compute_angle_means(
         organized_data['train']['ang'])
