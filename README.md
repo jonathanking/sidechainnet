@@ -35,11 +35,6 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 ## Installation
 To run this code, it's recommended to first perform a developmental install of the package with pip in your current environment with `pip install -e .`. This will install the `sidechainnet` package in your environment.
 
-## Downloading Data
-For each existing ProteinNet dataset, a corresponding SidechainNet dataset can be accessed via `sidechainnet.load` (as of 10/20/20 only CASP 12 is available, though the remaining datasets will be added in the coming days). 
-
-There are separate datasets for each available CASP competition (CASP 7-12) as well as each "thinning" of the data as described by ProteinNet (`30, 50, 70, 90, 95, 100%`). A thinning represents the same dataset but has been clustered and downsampled to reduce its size. Thinnings marked as `100` contain the complete dataset.
-
 ## Usage Examples
 
 ### Loading SidechainNet as a Python dictionary
@@ -79,9 +74,9 @@ By default, the `load` function downloads the data from the web into the current
 ```
 
 ### Loading SidechainNet with PyTorch DataLoaders
-The `load` function can also be used to load SidechainNet data as a dictionary of torch.utils.data.DataLoader` objects. PyTorch `DataLoaders` make it simple to iterate over dataset items for training machine learning models. This method is recommended for using SidechainNet data with PyTorch.
+The `load` function can also be used to load SidechainNet data as a dictionary of `torch.utils.data.DataLoader` objects. PyTorch `DataLoaders` make it simple to iterate over dataset items for training machine learning models. This method is recommended for using SidechainNet data with PyTorch.
 
-By default, the provided `DataLoader`s use a custom batching method that randomly generates batches of proteins of similar length. For faster training, it generates larger batches when the average length of proteins in the batch is small, and smaller batches when the proteins are large. The probability of selecting small-length batches is decreased so that each protein in SidechainNet is included in a batch with equal probability. See `dynamic_batch_size` and `collate_fn` arguments for more information on modifying this behavior. In the example below, `model_input` is a collated Tensor containing sequence and PSSM information as described in the original ProteinNet paper.
+By default, the provided `DataLoader`s use a custom batching method that randomly generates batches of proteins of similar length. For faster training, it generates larger batches when the average length of proteins in the batch is small, and smaller batches when the proteins are large. The probability of selecting small-length batches is decreased so that each protein in SidechainNet is included in a batch with equal probability. See `dynamic_batch_size` and `collate_fn` arguments for more information on modifying this behavior. In the example below, `model_input` is a collated Tensor containing sequence and PSSM information.
 
 ```python
 >>> dataloaders = scn.load(casp_version=12, with_pytorch="dataloaders")
@@ -129,57 +124,55 @@ SidechainNet also makes it easy to visualize both existing and predicted all-ato
 
 The PDB format is a typical format for representing protein structures and can be opened in software tools like PyMOL. `py3Dmol` (built on [3Dmol.ks](http://3dmol.csb.pitt.edu) enables users to visualize and interact with protein structures on the web and in Jupyter Notebooks via an open-source, object-oriented, and hardware-accelerated Javascript library. Finally, `gLTF` files, despite their larger size, can be convenient for visualizing proteins on the web or in contexts where other protein visualization tools are not supported. 
 
-```python
->>> my_structure_builder.to_pdb("example.pdb")
->>> my_structure_builder.to_gltf("example.gltf")
-```
-
 ![StructureBuilder.to_3Dmol() example](./docs/_static/structure_example.png)
+
+```python
+>>> sb.to_pdb("example.pdb")
+>>> sb.to_gltf("example.gltf")
+```
 
 ### Using SidechainNet to train an all-atom protein structure prediction model 
 
-For a complete example of model training, please see [sidechainnet/examples/train.py](./sidechainnet/examples/train.py). Below is an outline of how to use this repository to load SidechainNet data with our custom DataLoaders and train a model.
+Below is an outline of how to use this repository for machine learning model training. Assuming you have a predictive model variable `model` and a loss function `loss_fn` used to evaluate your model, you can load SidechainNet using our DataLoaders and begin training.
 
 ```python
-import sidechainnet
-from sidechainnet.examples.rgn import RGN
-from sidechainnet.examples.losses import drmsd
+import sidechainnet as scn
 
+data = scn.load(casp_version=12,thinning=30, with_pytorch="dataloaders")
 
-train, train_eval, validations, test = sidechainnet.get_dataloaders("casp12_100.pkl")
-model = RGN()
-
-for epoch in range(10):
-
+for epoch in range(100):
     # Training epoch
-    for seq, tgt_angles, tgt_coords in train:
-        pred_coords = model(seq)
-        loss = drmsd(pred_coords, tgt_coords)
+    for protein_ids, model_input, tgt_angles, tgt_coords in data['train']:
+        predictions = model(model_input)
+        loss = loss_fn(predictions, tgt_angles, tgt_coords)
         loss.backwards()
         ...
     
-    # Evaluate performance on downsampled training set
-    for seq, tgt_angles, tgt_coords in train_eval:
-        pred_coords = model(seq)
-        train_loss = drmsd(pred_coords, tgt_coords)
+    # Evaluate performance on down-sampled training set for efficiency
+    for protein_ids, model_input, tgt_angles, tgt_coords in data['train-eval']:
+        predictions = model(model_input)
+        loss = loss_fn(predictions, tgt_angles, tgt_coords)
+        loss.backwards()
         ...
 
     # Evaluate performance on each of the 7 validation sets
-    for validation_set in validations:
-        for seq, tgt_angles, tgt_coords in validations:
-            pred_coords = model(seq)
-            val_loss = drmsd(pred_coords, tgt_coords)
+    for valid_set in [data[f'valid-{split}'] for split in scn.utils.download.VALID_SPLITS]:
+        for protein_ids, model_input, tgt_angles, tgt_coords in valid_set:
+            predictions = model(model_input)
+            loss = loss_fn(predictions, tgt_angles, tgt_coords)
+            loss.backwards()
             ...
 
 # Evaluate performance on test set
-for seq, tgt_angles, tgt_coords in test:
-        pred_coords = model(seq)
-        test_loss = drmsd(pred_coords, tgt_coords)
+for protein_ids, model_input, tgt_angles, tgt_coords in data['test']:
+    predictions = model(model_input)
+    loss = loss_fn(predictions, tgt_angles, tgt_coords)
+    loss.backwards()
     ...
 ```
 
 
-## Directions to Reproduce SidechainNet
+## Reproducing SidechainNet
 
 If you would like to reproduce our work or make modifications to the dataset, you may follow the directions below to generate SidechainNet from scratch.
 
@@ -194,6 +187,7 @@ If you would like to reproduce our work or make modifications to the dataset, yo
 - scipy
 - [PyTorch](https://pytorch.org/get-started/locally/)
 - tqdm
+- py3Dmol (`pip install py3Dmol`)
 
 
 ## Acknowledgements
