@@ -3,7 +3,7 @@ import torch
 
 from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
-from sidechainnet.structure.Structure import nerf
+from sidechainnet.structure.structure import nerf
 
 
 class StructureBuilder(object):

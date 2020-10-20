@@ -52,8 +52,8 @@ def nerf(a, b, c, l, theta, chi):
             d: tuple of (x, y, z) in cartesian space
     """
     # calculate unit vectors AB and BC
-    assert -np.pi <= theta <= np.pi, "theta must be in radians and in [-pi, pi]. theta = " + str(
-        theta)
+    if not (-np.pi <= theta <= np.pi):
+        raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
 
     W_hat = torch.nn.functional.normalize(b - a, dim=0)
     x_hat = torch.nn.functional.normalize(c - b, dim=0)
@@ -80,9 +80,11 @@ def nerf(a, b, c, l, theta, chi):
     res = c + torch.mm(M, d).squeeze()
     return res.squeeze()
 
+
 def determine_missing_positions(ang_or_coord_matrix):
     """Uses GLOBAL_PAD_CHAR to determine location of missing atoms or residues."""
     raise NotImplementedError
+
 
 def deg2rad(angle):
     """
@@ -94,8 +96,7 @@ def deg2rad(angle):
 # import sidechainnet.protein.StructureBuilder as StructureBuilder
 
 if __name__ == '__main__':
-    d = torch.load(
-        "/home/jok120/protein-transformer/data/proteinnet/casp12_200206_30.pt")
+    d = torch.load("/home/jok120/protein-transformer/data/proteinnet/casp12_200206_30.pt")
     seq = d["train"]["seq"][70]
     ang = d["train"]["ang"][70]
     sb = StructureBuilder.StructureBuilder(seq, ang)

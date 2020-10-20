@@ -64,15 +64,6 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences
 ```
 By default, the `load` function downloads the data from the web into the current directory and loads it as a Python dictionary. If the data already exists locally, it reads it from disk. Other than the requirement that the data must be loaded using Python, this method of data loading is agnostic to any downstream analyses
 
-```python
->>> import sidechainnet as scn
->>> data = scn.load(casp_version=12)
->>> data.keys()
-['train', 'test', 'valid-10',...'valid-90', 'settings', 'description', 'date']
->>> data['train'].keys()
-['seq', 'ang', 'ids', 'crd', 'msk', 'evo']
-```
-
 ### Loading SidechainNet with PyTorch DataLoaders
 The `load` function can also be used to load SidechainNet data as a dictionary of `torch.utils.data.DataLoader` objects. PyTorch `DataLoaders` make it simple to iterate over dataset items for training machine learning models. This method is recommended for using SidechainNet data with PyTorch.
 
