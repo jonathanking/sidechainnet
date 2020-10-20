@@ -57,10 +57,10 @@ def create_empty_dictionary(casp_version):
     return data
 
 
-def get_proteinnetIDs_by_split(proteinnet_dir):
+def get_proteinnetIDs_by_split(proteinnet_dir, thinning):
     """Returns a dict of ProteinNet IDs organized by data split (train/test/valid)."""
     pn_files = [
-        os.path.join(proteinnet_dir, f"training_100_ids.txt"),
+        os.path.join(proteinnet_dir, f"training_{thinning}_ids.txt"),
         os.path.join(proteinnet_dir, f"validation_ids.txt"),
         os.path.join(proteinnet_dir, f"testing_ids.txt")
     ]
@@ -71,14 +71,15 @@ def get_proteinnetIDs_by_split(proteinnet_dir):
         return _ids
 
     ids = {
-        'train': parse_ids(pn_files[0]),
+        "train": parse_ids(pn_files[0]),
         "valid": parse_ids(pn_files[1]),
         "test": parse_ids(pn_files[2])
     }
+
     return ids
 
 
-def organize_data(scnet_data, proteinnet_dir, casp_version):
+def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     """Given an unsorted Sidechainnet data dict, organizes into ProteinNet data splits.
     
     Args:
@@ -95,13 +96,15 @@ def organize_data(scnet_data, proteinnet_dir, casp_version):
     # TODO add bin_sequence_data ?
 
     # First, we need to determine which pnids belong to which data split.
-    ids = get_proteinnetIDs_by_split(proteinnet_dir)
+    ids = get_proteinnetIDs_by_split(proteinnet_dir, thinning)
 
     # Next, we create the empty dictionary for storing the data, organized by data splits
     organized_data = create_empty_dictionary(casp_version)
 
     # Now, we organize the data by its data splits
     for split in ["train", "test", "valid"]:
+        if split == "train":
+            print(len(ids[split]), "proteins in this split.")
         for pnid in ids[split]:
             if pnid not in scnet_data:
                 continue
