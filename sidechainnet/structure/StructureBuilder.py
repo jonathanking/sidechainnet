@@ -31,8 +31,8 @@ class StructureBuilder(object):
         if (ang is None and coords is None) or (ang is not None and coords is not None):
             raise ValueError(
                 "You must provide exactly one of either coordinates or angles.")
-        if ang is not None and np.any(np.all(ang==0, axis=1)):
-            missing_loc = np.where(np.all(ang==0, axis=1))
+        if ang is not None and np.any(np.all(ang == 0, axis=1)):
+            missing_loc = np.where(np.all(ang == 0, axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "
@@ -91,7 +91,7 @@ class StructureBuilder(object):
         # If a StructureBuilder does not have angles, build returns its coordinates
         if self.ang is None:
             return self.coords
-        
+
         # Build the first and second residues, a special case
         first, second = self._build_first_two_residues()
 
@@ -101,7 +101,11 @@ class StructureBuilder(object):
         # Build the rest of the structure
         prev_res = second
         for i, (resname, ang) in enumerate(self._iter_resname_angs(start=2)):
-            res = ResidueBuilder(resname, ang, prev_res=prev_res, next_res=None)
+            res = ResidueBuilder(resname,
+                                 ang,
+                                 prev_res=prev_res,
+                                 next_res=None,
+                                 is_last_res=i + 2 == len(self.seq) - 1)
             self.coords += res.build()
             prev_res = res
 
@@ -147,7 +151,13 @@ class StructureBuilder(object):
 
 class ResidueBuilder(object):
 
-    def __init__(self, name, angles, prev_res, next_res, device=torch.device("cpu")):
+    def __init__(self,
+                 name,
+                 angles,
+                 prev_res,
+                 next_res,
+                 is_last_res=False,
+                 device=torch.device("cpu")):
         """Initialize a residue builder for building a residue's coordinates from angles.  
         
         If prev_{bb, ang} are None, then this is the first residue. 
@@ -170,6 +180,7 @@ class ResidueBuilder(object):
         self.prev_res = prev_res
         self.next_res = next_res
         self.device = device
+        self.is_last_res = is_last_res
 
         self.bb = []
         self.sc = []
@@ -204,10 +215,16 @@ class ResidueBuilder(object):
                     b = BB_BUILD_INFO["BONDLENS"]["ca-c"]
                     dihedral = self.ang[0]  # phi of current residue
                 else:
-                    # Placing O
+                    # Placing O (carbonyl)
                     t = torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"])
                     b = BB_BUILD_INFO["BONDLENS"]["c-o"]
-                    dihedral = self.ang[1] - np.pi  # opposite to psi of current residue
+                    if self.is_last_res:
+                        # we explicitly measure this angle during dataset creation,
+                        # no need to invert it here.
+                        dihedral = self.ang[1]
+                    else:
+                        # the angle for placing oxygen is opposite to psi of current res
+                        dihedral = self.ang[1] - np.pi
 
                 next_pt = nerf(pts[-3], pts[-2], pts[-1], b, t, dihedral)
                 pts.append(next_pt)
