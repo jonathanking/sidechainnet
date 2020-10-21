@@ -165,9 +165,8 @@ for protein_ids, model_input, tgt_angles, tgt_coords in data['test']:
 
 ## Reproducing SidechainNet
 
-If you would like to reproduce our work or make modifications to the dataset, you may follow the directions below to generate SidechainNet from scratch.
+If you would like to reproduce our work or make modifications to the dataset, you may follow [these directions](how_to_reproduce.md)) below to generate SidechainNet from scratch.
 
-[How to reproduce and generate SidechainNet](how_to_reproduce.md)
 
 ## Package Requirements
 
@@ -179,11 +178,12 @@ If you would like to reproduce our work or make modifications to the dataset, yo
 - [PyTorch](https://pytorch.org/get-started/locally/)
 - tqdm
 - py3Dmol (`pip install py3Dmol`)
+- pymol (for `gltf` support)
 
 
 ## Acknowledgements
 
-Many thanks to Mohammed AlQuraishi for his inspiring work on protein structure prediction. Thanks, also, to [Jeppe Hallgren](https://github.com/JeppeHallgren) for his development of a ProteinNet text record [parser](https://github.com/biolib/openprotein/blob/master/preprocessing.py), which I have used in part here.
+Thanks to Mohammed AlQuraishi for his inspiring work on protein structure prediction. Thanks, also, to [Jeppe Hallgren](https://github.com/JeppeHallgren) for his development of a ProteinNet text record [parser](https://github.com/biolib/openprotein/blob/master/preprocessing.py), which I have used in part here.
 
  This work is supported by R01GM108340 from the National Institute of General Medical Sciences, is supported in part by the University of Pittsburgh Center for Research Computing through the resources provided, and by NIH T32 training grant T32 EB009403 as part of the HHMI-NIBIB Interfaces Initiative.
 
