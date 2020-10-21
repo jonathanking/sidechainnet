@@ -178,7 +178,7 @@ If you would like to reproduce our work or make modifications to the dataset, yo
 - [PyTorch](https://pytorch.org/get-started/locally/)
 - tqdm
 - py3Dmol (`pip install py3Dmol`)
-- pymol (for `gltf` support)
+- pymol (optional, for `gltf` support)
 
 
 ## Acknowledgements
