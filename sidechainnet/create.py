@@ -136,7 +136,8 @@ def format_sidechainnet_path(casp_version, training_split):
     return f"sidechainnet_casp{casp_version}_{training_split}.pkl"
 
 
-def main():
+def create():
+    """Generates SidechainNet for a single CASP thinning."""
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
                                  args.training_set)
@@ -164,6 +165,36 @@ def main():
     )
 
 
+def create_all():
+    """Generates all thinnings of a particular CASP dataset, starting with the largest."""
+    # First, parse raw proteinnet files into Python dictionaries for convenience
+    pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, 100)
+    pnids = pnids[:args.limit]  # Limit the length of the list for debugging
+
+    # Using the ProteinNet IDs as a guide, download the relevant sidechain data
+    sc_only_data, sc_filename = download_sidechain_data(pnids,
+                                                        args.sidechainnet_out,
+                                                        args.casp_version,
+                                                        100,
+                                                        args.limit,
+                                                        args.proteinnet_in,
+                                                        regenerate_scdata=True)
+
+    # Finally, unify the sidechain data with ProteinNet
+    sidechainnet_raw_100 = combine_datasets(args.proteinnet_out, sc_only_data, 100)
+
+    for training_set in [100, 95, 90, 70, 50, 30]:
+        sc_outfile = os.path.join(
+            args.sidechainnet_out,
+            format_sidechainnet_path(args.casp_version, training_set))
+        sidechainnet = organize_data(sidechainnet_raw_100, args.proteinnet_out,
+                                     args.casp_version, training_set)
+        save_data(sidechainnet, sc_outfile)
+        print(f"SidechainNet for CASP {args.casp_version} "
+              f"({training_set}% thinning) written to {sc_outfile}."
+        )
+        
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Constructs SidechainNet.")
     parser.add_argument('proteinnet_in',
@@ -189,8 +220,8 @@ if __name__ == "__main__":
                         type=str,
                         help="Location to download PDB files for ProDy.")
     parser.add_argument('--training_set',
-                        type=int,
-                        default=30,
+                        type=str,
+                        default='30',
                         help='Which \'thinning\' of the ProteinNet training '
                         'set to parse. {30,50,70,90,95,100}. Default 30.')
     parser.add_argument(
@@ -199,6 +230,8 @@ if __name__ == "__main__":
         help=('If True, then regenerate the sidechain-only data even if it already exists'
               ' locally.'))
     args = parser.parse_args()
+    if args.training_set != 'all':
+        args.training_set = int(args.training_set)
 
     match = re.search(r"casp(\d+)", args.proteinnet_in, re.IGNORECASE)
     if not match:
@@ -208,4 +241,7 @@ if __name__ == "__main__":
                                      " i.e. 'casp12'.")
     args.casp_version = match.group(1)
 
-    main()
+    if args.training_set == 'all':
+        create_all()
+    else:
+        create()
