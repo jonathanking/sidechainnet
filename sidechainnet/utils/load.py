@@ -163,9 +163,9 @@ BOXURLS = {
     "sidechainnet_casp12_90.pkl":
         "https://pitt.box.com/shared/static/yn5ucsxwo9bp01yp23jltseg4j8sb3f8.pkl",
     "sidechainnet_casp12_95.pkl":
-        "https://pitt.box.com/shared/static/s82n4wcadrwa1bllnj8ygaxcbw8xqrjt.pkl",
+        "https://pitt.box.com/shared/static/k3fr29s5dyckj6f535silvqab6ikai43.pkl",
     "sidechainnet_casp12_100.pkl":
-        "https://pitt.box.com/shared/static/7dh68fsbxyhfhssf1ih0ff85kpedurz0.pkl",
+        "https://pitt.box.com/shared/static/52ggdgl60optmp57b5mcwocv4cabwmbv.pkl",
 
     # CASP 11
     "sidechainnet_casp11_30.pkl":
