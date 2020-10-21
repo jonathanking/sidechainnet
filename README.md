@@ -11,11 +11,8 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 **This repository provides the following:**
 1. SidechainNet datasets stored as pickled Python dictionaries.
-    - (see `sidechainnet.load`)
 2. Methods for loading and batching SidechainNet data efficiently in PyTorch. 
-    - (see `sidechainnet.load(with_pytorch='dataloaders')`)
 3. Methods for generating protein structure visualizations (`.pdb`, [`3Dmol`](http://3dmol.csb.pitt.edu), `.gltf`) from model predictions.
-    - (see `sidechainnet.StructureBuilder`)
 
  
 ## Summary of SidechainNet data
@@ -36,7 +33,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 <sup>**</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
 ## Installation
-To run this code, it's recommended to first perform a developmental install of the package with pip in your current environment with `pip install -e .`. This will install the `sidechainnet` package in your environment.
+To run this code, it's recommended to first clone the repo into an appropriate source directory with `git clone <CLONE_URL>`. Then, perform a developmental install of the package with pip in your current environment with `pip install -e .`. This will install the `sidechainnet` package in your environment.
 
 ## Usage Examples
 
@@ -116,7 +113,7 @@ In the below example, `angles` is a NumPy matrix or Torch Tensor following the s
 ### Visualizing All-Atom Structures with `PDB`, `py3Dmol`, and `gLTF` Formats
 SidechainNet also makes it easy to visualize both existing and predicted all-atom protein structures. These visualizations are available as `PDB` files, `py3Dmol.view` objects, and Graphics Library Transmission Format (`gLTF`) files. Examples of each are included below.
 
-The PDB format is a typical format for representing protein structures and can be opened in software tools like PyMOL. `py3Dmol` (built on [3Dmol.js](http://3dmol.csb.pitt.edu) enables users to visualize and interact with protein structures on the web and in Jupyter Notebooks via an open-source, object-oriented, and hardware-accelerated Javascript library. Finally, `gLTF` files, despite their larger size, can be convenient for visualizing proteins on the web or in contexts where other protein visualization tools are not supported. 
+The PDB format is a typical format for representing protein structures and can be opened in software tools like PyMOL. `py3Dmol` (built on [3Dmol.js](http://3dmol.csb.pitt.edu)<sup>2</sup> enables users to visualize and interact with protein structures on the web and in Jupyter Notebooks via an open-source, object-oriented, and hardware-accelerated Javascript library. Finally, `gLTF` files, despite their larger size, can be convenient for visualizing proteins on the web or in contexts where other protein visualization tools are not supported. 
 
 ![StructureBuilder.to_3Dmol() example](./docs/_static/structure_example.png)
 
@@ -175,9 +172,9 @@ If you would like to reproduce our work or make modifications to the dataset, yo
 
 - Python 3
 - ProDy (`pip install ProDy`)
-- Biopython
-- numpy
-- scipy
+    - Biopython
+    - numpy
+    - scipy
 - [PyTorch](https://pytorch.org/get-started/locally/)
 - tqdm
 - py3Dmol (`pip install py3Dmol`)
@@ -194,8 +191,8 @@ Project structure (continuous integration, docs, testing) based on the
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
 
 ## References
-1. [End-to-End Differentiable Learning of Protein Structure](https://doi.org/10.1016/j.cels.2019.03.006). AlQuraishi, Mohammed. Cell Systems, Volume 8, Issue 4, 292 - 301. (2019).
-2. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). AlQuraishi, Mohammed. BMC Bioinformatics 20, 311 (2019).
+1. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). M. AlQuraishi. BMC Bioinformatics 20, 311 (2019).
+2. [3dmol.js: molecular visualization with WebGL.](https://doi.org/10.1093/bioinformatics/btu829) N. Rego and D. Koes. Bioinformatics, 31(8):1322–1324, (2014).
  
 
 ## Copyright
