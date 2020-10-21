@@ -218,7 +218,7 @@ def get_seq_coords_and_angles(chain):
             raise NonStandardAminoAcidError
 
         # Measure basic angles
-        bb_angles = measure_phi_psi_omega(res)
+        bb_angles = measure_phi_psi_omega(res, last_res=res_id == len(all_residues) - 1)
         bond_angles = measure_bond_angles(res, res_id, all_residues)
 
         # Measure sidechain angles
@@ -306,13 +306,16 @@ def measure_bond_angles(residue, res_idx, all_res):
     return list(get_bond_angles(residue, next_res))
 
 
-def measure_phi_psi_omega(residue, include_OXT=False):
+def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
     """Measures a residue's primary backbone torsional angles (phi, psi, omega).
 
     Args:
-        residue: ProDy residue object
+        residue: ProDy residue object.
         include_OXT: Boolean describing whether or not to measure an angle to
-                     place the terminal oxygen.
+            place the terminal oxygen.
+        last_res: Boolean describing if this residue is the last residue in a chain.
+            If so, instead of measuring a psi angle, we measure the related torsional
+            angle of (N, Ca, C, O).
 
     Returns:
         Python list of phi, psi, and omega angles for residue.
@@ -323,8 +326,12 @@ def measure_phi_psi_omega(residue, include_OXT=False):
     except ValueError:
         phi = GLOBAL_PAD_CHAR
     try:
-        psi = pr.calcPsi(residue, radian=True)
-    except ValueError:
+        if last_res:
+            psi = compute_single_dihedral(
+                [residue.select("name " + an) for an in "N CA C O".split()])
+        else:
+            psi = pr.calcPsi(residue, radian=True)
+    except (ValueError, IndexError):
         # For the last residue, we can measure a "psi" angle that is actually
         # the placement of the terminal oxygen. Currently, this is not utilized
         # in the building of structures, but it is included in case the need
@@ -332,7 +339,8 @@ def measure_phi_psi_omega(residue, include_OXT=False):
         # character.
         if include_OXT:
             try:
-                psi = compute_single_dihedral(residue.select("name N CA C OXT"))
+                psi = compute_single_dihedral(
+                    [residue.select("name " + an) for an in "N CA C OXT".split()])
             except ValueError:
                 psi = GLOBAL_PAD_CHAR
             except IndexError:
@@ -396,3 +404,7 @@ def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
 
 # Re-assign ProDy's built-in getDihedral function to account for overflow.
 pr.measure.measure.getDihedral = get_dihedral
+
+if __name__ == '__main__':
+    chain = pr.parsePDB("2muf")
+    get_seq_coords_and_angles(chain)

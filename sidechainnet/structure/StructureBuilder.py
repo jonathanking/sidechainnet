@@ -304,10 +304,9 @@ if __name__ == '__main__':
         return data
 
     d = load_data(
-        "/home/jok120/dev_sidechainnet/data/sidechainnet/sidechainnet_casp12_100.pkl")
+        "/home/jok120/dev_sidechainnet/data/sidechainnet/sidechainnet_casp12_30.pkl")
 
-    angles = d['2KZQ_1_A']['ang']
-    sequence = d['2KZQ_1_A']['seq']
+    i = 15
 
-    sb = StructureBuilder(sequence, angles)
-    sb.to_pdb("test01.pdb")
+    sb = StructureBuilder(d['train']['seq'][i], d['train']['ang'][i])
+    sb.to_pdb("test00.pdb")
