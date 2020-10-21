@@ -150,9 +150,9 @@ def load(casp_version=12,
 BOXURLS = {
     # CASP 12
     "sidechainnet_casp12_30.pkl":
-        "https://pitt.box.com/shared/static/11qn4922x22fdxycuv7f2vxjfkplxihz.pkl",
+        "https://pitt.box.com/shared/static/sjnecyqfm8hkqf0nk5yz1cf3ct4dygyf.pkl",
     "sidechainnet_casp12_50.pkl":
-        "https://pitt.box.com/shared/static/pt5p1xh5z9sfst5zfd2u54o6f91kb8vg.pkl",
+        "https://pitt.box.com/shared/static/h2sdnmxgobh9duamfzqvinjbx0tswn1i.pkl",
     "sidechainnet_casp12_70.pkl":
         "https://pitt.box.com/shared/static/y1ekdkhtm2f3e5ggxnmed4ar74wj4d6s.pkl",
     "sidechainnet_casp12_90.pkl":

@@ -35,8 +35,13 @@ ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
 del ASTRAL_SUMMARY
 
 
-def download_sidechain_data(pnids, sidechainnet_out_dir, casp_version, training_set,
-                            limit, proteinnet_in, regenerate_scdata=False):
+def download_sidechain_data(pnids,
+                            sidechainnet_out_dir,
+                            casp_version,
+                            training_set,
+                            limit,
+                            proteinnet_in,
+                            regenerate_scdata=False):
     """Downloads the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
