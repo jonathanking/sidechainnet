@@ -2,6 +2,8 @@
 Hard-coded values to use when building and analyzing sidechain structures.
 
 Bond lengths and angles are programmatically parsed from AMBER forcefields.
+
+'p' and 'i' for 'torsion-vals' stand for predicted and inferred, respectively.
 """
 
 NUM_ANGLES = 12
