@@ -102,6 +102,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     organized_data = create_empty_dictionary(casp_version)
 
     # Now, we organize the data by its data splits
+    n_proteins = 0
     for split in ["train", "test", "valid"]:
         if split == "train":
             print(len(ids[split]), "proteins in this split.")
@@ -119,6 +120,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
             organized_data[realsplit]['msk'].append(scnet_data[pnid]['msk'])
             organized_data[realsplit]['evo'].append(scnet_data[pnid]['evo'])
             organized_data[realsplit]['ids'].append(pnid)
+            n_proteins += 1
 
     # Sort each split of data by length, ascending
     for split in ["train", "test"] + [f"valid-{vs}" for vs in VALID_SPLITS]:
@@ -128,7 +130,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     organized_data["description"] = f"SidechainNet {casp_version}"
     organized_data["settings"]["casp_version"] = int(casp_version)
     organized_data["settings"]["thinning"] = int(thinning)
-    organized_data["settings"]["n_proteins"] = len(scnet_data)
+    organized_data["settings"]["n_proteins"] = n_proteins
     organized_data["settings"]["angle_means"] = compute_angle_means(
         organized_data['train']['ang'])
     organized_data["settings"]["lengths"] = np.sort(

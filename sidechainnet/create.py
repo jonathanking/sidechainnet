@@ -160,9 +160,7 @@ def create():
     sidechainnet = organize_data(sidechainnet_raw, args.proteinnet_out, args.casp_version,
                                  args.training_set)
     save_data(sidechainnet, sidechainnet_outfile)
-    print(
-        f"SidechainNet for CASP {args.casp_version} written to {sidechainnet_outfile}."
-    )
+    print(f"SidechainNet for CASP {args.casp_version} written to {sidechainnet_outfile}.")
 
 
 def create_all():
@@ -172,13 +170,14 @@ def create_all():
     pnids = pnids[:args.limit]  # Limit the length of the list for debugging
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
-    sc_only_data, sc_filename = download_sidechain_data(pnids,
-                                                        args.sidechainnet_out,
-                                                        args.casp_version,
-                                                        100,
-                                                        args.limit,
-                                                        args.proteinnet_in,
-                                                        regenerate_scdata=True)
+    sc_only_data, sc_filename = download_sidechain_data(
+        pnids,
+        args.sidechainnet_out,
+        args.casp_version,
+        100,
+        args.limit,
+        args.proteinnet_in,
+        regenerate_scdata=args.regenerate_scdata)
 
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet_raw_100 = combine_datasets(args.proteinnet_out, sc_only_data, 100)
@@ -191,9 +190,8 @@ def create_all():
                                      args.casp_version, training_set)
         save_data(sidechainnet, sc_outfile)
         print(f"SidechainNet for CASP {args.casp_version} "
-              f"({training_set}% thinning) written to {sc_outfile}."
-        )
-        
+              f"({training_set}% thinning) written to {sc_outfile}.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Constructs SidechainNet.")
