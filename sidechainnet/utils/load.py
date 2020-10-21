@@ -11,8 +11,9 @@ from sidechainnet.dataloaders.collate import prepare_dataloaders
 
 def get_local_sidechainnet_path(casp_version, thinning, scn_dir):
     """Returns local path to SidechainNet file iff it exists, else returns None."""
-    if os.path.isdir(scn_dir):
-        return os.path.join(scn_dir, format_sidechainnet_path(casp_version, thinning))
+    filepath = os.path.join(scn_dir, format_sidechainnet_path(casp_version, thinning))
+    if os.path.isfile(filepath):
+        return filepath
     else:
         return None
 
