@@ -3,6 +3,8 @@ SidechainNet
 [//]: # (Badges)
 [![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
 
+**[Colab Walkthrough](https://colab.research.google.com/drive/1WLaXUK0n2t1FLapFbr1hPQI5o23WAgqm?usp=sharing)**
+
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
 Specifically, SidechainNet adds measurements for protein angles and coordinates that describe the complete, all-atom protein structure (backbone *and* sidechain, excluding hydrogens) instead of the protein [backbone](https://foldit.fandom.com/wiki/Protein_backbone) alone.
@@ -14,6 +16,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
     - (see `sidechainnet.load(with_pytorch='dataloaders')`)
 3. Methods for generating protein structure visualizations (`.pdb`, [`3Dmol`](http://3dmol.csb.pitt.edu), `.gltf`) from model predictions.
     - (see `sidechainnet.StructureBuilder`)
+
  
 ## Summary of SidechainNet data
  
