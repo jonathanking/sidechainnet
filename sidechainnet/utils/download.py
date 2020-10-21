@@ -9,25 +9,17 @@
     Date:   July 21, 2019
 """
 
-import argparse
-import datetime
 import multiprocessing
-import pickle
-import re
-import sys
 from glob import glob
 
-import numpy as np
 import prody as pr
 import tqdm
 
 from sidechainnet.utils.astral_data import ASTRAL_SUMMARY
 from sidechainnet.utils.errors import *
 from sidechainnet.utils.errors import ERRORS, report_errors
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR, angle_list_to_sin_cos, \
-    get_seq_coords_and_angles, no_nans_infs_allzeros
+from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file
-from sidechainnet.utils.sequence import bin_sequence_data
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]

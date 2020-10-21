@@ -104,8 +104,8 @@ In the below example, `angles` is a NumPy matrix or Torch Tensor following the s
 ```python
 >>> (len(sequence), angles.shape)  # 12 angles per residue
 (128, (128, 12))
->>> my_structure_builder = scn.StructureBuilder(sequence, angles)
->>> coords = my_structure_builder.build()
+>>> sb = scn.StructureBuilder(sequence, angles)
+>>> coords = sb.build()
 >>> coords.shape  # 14 atoms per residue (128*14 = 1792)
 (1792, 3)
 ```

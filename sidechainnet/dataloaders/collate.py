@@ -9,9 +9,7 @@ from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
-def get_collate_fn(aggregate_input,
-                   return_masks=False,
-                   seqs_as_onehot=None):
+def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
     """Returns a collate function for collating ProteinDataset batches.
     
     Args:
@@ -114,6 +112,9 @@ def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
         batch = torch.LongTensor(batch)
         if seqs_as_onehot:
             batch = torch.nn.functional.one_hot(batch, len(VOCAB))
+            if VOCAB.include_pad_char:
+                # Delete the column for the pad character since it is implied (0-vector)
+                batch = batch[:, :, :-1]
     elif type == "msk":
         # Mask sequences (1 if present, 0 if absent) are padded with 0s
         for msk in items:

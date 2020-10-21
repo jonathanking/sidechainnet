@@ -88,8 +88,12 @@ class ProteinVocabulary(object):
     # TODO disable pad character for training
     """
 
-    def __init__(self, add_sos_eos=False, include_unknown_char=False):
+    def __init__(self,
+                 add_sos_eos=False,
+                 include_unknown_char=False,
+                 include_pad_char=True):
         self.include_unknown_char = include_unknown_char
+        self.include_pad_char = include_pad_char
         self.pad_char = "_"  # Pad character
         self.unk_char = "?"  # unknown character
         self.sos_char = "<"  # SOS character
@@ -106,16 +110,18 @@ class ProteinVocabulary(object):
         for aa in self.stdaas:
             self.add(aa)
 
-        self.add(self.pad_char)
+        if include_pad_char:
+            self.add(self.pad_char)
+            self.pad_id = self[self.pad_char]
+        else:
+            self.pad_id = 0  # Implicit padding with all-zeros
         if include_unknown_char:
             self.add(self.unk_char)
         if add_sos_eos:
             self.add(self.sos_char)
             self.add(self.eos_char)
-
-        self.pad_id = self[self.pad_char]
-        self.sos_id = self[self.sos_char]
-        self.eos_id = self[self.eos_char]
+            self.sos_id = self[self.sos_char]
+            self.eos_id = self[self.eos_char]
 
     def __getitem__(self, aa):
         if self.include_unknown_char:
