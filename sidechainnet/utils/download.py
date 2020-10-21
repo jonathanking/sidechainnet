@@ -157,6 +157,8 @@ def process_id(pnid):
     except SequenceError:
         print("Not fixed.", pnid)
         return pnid, ERRORS["SEQUENCE_ERRORS"]
+    except ArithmeticError:
+        return pnid, ERRORS["NONE_STRUCTURE_ERRORS"]
 
     # If we've made it this far, we can unpack the data and return it
     dihedrals, coords, sequence = dihedrals_coords_sequence
