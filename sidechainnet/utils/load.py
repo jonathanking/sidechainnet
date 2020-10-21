@@ -85,6 +85,7 @@ def load_dict(local_path):
 def load(casp_version=12,
          thinning=30,
          scn_dir="./sidechainnet",
+         force_download=False,
          with_pytorch=None,
          aggregate_model_input=True,
          collate_fn=None,
@@ -98,6 +99,8 @@ def load(casp_version=12,
     """Loads SidechainNet as a Python dictionary.
     
     Args:
+        force_download: Downloads SidechainNet data to regardless of whether or not it
+            has already been downloaded. 
         casp_version: An integer between 7 and 12, representing which CASP contest (and 
             therefore which ProteinNet version) to load SidechainNet from.
         thinning: An integer (30, 50, 70, 90, 95, 100) representing the training set
@@ -121,7 +124,8 @@ def load(casp_version=12,
     local_path = get_local_sidechainnet_path(casp_version, thinning, scn_dir)
     if not local_path:
         print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
-        # Download SidechainNet if it does not exist locally
+    if not local_path or force_download:
+        # Download SidechainNet if it does not exist locally, or if requested
         local_path = download_sidechainnet(casp_version, thinning, scn_dir)
 
     scn_dict = load_dict(local_path)
@@ -154,9 +158,9 @@ BOXURLS = {
     "sidechainnet_casp12_50.pkl":
         "https://pitt.box.com/shared/static/h2sdnmxgobh9duamfzqvinjbx0tswn1i.pkl",
     "sidechainnet_casp12_70.pkl":
-        "https://pitt.box.com/shared/static/y1ekdkhtm2f3e5ggxnmed4ar74wj4d6s.pkl",
+        "https://pitt.box.com/shared/static/7ikrp46bej1wylieqjpw76ceabcnc7r4.pkl",
     "sidechainnet_casp12_90.pkl":
-        "https://pitt.box.com/shared/static/1p8er43his3t9z3bi2s9dtfr3nn2ia4s.pkl",
+        "https://pitt.box.com/shared/static/yn5ucsxwo9bp01yp23jltseg4j8sb3f8.pkl",
     "sidechainnet_casp12_95.pkl":
         "https://pitt.box.com/shared/static/s82n4wcadrwa1bllnj8ygaxcbw8xqrjt.pkl",
     "sidechainnet_casp12_100.pkl":

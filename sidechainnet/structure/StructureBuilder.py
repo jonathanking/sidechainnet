@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from sidechainnet.utils.sequence import VOCAB
-from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
+from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
 from sidechainnet.structure.structure import nerf
 
 
@@ -17,7 +17,7 @@ class StructureBuilder(object):
     ignore this atom for now.
     """
 
-    def __init__(self, seq, ang=None, coords=None, device=torch.device("cpu")):
+    def __init__(self, seq, ang=None, crd=None, device=torch.device("cpu")):
         """Initialize a StructureBuilder for a single protein.
 
         Args:
@@ -28,9 +28,24 @@ class StructureBuilder(object):
             device: An optional torch device on which to build the structure.
         """
         # Validate input data
-        if (ang is None and coords is None) or (ang is not None and coords is not None):
+        if (ang is None and crd is None) or (ang is not None and crd is not None):
+            raise ValueError("You must provide exactly one of either coordinates (crd) "
+                             "or angles (ang).")
+        # Perhaps the user mistakenly passed coordinates for the angle arguments
+        if ang is not None and crd is None and ang.shape[-1] == 3:
+            crd = ang.copy()
+            ang = None
+        if ang is not None and ang.shape[-1] != NUM_ANGLES:
+            raise ValueError(f"Angle matrix dimensions must match (L x {NUM_ANGLES}). "
+                             f"You have provided {tuple(ang.shape)}.")
+        if (crd is not None and crd.shape[-1] != 3):
+            raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
+                             f"You have provided {tuple(crd.shape)}.")
+        if (crd is not None and (crd.shape[0] // NUM_COORDS_PER_RES) != len(seq)):
             raise ValueError(
-                "You must provide exactly one of either coordinates or angles.")
+                f"The length of the coordinate matrix must match the sequence length "
+                f"times {NUM_COORDS_PER_RES}. You have provided {crd.shape[0]} // "
+                f"{NUM_COORDS_PER_RES} = {crd.shape[0] // NUM_COORDS_PER_RES}.")
         if ang is not None and np.any(np.all(ang == 0, axis=1)):
             missing_loc = np.where(np.all(ang == 0, axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
@@ -38,9 +53,9 @@ class StructureBuilder(object):
                              f"{list(missing_loc[0])}. Protein structures with missing "
                              "residues are only supported if built directly from "
                              "coordinates (also supported by StructureBuilder).")
-        if coords is not None:
-            self.coords = coords
-            self.coord_type = "numpy" if type(coords) is np.ndarray else 'torch'
+        if crd is not None:
+            self.coords = crd
+            self.coord_type = "numpy" if type(crd) is np.ndarray else 'torch'
         else:
             self.coords = []
             self.coord_type = "numpy" if type(ang) is np.ndarray else 'torch'
