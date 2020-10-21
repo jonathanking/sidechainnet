@@ -85,7 +85,7 @@ def load_dict(local_path):
 
 def load(casp_version=12,
          thinning=30,
-         scn_dir="./sidechainnet",
+         scn_dir="./sidechainnet_data",
          force_download=False,
          with_pytorch=None,
          aggregate_model_input=True,
