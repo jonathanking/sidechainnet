@@ -29,7 +29,7 @@ from sidechainnet.utils.measure import GLOBAL_PAD_CHAR, angle_list_to_sin_cos, \
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file
 from sidechainnet.utils.sequence import bin_sequence_data
 
-MAX_SEQ_LEN = 10_000
+MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
 ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
 del ASTRAL_SUMMARY
