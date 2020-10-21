@@ -15,7 +15,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 3. Methods for generating protein structure visualizations (`.pdb`, [`3Dmol`](http://3dmol.csb.pitt.edu), `.gltf`) from model predictions.
     - (see `sidechainnet.StructureBuilder`)
  
- **Summary of SidechainNet data**
+## Summary of SidechainNet data
  
 | Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
 | :---: | :---: |  :---: | :---: | :---: | 
