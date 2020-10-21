@@ -104,8 +104,6 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     # Now, we organize the data by its data splits
     n_proteins = 0
     for split in ["train", "test", "valid"]:
-        if split == "train":
-            print(len(ids[split]), "proteins in this split.")
         for pnid in ids[split]:
             if pnid not in scnet_data:
                 continue
@@ -136,6 +134,8 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     organized_data["settings"]["lengths"] = np.sort(
         np.asarray(list(map(len, (v['seq'] for k, v in scnet_data.items())))))
     organized_data['settings']['max_length'] = organized_data["settings"]["lengths"].max()
+    
+    print(f"{n_proteins} included in CASP {casp_version} ({thinning}% thinning).")
 
     validate_data_dict(organized_data)
 
