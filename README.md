@@ -110,10 +110,10 @@ In the below example, `angles` is a NumPy matrix or Torch Tensor following the s
 (1792, 3)
 ```
 
-### Visualizing All-Atom Structures with `PDB`, `py3Dmol`, and `gLTF` Formats
+### Visualizing & Interacting with All-Atom Structures via `PDB`, `py3Dmol`, and `gLTF` Formats
 SidechainNet also makes it easy to visualize both existing and predicted all-atom protein structures. These visualizations are available as `PDB` files, `py3Dmol.view` objects, and Graphics Library Transmission Format (`gLTF`) files. Examples of each are included below.
 
-The PDB format is a typical format for representing protein structures and can be opened in software tools like PyMOL. `py3Dmol` (built on [3Dmol.js](http://3dmol.csb.pitt.edu)<sup>2</sup> enables users to visualize and interact with protein structures on the web and in Jupyter Notebooks via an open-source, object-oriented, and hardware-accelerated Javascript library. Finally, `gLTF` files, despite their larger size, can be convenient for visualizing proteins on the web or in contexts where other protein visualization tools are not supported. 
+The PDB format is a typical format for representing protein structures and can be opened in software tools like PyMOL. `py3Dmol` (built on [3Dmol.js](http://3dmol.csb.pitt.edu)<sup>2</sup>) enables users to **visualize and interact** with protein structures on the web and in Jupyter Notebooks via an open-source, object-oriented, and hardware-accelerated Javascript library. Finally, `gLTF` files, despite their larger size, can be convenient for visualizing proteins on the web or in contexts where other protein visualization tools are not supported. 
 
 ![StructureBuilder.to_3Dmol() example](./docs/_static/structure_example.png)
 
