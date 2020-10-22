@@ -158,7 +158,6 @@ for epoch in range(100):
 for protein_ids, model_input, tgt_angles, tgt_coords in data['test']:
     predictions = model(model_input)
     loss = loss_fn(predictions, tgt_angles, tgt_coords)
-    loss.backwards()
     ...
 ```
 
