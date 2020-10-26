@@ -1,5 +1,6 @@
 # Pytorch saved files and associated ProteinNet files
 *.pt
+*.pkl
 *_ids.txt
 
 # Byte-compiled / optimized / DLL files
@@ -105,6 +106,7 @@ ENV/
 # mypy
 .mypy_cache/
 
-# custom porject ignore
+# custom project ignore
 errors/
 *.cif
+.idea/
