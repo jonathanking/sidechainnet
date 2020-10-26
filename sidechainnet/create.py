@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
     match = re.search(r"casp(\d+)", args.proteinnet_in, re.IGNORECASE)
     if not match:
-        raise argparse.ArgumentError("The input_dir does not contain 'caspX'. "
+        raise parser.error("The input_dir does not contain 'caspX'. "
                                      "Please ensure the raw files are enclosed "
                                      "in a path that contains the CASP version"
                                      " i.e. 'casp12'.")
