@@ -177,7 +177,7 @@ If you would like to reproduce our work or make modifications to the dataset, yo
 - [PyTorch](https://pytorch.org/get-started/locally/)
 - tqdm
 - py3Dmol (`pip install py3Dmol`)
-- pymol (optional, for `gltf` support)
+- pymol (optional, for `gltf` support, [repo](https://pymolwiki.org/index.php/Linux_Install), [linux install](https://pymolwiki.org/index.php/Linux_Install) requires `libxml2`)
 
 
 ## Acknowledgements
