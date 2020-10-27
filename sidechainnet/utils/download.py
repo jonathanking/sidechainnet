@@ -1,25 +1,17 @@
-"""
-    Using ProteinNet as a guide, this script creates a new dataset that adds sidechain atom
-    information.
-    It retains data splits, sequences, and masks but recomputes each structure's coordinates so that
-    sidechain atoms may be recorded. It also saves the entirety of the data as a single Python
-    dictionary.
-
-    Author: Jonathan King
-    Date:   July 21, 2019
-"""
+"""Functions for downloading protein structure data from RCSB PDB using the ProDy pkg."""
 
 import multiprocessing
+import os
 from glob import glob
 
 import prody as pr
+import sidechainnet.utils.errors as errors
 import tqdm
-
 from sidechainnet.utils.astral_data import ASTRAL_SUMMARY
-from sidechainnet.utils.errors import *
-from sidechainnet.utils.errors import ERRORS, report_errors
-from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
-from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file
+from sidechainnet.utils.measure import (get_seq_coords_and_angles,
+                                        no_nans_infs_allzeros)
+from sidechainnet.utils.parse import (get_chain_from_astral_id,
+                                      parse_astral_summary_file)
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
@@ -50,6 +42,7 @@ def download_sidechain_data(pnids,
         sc_data: Python dictionary `{pnid: {...}, ...}`
     """
     from sidechainnet.utils.organize import load_data, save_data
+
     # Initalize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
@@ -71,7 +64,7 @@ def download_sidechain_data(pnids,
     # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
     save_data(sc_data, output_path)
-    report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
+    errors.report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
     # Clean up working directory
     for file in glob('*.cif'):
@@ -132,7 +125,7 @@ def process_id(pnid):
     pnid_type = determine_pnid_type(pnid)
     chain = get_chain_from_proteinnetid(pnid, pnid_type)
     if not chain:
-        return pnid, ERRORS["NONE_STRUCTURE_ERRORS"]
+        return pnid, errors.ERRORS["NONE_STRUCTURE_ERRORS"]
     elif type(chain) == tuple and type(chain[1]) == int:
         # This indicates there was an issue parsing the chain
         return pnid, chain[1]
@@ -141,21 +134,21 @@ def process_id(pnid):
         chain = chain[0]
     try:
         dihedrals_coords_sequence = get_seq_coords_and_angles(chain)
-    except NonStandardAminoAcidError:
-        return pnid, ERRORS["NSAA_ERRORS"]
-    except NoneStructureError:
-        return pnid, ERRORS["NONE_STRUCTURE_ERRORS"]
-    except ContigMultipleMatchingError:
-        return pnid, ERRORS["MULTIPLE_CONTIG_ERRORS"]
-    except ShortStructureError:
-        return pnid, ERRORS["SHORT_ERRORS"]
-    except MissingAtomsError:
-        return pnid, ERRORS["MISSING_ATOMS_ERROR"]
-    except SequenceError:
+    except errors.NonStandardAminoAcidError:
+        return pnid, errors.ERRORS["NSAA_ERRORS"]
+    except errors.NoneStructureError:
+        return pnid, errors.ERRORS["NONE_STRUCTURE_ERRORS"]
+    except errors.ContigMultipleMatchingError:
+        return pnid, errors.ERRORS["MULTIPLE_CONTIG_ERRORS"]
+    except errors.ShortStructureError:
+        return pnid, errors.ERRORS["SHORT_ERRORS"]
+    except errors.MissingAtomsError:
+        return pnid, errors.ERRORS["MISSING_ATOMS_ERROR"]
+    except errors.SequenceError:
         print("Not fixed.", pnid)
-        return pnid, ERRORS["SEQUENCE_ERRORS"]
+        return pnid, errors.ERRORS["SEQUENCE_ERRORS"]
     except ArithmeticError:
-        return pnid, ERRORS["NONE_STRUCTURE_ERRORS"]
+        return pnid, errors.ERRORS["NONE_STRUCTURE_ERRORS"]
 
     # If we've made it this far, we can unpack the data and return it
     dihedrals, coords, sequence = dihedrals_coords_sequence
@@ -211,11 +204,9 @@ def get_chain_from_trainid(pnid):
             return get_chain_from_astral_id(astral_id.replace("-", "_"),
                                             ASTRAL_ID_MAPPING)
         except KeyError:
-            return pnid, ERRORS["MISSING_ASTRAL_IDS"]
-        except ValueError:
-            return pnid, ERRORS["FAILED_ASTRAL_IDS"]
-        except:
-            return pnid, ERRORS["FAILED_ASTRAL_IDS"]
+            return pnid, errors.ERRORS["MISSING_ASTRAL_IDS"]
+        except (ValueError, Exception):
+            return pnid, errors.ERRORS["FAILED_ASTRAL_IDS"]
 
     # Continue loading the chain, given the PDB ID
     use_pdb = True
@@ -236,12 +227,12 @@ def get_chain_from_trainid(pnid):
                 modified_model_number = True
             except Exception as e:
                 print(e)
-                return pnid, ERRORS["PARSING_ERROR_OSERROR"]
+                return pnid, errors.ERRORS["PARSING_ERROR_OSERROR"]
         except Exception as e:  # EOFERROR
             print(e)
-            return pnid, ERRORS["PARSING_ERROR_OSERROR"]
+            return pnid, errors.ERRORS["PARSING_ERROR_OSERROR"]
     except AttributeError:
-        return pnid, ERRORS["PARSING_ERROR_ATTRIBUTE"]
+        return pnid, errors.ERRORS["PARSING_ERROR_ATTRIBUTE"]
     except (pr.proteins.pdbfile.PDBParseError, IndexError):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
@@ -251,16 +242,16 @@ def get_chain_from_trainid(pnid):
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
                 modified_model_number = True
-            except:
-                return pnid, ERRORS["PARSING_ERROR"]
+            except Exception:
+                return pnid, errors.ERRORS["PARSING_ERROR"]
         else:
-            return pnid, ERRORS["PARSING_ERROR"]
+            return pnid, errors.ERRORS["PARSING_ERROR"]
     except Exception as e:
         print(e)
-        return pnid, ERRORS["UNKNOWN_EXCEPTIONS"]
+        return pnid, errors.ERRORS["UNKNOWN_EXCEPTIONS"]
 
     if chain is None:
-        return pnid, ERRORS["NONE_CHAINS"]
+        return pnid, errors.ERRORS["NONE_CHAINS"]
 
     if modified_model_number:
         return chain, "MODIFIED_MODEL"
@@ -282,12 +273,12 @@ def get_chain_from_testid(pnid):
     try:
         chain = pr.parsePDB(os.path.join(PROTEINNET_IN_DIR, "targets", caspid + ".pdb"))
     except AttributeError:
-        return pnid, ERRORS["TEST_PARSING_ERRORS"]
+        return pnid, errors.ERRORS["TEST_PARSING_ERRORS"]
     try:
         assert chain.numChains() == 1
-    except:
+    except Exception:
         print("Only a single chain should be parsed from the CASP target PDB.")
-        return pnid, ERRORS["TEST_PARSING_ERRORS"]
+        return pnid, errors.ERRORS["TEST_PARSING_ERRORS"]
     return chain
 
 
@@ -324,7 +315,7 @@ def unpack_processed_results(results, pnids):
     for r, pnid in zip(results, pnids):
         if type(r) == int:
             # PDB failed to download
-            ERRORS.count(r, pnid)
+            errors.ERRORS.count(r, pnid)
             continue
         ang, coords, seq, i = r
         if no_nans_infs_allzeros(ang) and no_nans_infs_allzeros(coords):

@@ -119,31 +119,13 @@ ERRORS = ProteinErrors()
 class IncompleteStructureError(Exception):
     """An exception to raise when a structure is incomplete."""
 
-    def __init__(self, message):
-        self.message = message
-
 
 class NonStandardAminoAcidError(Exception):
     """An exception to raise when a structure contains a Non-standard amino acid."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
-
-
-# TODO The one instance where this was called in stucture_utils.py was commented out. May not be
-#  needed.
-class MissingBackboneAtomsError(Exception):
-    """An exception to raise when a protein backbone is incomplete."""
-
-    def __init__(self, message):
-        self.message = message
-
 
 class SequenceError(Exception):
     """An exception to raise when a sequence is not as expected."""
-
-    def __init__(self, *args):
-        super().__init__(*args)
 
 
 class ContigMultipleMatchingError(Exception):
@@ -151,29 +133,19 @@ class ContigMultipleMatchingError(Exception):
     locations.
     """
 
-    def __init__(self, *args):
-        super().__init__(*args)
-
 
 class ShortStructureError(Exception):
     """An exception to raise when a sequence too short to be meaningful."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
-
 
 class MissingAtomsError(Exception):
-    """An exception to raise when a residue is missing atoms and bond angles can't be calculated."""
-
-    def __init__(self, *args):
-        super().__init__(*args)
+    """An exception to raise when a residue is missing atoms and bond angles can't be
+     calculated.
+    """
 
 
 class NoneStructureError(Exception):
     """An exception to raise when a parsed structure becomes None."""
-
-    def __init__(self, *args):
-        super().__init__(*args)
 
 
 def report_errors(pnids_errorcodes, total_pnids):
@@ -204,12 +176,12 @@ def report_errors(pnids_errorcodes, total_pnids):
 
 
 def write_errors_to_files(results_warnings, pnids):
-    
+
     combined_data = {}
 
     # Define error dictionary for recording errors
-    errors = {  
-        "failed": [], 
+    errors = {
+        "failed": [],
         "single alignment, mask mismatch": [],
         "multiple alignments, mask mismatch": [],
         "multiple alignments, mask mismatch, many alignments": [],
@@ -218,11 +190,11 @@ def write_errors_to_files(results_warnings, pnids):
         "single alignment, mask mismatch, mismatch used in alignment": [],
         "multiple alignments, mask mismatch, mismatch used in alignment": [],
         "multiple alignments, mask mismatch, many alignments, mismatch used in "
-        "alignment": [], 
+        "alignment": [],
         "single alignment, found matching mask, mismatch used in alignment": [],
         "multiple alignments, found matching mask, mismatch used in alignment": [],
         "multiple alignments, found matching mask, many alignments, mismatch used in alignment":
-            [], 
+            [],
         "mismatch used in alignment": [],
         "too many wrong AAs, mismatch used in alignment": [],
         'too many wrong AAs, multiple alignments, found matching mask, mismatch used in alignment':
@@ -237,8 +209,7 @@ def write_errors_to_files(results_warnings, pnids):
             combined_data[pnid] = combined_result
         if warning:
             errors[warning].append(pnid)
-    
-    # TODO check for entries that still have 'primary' instead of 'seq', did they not get deleted? 
+
     # Record ProteinNet IDs that could not be combined or exhibited warnings
     with open("errors/NEEDS_ADJUSTMENT.txt", "w") as f:
         for failed_id in errors["needs manual adjustment"]:
@@ -292,5 +263,5 @@ def write_errors_to_files(results_warnings, pnids):
     with open("errors/BAD_GAPS.txt", "w") as f:
         for failed_id in errors['bad gaps']:
             f.write(f"{failed_id}\n")
-            
+
     return combined_data, errors

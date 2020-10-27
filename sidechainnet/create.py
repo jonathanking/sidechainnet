@@ -11,19 +11,18 @@ from multiprocessing import Pool, cpu_count
 import prody as pr
 from tqdm import tqdm
 
-from sidechainnet.utils.align import merge, expand_data_with_mask, assert_mask_gaps_are_correct
-
+from sidechainnet.utils.align import (assert_mask_gaps_are_correct,
+                                      expand_data_with_mask, init_aligner,
+                                      manually_adjust_data, merge)
+from sidechainnet.utils.download import download_sidechain_data
 from sidechainnet.utils.errors import write_errors_to_files
-from sidechainnet.utils.manual_adjustment import manually_correct_mask, \
-    needs_manual_adjustment
-from sidechainnet.utils.organize import organize_data, load_data, save_data
+from sidechainnet.utils.manual_adjustment import (manually_correct_mask,
+                                                  needs_manual_adjustment)
+from sidechainnet.utils.measure import NUM_COORDS_PER_RES
+from sidechainnet.utils.organize import load_data, organize_data, save_data
+from sidechainnet.utils.parse import parse_raw_proteinnet
 
 pr.confProDy(verbosity="none")
-
-from sidechainnet.utils.download import download_sidechain_data
-from sidechainnet.utils.parse import parse_raw_proteinnet
-from sidechainnet.utils.align import init_aligner, manually_adjust_data
-from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
@@ -103,8 +102,8 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
     print("Preparing to merge ProteinNet data with downloaded sidechain data.")
     pn_files = [
         os.path.join(proteinnet_out, f"training_{training_set}.pkl"),
-        os.path.join(proteinnet_out, f"validation.pkl"),
-        os.path.join(proteinnet_out, f"testing.pkl")
+        os.path.join(proteinnet_out, "validation.pkl"),
+        os.path.join(proteinnet_out, "testing.pkl")
     ]
 
     pn_data = {}
@@ -234,9 +233,9 @@ if __name__ == "__main__":
     match = re.search(r"casp(\d+)", args.proteinnet_in, re.IGNORECASE)
     if not match:
         raise parser.error("The input_dir does not contain 'caspX'. "
-                                     "Please ensure the raw files are enclosed "
-                                     "in a path that contains the CASP version"
-                                     " i.e. 'casp12'.")
+                           "Please ensure the raw files are enclosed "
+                           "in a path that contains the CASP version"
+                           " i.e. 'casp12'.")
     args.casp_version = match.group(1)
 
     if args.training_set == 'all':

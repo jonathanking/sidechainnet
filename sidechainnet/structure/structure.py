@@ -1,3 +1,5 @@
+"""Contains high-level functionality for protein structure building tools, i.e. NeRF."""
+
 import numpy as np
 import torch
 from sidechainnet.structure import StructureBuilder
@@ -93,14 +95,14 @@ def deg2rad(angle):
     return angle * np.pi / 180.
 
 
-# import sidechainnet.protein.StructureBuilder as StructureBuilder
-
-if __name__ == '__main__':
+def debug_example():
+    """A simple example of structure building for debugging."""
     d = torch.load("/home/jok120/protein-transformer/data/proteinnet/casp12_200206_30.pt")
     seq = d["train"]["seq"][70]
     ang = d["train"]["ang"][70]
     sb = StructureBuilder.StructureBuilder(seq, ang)
-    print(sb.seq_as_str())
     sb.build()
-    print("Hi")
-    pass
+
+
+if __name__ == '__main__':
+    debug_example()
