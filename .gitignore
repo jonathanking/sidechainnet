@@ -110,4 +110,4 @@ ENV/
 errors/
 *.cif
 .idea/
-.vscode/launch.json
+.vscode/*
