@@ -6,9 +6,7 @@ import pickle
 
 import numpy as np
 
-from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
-from sidechainnet.utils.sequence import bin_sequence_data
+from sidechainnet.utils.download import VALID_SPLITS
 
 
 def validate_data_dict(data):
@@ -30,7 +28,7 @@ def validate_data_dict(data):
         ]), "Valid lengths don't match."
 
 
-def create_empty_dictionary(casp_version):
+def create_empty_dictionary():
     """Creates an empty SidechainNet dictionary ready to hold SidechainNet data."""
     basic_data_entries = {
         "seq": [],
@@ -61,8 +59,8 @@ def get_proteinnetIDs_by_split(proteinnet_dir, thinning):
     """Returns a dict of ProteinNet IDs organized by data split (train/test/valid)."""
     pn_files = [
         os.path.join(proteinnet_dir, f"training_{thinning}_ids.txt"),
-        os.path.join(proteinnet_dir, f"validation_ids.txt"),
-        os.path.join(proteinnet_dir, f"testing_ids.txt")
+        os.path.join(proteinnet_dir, "validation_ids.txt"),
+        os.path.join(proteinnet_dir, "testing_ids.txt")
     ]
 
     def parse_ids(filepath):
@@ -93,13 +91,11 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
         A Python dictionary containing SidechainNet data, but this time, organized
         and divided into the data splits specified by ProteinNet.
     """
-    # TODO add bin_sequence_data ?
-
     # First, we need to determine which pnids belong to which data split.
     ids = get_proteinnetIDs_by_split(proteinnet_dir, thinning)
 
     # Next, we create the empty dictionary for storing the data, organized by data splits
-    organized_data = create_empty_dictionary(casp_version)
+    organized_data = create_empty_dictionary()
 
     # Now, we organize the data by its data splits
     n_proteins = 0
