@@ -1,8 +1,26 @@
-"""
-A protein structure prediction data set that includes sidechain information.
-A direct extension of ProteinNet by Mohammed AlQuraishi.
+"""Generates SidechainNet files.
 
+SidechainNet is an all-atom protein structure prediction dataset for machine learning.
+SidechainNet extends ProteinNet, including angles and coordinates that describe both
+the backbone and sidechain components of each protein structure.
+
+The procedure is as follows:
+    0. Download ProteinNet raw/text files before calling this script.
+    1. Parse raw/text ProteinNet files into Python dictionaries.
+    2. Take ProteinNet IDs (pnids) and download the corresponding all-atom information.
+    3. Unify the data provided by ProteinNet with the all-atom data by aligning the
+        protein sequences from ProteinNet with those observed during downloading.
+
+To generate all ProteinNet datasets for a CASP competition, run:
+    python create.py $PATH_TO_PROTEINNET_FILES_FOR_SINGLE_CASP --training_set all
+
+To generate a single "thinning" (e.g. 30) for a CASP competition, run:
+    python create.py $PATH_TO_PROTEINNET_FILES_FOR_SINGLE_CASP --training_set 30
+
+Author: Jonathan King
+Date:   10/28/2020
 """
+
 import argparse
 import os
 import re

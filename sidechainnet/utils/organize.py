@@ -1,4 +1,5 @@
 """Contains methods for organizing SidechainNet data into a Python dictionary."""
+
 import copy
 import datetime
 import os

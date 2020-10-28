@@ -1,4 +1,5 @@
 """Functionality for parsing raw ProteinNet files."""
+
 import itertools
 import multiprocessing
 import os

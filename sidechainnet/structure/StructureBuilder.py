@@ -1,4 +1,5 @@
 """A class for generating/visualizing protein atomic coordinates from measured angles."""
+
 import numpy as np
 import torch
 

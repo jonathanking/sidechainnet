@@ -1,4 +1,5 @@
 """A class for generating protein sequence/structure batches of similar length."""
+
 import numpy as np
 import torch
 import torch.utils

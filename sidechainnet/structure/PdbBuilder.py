@@ -1,4 +1,5 @@
 """A class for creating PDB files/strings given a protein's sequence and coordinates."""
+
 import numpy as np
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP

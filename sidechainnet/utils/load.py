@@ -1,4 +1,5 @@
 """Implements SidechainNet loading functionality."""
+
 import pickle
 import os
 

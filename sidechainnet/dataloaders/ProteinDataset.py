@@ -1,4 +1,5 @@
 """A class extending torch.utils.data.Dataset for batching protein data."""
+
 import torch.utils
 
 from sidechainnet.utils.sequence import VOCAB
