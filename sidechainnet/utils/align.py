@@ -367,7 +367,7 @@ def manually_adjust_data(pnid, sc_entry):
     return sc_entry
 
 
-def assert_mask_gaps_are_correct(mask, coordinates, pnid=""):
+def assert_mask_gaps_are_correct(mask, coordinates):
     """Returns True if the structure supports the mask.
 
     Args:
@@ -413,8 +413,6 @@ def assert_mask_gaps_are_correct(mask, coordinates, pnid=""):
         for cur_res in coord_contig[1:]:
             cur_ca = cur_res[CA_IDX]
             if np.linalg.norm(cur_ca - prev_ca) > PRODY_CA_DIST * 1.85:
-                # if pnid != "":
-                #     print(f"{pnid} bad gap at resnum {resnum}")
                 return False, np.linalg.norm(cur_ca - prev_ca)
             prev_ca = cur_ca.copy()
             resnum += 1
