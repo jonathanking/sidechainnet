@@ -150,11 +150,11 @@ class ProteinVocabulary(object):
     def __repr__(self):
         return f"ProteinVocabulary[size={len(self)}]"
 
-    def int2char(self, id):
-        return self._int2char[id]
+    def int2char(self, idx):
+        return self._int2char[idx]
 
-    def int2chars(self, id):
-        return ONE_TO_THREE_LETTER_MAP[self._int2char[id]]
+    def int2chars(self, idx):
+        return ONE_TO_THREE_LETTER_MAP[self._int2char[idx]]
 
     def add(self, aa):
         if aa not in self:
