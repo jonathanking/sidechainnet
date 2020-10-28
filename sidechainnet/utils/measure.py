@@ -1,5 +1,4 @@
-""" Utility functions for parsing protein structures. """
-
+"""Utility functions for measuring attributes (angles/coords) of protein structures."""
 import numpy as np
 import prody as pr
 
@@ -10,10 +9,10 @@ GLOBAL_PAD_CHAR = 0
 
 
 def angle_list_to_sin_cos(angs, reshape=True):
-    """
-    Given a list of angles, returns a new list where those angles have been
-    turned into their sines and cosines. If reshape is False, a new dim. is
-    added that can hold the sine and cosine of each angle, i.e. (len x #angs)
+    """Given a list of angles, returns a new list where those angles have been turned into
+    their sines and cosines. If reshape is False, a new dim. is added that can hold the
+    sine and cosine of each angle, i.e. (len x #angs)
+
     -> ( len x #angs x 2). If reshape is true, this last dim. is squashed so
     that the list of angles becomes [cos sin cos sin ...].
     """
@@ -30,9 +29,7 @@ def angle_list_to_sin_cos(angs, reshape=True):
 
 
 def check_standard_continuous(residue, prev_res_num):
-    """
-    Asserts that the residue is standard and that the chain is continuous.
-    """
+    """Asserts that the residue is standard and that the chain is continuous."""
     if not residue.isstdaa:
         raise NonStandardAminoAcidError("Found a non-std AA.")
     if residue.getResnum() != prev_res_num:
@@ -41,10 +38,8 @@ def check_standard_continuous(residue, prev_res_num):
 
 
 def determine_sidechain_atomnames(_res):
-    """
-    Given a residue from ProDy, returns a list of sidechain atom names that
-    must be recorded.
-    """
+    """Given a residue from ProDy, returns a list of sidechain atom names that must be
+    recorded."""
     if _res.getResname() in SC_BUILD_INFO.keys():
         return SC_BUILD_INFO[_res.getResname()]["atom-names"]
     else:
@@ -52,18 +47,18 @@ def determine_sidechain_atomnames(_res):
 
 
 def compute_sidechain_dihedrals(residue, prev_residue, next_res):
-    """
-    Computes all angles to predict for a given residue. If the residue is the
-    first in the protein chain, a fictitious C atom is placed before the
-    first N. This is used to compute a [ C-1, N, CA, CB] dihedral angle. If
-    it is not the first residue in the chain, the previous residue's C is
-    used instead. Then, each group of 4 atoms in atom_names is used to
-    generate a list of dihedral angles for this residue.
+    """Computes all angles to predict for a given residue.
+
+    If the residue is the first in the protein chain, a fictitious C atom is
+    placed before the first N. This is used to compute a [ C-1, N, CA, CB]
+    dihedral angle. If it is not the first residue in the chain, the previous
+    residue's C is used instead. Then, each group of 4 atoms in atom_names is
+    used to generate a list of dihedral angles for this residue.
     """
     try:
         torsion_names = SC_BUILD_INFO[residue.getResname()]["torsion-names"]
-    except KeyError:
-        raise NonStandardAminoAcidError
+    except KeyError as e:
+        raise NonStandardAminoAcidError from e
     if len(torsion_names) == 0:
         return (NUM_ANGLES -
                 (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES)) * [GLOBAL_PAD_CHAR]
@@ -98,10 +93,11 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
 
 
 def get_atom_coords_by_names(residue, atom_names):
-    """
-    Given a ProDy Residue and a list of atom names, this attempts to select
-    and return all the atoms. If atoms are not present, it substitutes the
-    pad character in lieu of their coordinates.
+    """Given a ProDy Residue and a list of atom names, this attempts to select and return
+    all the atoms.
+
+    If atoms are not present, it substitutes the pad character in lieu of their
+    coordinates.
     """
     coords = []
     pad_coord = np.asarray([GLOBAL_PAD_CHAR] * 3)
@@ -115,35 +111,13 @@ def get_atom_coords_by_names(residue, atom_names):
 
 
 def measure_res_coordinates(_res):
-    """
-    Given a ProDy residue, measure all relevant coordinates.
-    """
+    """Given a ProDy residue, measure all relevant coordinates."""
     sc_atom_names = determine_sidechain_atomnames(_res)
     bbcoords = get_atom_coords_by_names(_res, ["N", "CA", "C", "O"])
     sccoords = get_atom_coords_by_names(_res, sc_atom_names)
     coord_padding = np.zeros((NUM_COORDS_PER_RES - len(bbcoords) - len(sccoords), 3))
     coord_padding[:] = GLOBAL_PAD_CHAR
     return np.concatenate((np.stack(bbcoords + sccoords), coord_padding))
-
-
-def empty_coord():
-    """
-    Return an empty coordinate tensor, representing 1 padding character at
-    the residue level.
-    """
-    coord_padding = np.zeros((NUM_COORDS_PER_RES, 3))
-    coord_padding[:] = GLOBAL_PAD_CHAR
-    return coord_padding
-
-
-def empty_ang():
-    """
-    Return an empty angle tensor, representing 1 padding character at the
-    residue level.
-    """
-    dihe_padding = np.zeros(NUM_ANGLES)
-    dihe_padding[:] = GLOBAL_PAD_CHAR
-    return dihe_padding
 
 
 def replace_nonstdaas(residues):
@@ -248,17 +222,15 @@ def get_seq_coords_and_angles(chain):
 
 
 def no_nans_infs_allzeros(matrix):
-    """
-    Returns true if a matrix does not contain NaNs, infs, or all 0s.
-    """
+    """Returns true if a matrix does not contain NaNs, infs, or all 0s."""
     return not np.any(np.isinf(matrix)) and np.any(matrix)
 
 
 def get_bond_angles(res, next_res):
-    """
-    Given 2 residues, returns the ncac, cacn, and cnca bond angles between
-    them. If any atoms are not present, the corresponding angles are set to
-    the GLOBAL_PAD_CHAR. If next_res is None, then only NCAC is measured.
+    """Given 2 residues, returns the ncac, cacn, and cnca bond angles between them.
+
+    If any atoms are not present, the corresponding angles are set to the
+    GLOBAL_PAD_CHAR. If next_res is None, then only NCAC is measured.
     """
     # First residue angles
     n1, ca1, c1 = tuple(res.select(f"name {a}") for a in ["N", "CA", "C"])
@@ -284,21 +256,19 @@ def get_bond_angles(res, next_res):
 
 
 def safecalcAngle(a, b, c, radian):
-    """
-    Calculates the angle between 3 coordinates. If any of them are missing, the
-    function raises a MissingAtomsError.
+    """Calculates the angle between 3 coordinates.
+
+    If any of them are missing, the function raises a MissingAtomsError.
     """
     try:
         angle = pr.calcAngle(a, b, c, radian=radian)[0]
-    except ValueError:
-        raise MissingAtomsError
+    except ValueError as e:
+        raise MissingAtomsError from e
     return angle
 
 
 def measure_bond_angles(residue, res_idx, all_res):
-    """
-    Given a residue, measure the ncac, cacn, and cnca bond angles.
-    """
+    """Given a residue, measure the ncac, cacn, and cnca bond angles."""
     if res_idx == len(all_res) - 1:
         next_res = None
     else:
@@ -319,7 +289,6 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
 
     Returns:
         Python list of phi, psi, and omega angles for residue.
-
     """
     try:
         phi = pr.calcPhi(residue, radian=True)
@@ -355,10 +324,7 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
 
 
 def compute_single_dihedral(atoms):
-    """
-    Given an iterable of 4 Atoms, calculate the dihedral angle between them
-    in radians.
-    """
+    """Given 4 Atoms, calculate the dihedral angle between them in radians."""
     if None in atoms:
         return GLOBAL_PAD_CHAR
     else:
@@ -367,9 +333,10 @@ def compute_single_dihedral(atoms):
 
 
 def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
-    """
-    Returns the dihedral angle in degrees. Modified from
-    prody.measure.measure to use a numerically safe normalization method.
+    """Returns the dihedral angle between four coordinates in degrees.
+
+    Modified from prody.measure.measure to use a numerically safe normalization
+    method.
     """
     rad2deg = 180 / np.pi
     eps = 1e-6
@@ -404,7 +371,3 @@ def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
 
 # Re-assign ProDy's built-in getDihedral function to account for overflow.
 pr.measure.measure.getDihedral = get_dihedral
-
-if __name__ == '__main__':
-    chain = pr.parsePDB("2muf")
-    get_seq_coords_and_angles(chain)

@@ -1,3 +1,4 @@
+"""A class for generating/visualizing protein atomic coordinates from measured angles."""
 import numpy as np
 import torch
 
@@ -23,7 +24,7 @@ class StructureBuilder(object):
         Args:
             seq: An integer tensor or a string of length L that represents the protein's
                 amino acid sequence.
-            ang: A float tensor (L X NUM_PREDICTED_ANGLES) that contains all of the 
+            ang: A float tensor (L X NUM_PREDICTED_ANGLES) that contains all of the
                 protein's interior angles.
             device: An optional torch device on which to build the structure.
         """
@@ -165,6 +166,7 @@ class StructureBuilder(object):
 
 
 class ResidueBuilder(object):
+    """Builds the atomic coordinates from angles for a specified amino acid residue."""
 
     def __init__(self,
                  name,
@@ -338,7 +340,7 @@ if __name__ == '__main__':
     d = load_data(
         "/home/jok120/dev_sidechainnet/data/sidechainnet/sidechainnet_casp12_30.pkl")
 
-    i = 15
+    idx = 15
 
-    sb = StructureBuilder(d['train']['seq'][i], d['train']['ang'][i])
+    sb = StructureBuilder(d['train']['seq'][idx], d['train']['ang'][idx])
     sb.to_pdb("test00.pdb")

@@ -1,3 +1,4 @@
+"""A class for creating PDB files/strings given a protein's sequence and coordinates."""
 import numpy as np
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
@@ -5,18 +6,18 @@ from sidechainnet.structure.build_info import SC_BUILD_INFO, NUM_COORDS_PER_RES
 
 
 class PdbBuilder(object):
-    """Creates a PDB file given a protein's atomic coordinates and sequence.  
-    
-    The general idea is that if any model is capable of predicting a set of coordinates 
-    and mapping between those coordinates and residue/atom names, then this object can 
-    be use to transform that output into a PDB file. 
+    """Creates a PDB file given a protein's atomic coordinates and sequence.
+
+    The general idea is that if any model is capable of predicting a set of coordinates
+    and mapping between those coordinates and residue/atom names, then this object can
+    be use to transform that output into a PDB file.
 
     The Python format string was taken from http://cupnet.net/pdb-format/.
     """
 
     def __init__(self, seq, coords, atoms_per_res=NUM_COORDS_PER_RES):
         """Initializes a PdbBuilder.
-        
+
         Args:
             coords: A numpy matrix of shape (L x N) x 3, where L is the protein sequence
                 length and N is the number of atoms per residue in the coordinate set.
@@ -69,8 +70,10 @@ class PdbBuilder(object):
             coord_idx += self.atoms_per_res
 
     def _get_line_for_atom(self, res_name, atom_name, atom_coords, missing=False):
-        """Returns the 'ATOM...' line in PDB format for the specified atom. If missing, 
-        this function should have special, but not yet determined, behavior. 
+        """Returns the 'ATOM...' line in PDB format for the specified atom.
+
+        If missing, this function should have special, but not yet determined,
+        behavior.
         """
         if missing:
             occupancy = 0
@@ -84,9 +87,9 @@ class PdbBuilder(object):
             self.defaults["charge"])
 
     def _get_lines_for_residue(self, res_name, atom_names, coords):
-        """Returns a list of PDB-formatted lines for all atoms in a single residue. 
-        
-        Calls get_line_for_atom. 
+        """Returns a list of PDB-formatted lines for all atoms in a single residue.
+
+        Calls get_line_for_atom.
         """
         residue_lines = []
         for atom_name, atom_coord in zip(atom_names, coords):
@@ -98,9 +101,9 @@ class PdbBuilder(object):
         return residue_lines
 
     def _get_lines_for_protein(self):
-        """Returns a list of PDB-formatted lines for all residues in this protein. 
-        
-        Calls get_lines_for_residue. 
+        """Returns a list of PDB-formatted lines for all residues in this protein.
+
+        Calls get_lines_for_residue.
         """
         self._pdb_body_lines = []
         self.res_nbr = 1
@@ -123,10 +126,8 @@ class PdbBuilder(object):
         return "TER\nEND          \n"
 
     def _make_mapping_from_seq(self):
-        """
-        Given a protein sequence, this returns a mapping that assumes coords
-        are generated in groups of 13, i.e. the output is L x 13 x 3.
-        """
+        """Given a protein sequence, this returns a mapping that assumes coords are
+        generated in groups of 14, i.e. the output is L x 14 x 3."""
         mapping = []
         for residue in self.seq:
             mapping.append((residue, ATOM_MAP_14[residue]))
@@ -145,17 +146,15 @@ class PdbBuilder(object):
         return self._pdb_str
 
     def save_pdb(self, path, title="UntitledProtein"):
-        """
-        Given a file path and title, this function generates the PDB lines,
-        then writes them to a file.
-        """
+        """Writes out the generated PDB file as a string to the specified path."""
         with open(path, "w") as outfile:
             outfile.write(self.get_pdb_string(title))
 
     def save_gltf(self, path, title="test", create_pdb=False):
+        """First creates a PDB file, then converts it to GLTF and saves it to disk.
+
+        Used for visualizing with Weights and Biases.
         """
-        This function first creates a PDB file, then converts it to a GLTF
-        (3D Object) file. Used for visualizing with Weights and Biases. """
         import pymol
         assert ".gltf" in path, "requested filepath must end with '.gtlf'."
         if create_pdb:

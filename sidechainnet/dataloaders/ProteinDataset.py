@@ -1,15 +1,11 @@
-import numpy as np
+"""A class extending torch.utils.data.Dataset for batching protein data."""
 import torch.utils
 
-from sidechainnet.utils.download import MAX_SEQ_LEN
-from sidechainnet.utils.sequence import VOCAB, ProteinVocabulary
+from sidechainnet.utils.sequence import VOCAB
 
 
 class ProteinDataset(torch.utils.data.Dataset):
-    """
-    This dataset can hold lists of sequences, angles, and coordinates for
-    each protein.
-    """
+    """This dataset holds lists of sequences, angles, and coordinates for each protein."""
 
     def __init__(self,
                  scn_data_split,
@@ -21,14 +17,14 @@ class ProteinDataset(torch.utils.data.Dataset):
                  reverse_sort=True):
 
         # Organize data
-        self._seqs = [VOCAB.str2ints(s, add_sos_eos) for s in scn_data_split['seq']]
-        self._angs = scn_data_split['ang']
-        self._crds = scn_data_split['crd']
-        self._msks = [
+        self.seqs = [VOCAB.str2ints(s, add_sos_eos) for s in scn_data_split['seq']]
+        self.angs = scn_data_split['ang']
+        self.crds = scn_data_split['crd']
+        self.msks = [
             [1 if m == "+" else 0 for m in mask] for mask in scn_data_split['msk']
         ]
-        self._evos = scn_data_split['evo']
-        self._ids = scn_data_split['ids']
+        self.evos = scn_data_split['evo']
+        self.ids = scn_data_split['ids']
 
         # Add metadata
         self.casp_version = scn_data_settings['casp_version']
@@ -46,22 +42,22 @@ class ProteinDataset(torch.utils.data.Dataset):
         """Sorts all data entries by sequence length."""
         sorted_len_indices = [
             a[0] for a in sorted(
-                enumerate(self._angs), key=lambda x: x[1].shape[0], reverse=reverse_sort)
+                enumerate(self.angs), key=lambda x: x[1].shape[0], reverse=reverse_sort)
         ]
-        self._seqs = [self._seqs[i] for i in sorted_len_indices]
-        self._angs = [self._angs[i] for i in sorted_len_indices]
-        self._crds = [self._crds[i] for i in sorted_len_indices]
-        self._msks = [self._msks[i] for i in sorted_len_indices]
-        self._evos = [self._evos[i] for i in sorted_len_indices]
-        self._ids = [self._ids[i] for i in sorted_len_indices]
+        self.seqs = [self.seqs[i] for i in sorted_len_indices]
+        self.angs = [self.angs[i] for i in sorted_len_indices]
+        self.crds = [self.crds[i] for i in sorted_len_indices]
+        self.msks = [self.msks[i] for i in sorted_len_indices]
+        self.evos = [self.evos[i] for i in sorted_len_indices]
+        self.ids = [self.ids[i] for i in sorted_len_indices]
 
     def __len__(self):
-        return len(self._seqs)
+        return len(self.seqs)
 
     def __getitem__(self, idx):
 
-        return self._ids[idx], self._seqs[idx], self._msks[idx], self._evos[
-            idx], self._angs[idx], self._crds[idx],
+        return (self.ids[idx], self.seqs[idx], self.msks[idx], self.evos[idx],
+                self.angs[idx], self.crds[idx])
 
     def __str__(self):
         """Describes this dataset to the user."""

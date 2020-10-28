@@ -1,6 +1,4 @@
-""" This script parses the raw ProteinNet files from
-https://github.com/aqlaboratory/proteinnet. """
-
+"""Functionality for parsing raw ProteinNet files."""
 import itertools
 import multiprocessing
 import os
@@ -12,10 +10,11 @@ import prody as pr
 
 
 def load_ids_from_text_files(directory, training_set):
-    """
-    Given a directory where raw ProteinNet records are stored along with .ids
-    files, reads and returns the contents of those files. Effectively returns
-    a list of IDs associated with the training, validation, and test sets.
+    """Given a directory where raw ProteinNet records are stored along with .ids files,
+    reads and returns the contents of those files.
+
+    Effectively returns a list of IDs associated with the training, validation,
+    and test sets.
     """
     with open(os.path.join(directory, f"training_{training_set}_ids.txt"),
               "r") as trainf, open(os.path.join(directory, "validation_ids.txt"),
@@ -114,9 +113,9 @@ def read_protein_from_file(file_pointer, include_tertiary):
 
 
 def process_file(input_filename_out_dir, return_ids=False):
-    """
-    A parallelizable method for processing one raw ProteinNet file and
-    creating a pickled dictionary of the data.
+    """Parallelizable method for processing a raw ProteinNet file.
+
+    Creates and returns a pickled dictionary of the data.
     """
     all_ids = []
     input_filename, out_dir = input_filename_out_dir
@@ -232,10 +231,8 @@ def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set)
 
 
 def parse_astral_summary_file(lines):
-    """
-    Given a path to the ASTRAL database summary file, this function parses
-    that file and returns a dictionary that maps ASTRAL IDs to (pdbid, chain).
-    """
+    """Given a path to the ASTRAL database summary file, this function parses that file
+    and returns a dictionary that maps ASTRAL IDs to (pdbid, chain)."""
     d = {}
     for line in lines:
         if line.startswith("#"):
@@ -248,10 +245,9 @@ def parse_astral_summary_file(lines):
     return d
 
 
-def get_chain_from_astral_id(astral_id, d, match_proteinnet_chainA_sep2020=True):
-    """Given an ASTRAL ID and the ASTRAL->PDB/chain mapping dictionary,
-    this function attempts to return the relevant, parsed ProDy object.
-    """
+def get_chain_from_astral_id(astral_id, d):
+    """Given an ASTRAL ID and the ASTRAL->PDB/chain mapping dictionary, this function
+    attempts to return the relevant, parsed ProDy object."""
     pdbid, chain = d[astral_id]
     assert "," not in chain, f"Issue parsing {astral_id} with chain {chain} and pdbid " \
                              f"{pdbid}."

@@ -1,5 +1,4 @@
 """Implement custom exceptions and error handling for processing protein data."""
-
 import os
 
 import sidechainnet
@@ -32,16 +31,16 @@ ERROR_CODES = [
 
 
 class ProteinErrors(object):
-    """
-    A simple, flexible class to record and report errors when parsing.
+    """A simple, flexible class to record and report errors when parsing.
 
-    For each type of error, this class records the error's name (a short, descriptive title),
-    the error's description, and an integer error code.
+    For each type of error, this class records the error's name (a short, descriptive
+    title), the error's description, and an integer error code.
 
-    The reason for implementing this extra class is that when using multiprocessing to process
-    all the structures, the processes are free to fail by raising any type of special exception.
-    To communicate this information back to the parent process, we create a simple mapping from
-    error to code/description so that these can be shown to the user.
+    The reason for implementing this extra class is that when using multiprocessing to
+    process all the structures, the processes are free to fail by raising any type of
+    special exception. To communicate this information back to the parent process, we
+    create a simple mapping from error to code/description so that these can be shown
+    to the user.
     """
 
     def __init__(self):
@@ -55,20 +54,21 @@ class ProteinErrors(object):
             self.name_to_descr[error_name] = error_descr
             self.code_to_name[i] = error_name
             self.code_to_descr[i] = error_descr
+        self.error_codes_inv = None
 
     def __getitem__(self, error_name):
-        """ Returns the error code for a certain error name. """
+        """Returns the error code for a certain error name."""
         return self.name_to_code[error_name]
 
     def count(self, ec, pnid):
-        """ Creates a record of a certain PNID exhibiting a certain error. """
+        """Creates a record of a certain PNID exhibiting a certain error."""
         if not self.counts:
             self.counts = {ec: [] for ec in self.name_to_code.values()}
 
         self.counts[ec].append(pnid)
 
     def summarize(self, total_processed=None):
-        """ Prints a summary of all errors that have been recorded."""
+        """Prints a summary of all errors that have been recorded."""
         if not self.counts:
             print("No errors recorded.")
             return
@@ -89,19 +89,18 @@ class ProteinErrors(object):
         self.write_summary_files()
 
     def get_pnids_with_error_name(self, error_name):
-        """After counting, returns a list of pnids that have failed with a specified error code.
-        """
+        """After counting, returns a list of pnids that have failed with a specified error
+        code."""
         error_code = self[error_name]
         return self.counts[error_code]
 
     def get_error_names(self):
-        """ Returns a list of error names. """
+        """Returns a list of error names."""
         return self.name_to_code.keys()
 
     def write_summary_files(self):
         """For all counted errors, writes the list of pnids with each error to the errors/
-        directory.
-        """
+        directory."""
         os.makedirs("errors/", exist_ok=True)
         for e in self.get_error_names():
             if len(self.get_pnids_with_error_name(e)) > 0:
@@ -109,7 +108,7 @@ class ProteinErrors(object):
                     f.write("\n".join(self.get_pnids_with_error_name(e)) + "\n")
 
     def get_error_name_from_code(self, code):
-        """ Returns the error name for the associated code. """
+        """Returns the error name for the associated code."""
         return self.code_to_name[code]
 
 
@@ -129,9 +128,7 @@ class SequenceError(Exception):
 
 
 class ContigMultipleMatchingError(Exception):
-    """An exception to raise when a sequence is ambiguous due to multiple matching contig
-    locations.
-    """
+    """An exception to raise when a sequence is ambiguous due to repetitive contigs."""
 
 
 class ShortStructureError(Exception):
@@ -139,9 +136,7 @@ class ShortStructureError(Exception):
 
 
 class MissingAtomsError(Exception):
-    """An exception to raise when a residue is missing atoms and bond angles can't be
-     calculated.
-    """
+    """An exception to raise when a residue is missing atoms."""
 
 
 class NoneStructureError(Exception):
@@ -159,7 +154,6 @@ def report_errors(pnids_errorcodes, total_pnids):
     Returns:
         None. Prints summary to stdout and generates files containing failed
         IDs in .errors/{ERROR_CODE}.txt
-
     """
     print(f"\n{total_pnids} ProteinNet IDs were processed to extract sidechain " f"data.")
     error_summarizer = sidechainnet.utils.errors.ProteinErrors()

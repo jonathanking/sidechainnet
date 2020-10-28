@@ -1,12 +1,4 @@
-"""
-This file will implement functions that allow the merging of sidechain data with
-Mohammed AlQuraishi's ProteinNet. It works by conforming the data I have
-generated with sidechain information to match the sequence and mask reported by
-ProteinNet.
-
-Author: Jonathan King
-Date : 3/09/2020
-"""
+"""Functionality for aligning protein sequences in ProteinNet vs SidechainNet."""
 
 import numpy as np
 from Bio import Align
@@ -17,7 +9,7 @@ from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
 
 def init_basic_aligner(allow_mismatches=False):
-    """ Returns an aligner with minimal assumptions about gaps."""
+    """Returns an aligner with minimal assumptions about gaps."""
     a = Align.PairwiseAligner()
     if allow_mismatches:
         a.mismatch_score = -1
@@ -30,11 +22,8 @@ def init_basic_aligner(allow_mismatches=False):
 
 
 def init_aligner(allow_target_gaps=False, allow_target_mismatches=False):
-    """
-    Creates an aligner whose weights penalize excessive gaps, make gaps
-    in the ProteinNet sequence impossible, and prefer gaps at the tail ends
-    of sequences.
-    """
+    """Creates an aligner whose weights penalize excessive gaps, make gaps in the
+    ProteinNet sequence impossible, and prefer gaps at the tail ends of sequences."""
     a = Align.PairwiseAligner()
     a.mismatch = -np.inf
     a.mismatch_score = -np.inf
@@ -64,24 +53,24 @@ def init_aligner(allow_target_gaps=False, allow_target_mismatches=False):
 
 
 def get_mask_from_alignment(al):
-    """ For a single alignment, return the mask as a string of '+' and '-'s. """
+    """For a single alignment, return the mask as a string of '+' and '-'s."""
     alignment_str = str(al).split("\n")[1]
     return alignment_str.replace("|", "+")
 
 
 def get_padded_second_seq_from_alignment(al):
-    """ For a single alignment, return the second padded string. """
+    """For a single alignment, return the second padded string."""
     alignment_str = str(al).split("\n")[2]
     return alignment_str
 
 
 def locate_char(c, s):
-    """ Returns a list of indices of character c in string s."""
+    """Returns a list of indices of character c in string s."""
     return [i for i, l in enumerate(s) if l == c]
 
 
 def masks_match(pn, new):
-    """ Returns true if the two masks match, or if pn is a subset of new."""
+    """Returns true if the two masks match, or if pn is a subset of new."""
     if pn == new:
         return True
     elif new.count("-") > pn.count("-"):
@@ -89,8 +78,7 @@ def masks_match(pn, new):
         # alignment, but there are some additional gaps, this is acceptable.
         new_gap_locs = locate_char("-", new)
         pn_gap_locs = locate_char("-", pn)
-        pn_gaps_still_present = all(
-            [pn_gap in new_gap_locs for pn_gap in pn_gap_locs])
+        pn_gaps_still_present = all([pn_gap in new_gap_locs for pn_gap in pn_gap_locs])
         return pn_gaps_still_present
     else:
         return False
@@ -126,10 +114,10 @@ def shorten_ends(s1, s2, s1_ang, s1_crd):
 
 
 def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
-    """
-    Returns True iff when pn_seq and my_seq are aligned, the resultant mask
-    is the same as reported by ProteinNet. Also returns the computed_mask that
-    matches with ProteinNet
+    """Returns True iff when pn_seq and my_seq are aligned, the resultant mask is the same
+    as reported by ProteinNet.
+
+    Also returns the computed_mask that matches with ProteinNet
     """
     a = aligner.align(pn_seq, my_seq)
     pn_mask = binary_mask_to_str(pn_mask)
@@ -145,14 +133,7 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
     if n_alignments == 0 and attempt_number == 0:
         # Use aligner with a typical set of assumptions.
         aligner = init_aligner()
-        return merge(aligner,
-                     pn_seq,
-                     my_seq,
-                     ang,
-                     crd,
-                     pn_mask,
-                     pnid,
-                     attempt_number=1)
+        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=1)
 
     if n_alignments == 0 and attempt_number == 1:
         # If there appear to be no alignments, it may be the case that there
@@ -160,31 +141,16 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
         my_seq, ang, crd = shorten_ends(my_seq, pn_seq, ang, crd)
-        return merge(aligner,
-                     pn_seq,
-                     my_seq,
-                     ang,
-                     crd,
-                     pn_mask,
-                     pnid,
-                     attempt_number=2)
+        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=2)
 
     if n_alignments == 0 and attempt_number == 2:
         # Try making very few assumptions about gaps before allowing mismatches/gaps in
         # the target sequence.
         aligner = init_basic_aligner(allow_mismatches=True)
-        return merge(aligner,
-                     pn_seq,
-                     my_seq,
-                     ang,
-                     crd,
-                     pn_mask,
-                     pnid,
-                     attempt_number=3)
+        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=3)
 
     elif n_alignments == 0 and attempt_number == 3:
-        aligner = init_aligner(allow_target_gaps=True,
-                               allow_target_mismatches=True)
+        aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
         mask, a0, ang, crd, warning = merge(aligner,
                                             pn_seq,
                                             my_seq,
@@ -209,8 +175,7 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
             computed_mask = computed_mask.replace("X", "+").replace(".", "+")
         if not masks_match(pn_mask, computed_mask):
             if "astral" in determine_pnid_type(pnid):
-                pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace(
-                    "-", "_")]
+                pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace("-", "_")]
                 if "A" not in chain:
                     # This suggests that ProteinNet made a mistake and parsed
                     # chain A when they should have parsed the correct chain.
@@ -237,8 +202,7 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
             if attempt_number == 4:
                 if computed_mask.count("X") + computed_mask.count(".") > 5:
                     warning = "too many wrong AAs"
-                computed_mask = computed_mask.replace("X",
-                                                      "+").replace(".", "+")
+                computed_mask = computed_mask.replace("X", "+").replace(".", "+")
             if not best_mask:
                 best_mask = computed_mask
                 best_idx = i
@@ -293,10 +257,8 @@ def other_alignments_with_same_score(all_alignments, cur_alignment_idx,
 
 
 def binary_mask_to_str(m):
-    """
-    Given an iterable or list of 1s and 0s representing a mask, this returns
-    a string mask with '+'s and '-'s.
-    """
+    """Given an iterable or list of 1s and 0s representing a mask, this returns a string
+    mask with '+'s and '-'s."""
     m = list(map(lambda x: "-" if x == 0 else "+", m))
     return "".join(m)
 
@@ -381,7 +343,7 @@ def pad_seq_with_mask(seq, mask):
 
 
 def manually_adjust_data(pnid, sc_entry):
-    """ Returns a modified version of sc_entry to fix some issues manually.
+    """Returns a modified version of sc_entry to fix some issues manually.
 
     Args:
         pnid: string, ProteinNet ID
@@ -390,7 +352,6 @@ def manually_adjust_data(pnid, sc_entry):
     Returns:
         If sc_entry must be modified, then it is corrected and returned.
         Otherwise, it is returned without modifications.
-
     """
 
     # In the case of 5FXN, ProDy mistakenly parses two extranneous residues "VK"
@@ -398,8 +359,7 @@ def manually_adjust_data(pnid, sc_entry):
     # on a different segment. We can manually remove this data here before
     # proceeding with alignment.
     # https://github.com/prody/ProDy/issues/1045
-    if "5FXN" in pnid and len(
-            sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
+    if "5FXN" in pnid and len(sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
         sc_entry["seq"] = sc_entry["seq"][:-2]
         sc_entry["ang"] = sc_entry["ang"][:-2]
         sc_entry["crd"] = sc_entry["crd"][:-NUM_COORDS_PER_RES * 2]
@@ -408,7 +368,7 @@ def manually_adjust_data(pnid, sc_entry):
 
 
 def assert_mask_gaps_are_correct(mask, coordinates, pnid=""):
-    """ Returns True if the structure supports the mask.
+    """Returns True if the structure supports the mask.
 
     Args:
         mask: string of "+" and "-"s, denoting missing residues

@@ -5,13 +5,12 @@ import os
 from glob import glob
 
 import prody as pr
-import sidechainnet.utils.errors as errors
 import tqdm
+
+import sidechainnet.utils.errors as errors
 from sidechainnet.utils.astral_data import ASTRAL_SUMMARY
-from sidechainnet.utils.measure import (get_seq_coords_and_angles,
-                                        no_nans_infs_allzeros)
-from sidechainnet.utils.parse import (get_chain_from_astral_id,
-                                      parse_astral_summary_file)
+from sidechainnet.utils.measure import (get_seq_coords_and_angles, no_nans_infs_allzeros)
+from sidechainnet.utils.parse import (get_chain_from_astral_id, parse_astral_summary_file)
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
@@ -109,7 +108,7 @@ def get_sidechain_data(pnids, limit):
 
 
 def process_id(pnid):
-    """ Creates dictionary of sidechain data for a single ProteinNet ID.
+    """Creates dictionary of sidechain data for a single ProteinNet ID.
 
     For a single ProteinNet ID i.e. ('1A9U_1_A'), fetches that PDB chain
     from the PDB and extracts its angles, coordinates, and sequence. Missing
@@ -119,7 +118,6 @@ def process_id(pnid):
 
     Returns:
         Dictionary of relevant data for that ID.
-
     """
     message = None
     pnid_type = determine_pnid_type(pnid)
@@ -182,7 +180,7 @@ def determine_pnid_type(pnid):
 
 
 def get_chain_from_trainid(pnid):
-    """ Return a ProDy chain object for a ProteinNet ID. Assumes train/valid ID.
+    """Return a ProDy chain object for a ProteinNet ID. Assumes train/valid ID.
 
     Args:
         pnid: ProteinNet ID
@@ -260,7 +258,7 @@ def get_chain_from_trainid(pnid):
 
 
 def get_chain_from_testid(pnid):
-    """ Returns a ProDy chain object for a test pnid. Requires local file.
+    """Returns a ProDy chain object for a test pnid. Requires local file.
 
     Args:
         pnid: ProteinNet ID. Must refer to a test-set record.
@@ -302,11 +300,9 @@ def get_chain_from_proteinnetid(pnid, pnid_type):
 
 
 def unpack_processed_results(results, pnids):
-    """
-    Given an iterable of processed results containing angles, sequences, and PDB IDs,
-    this function separates out the components (sequences as one-hot vectors, angle matrices,
-    and PDB IDs) iff all were successfully preprocessed.
-    """
+    """Given an iterable of processed results containing angles, sequences, and PDB IDs,
+    this function separates out the components (sequences as one-hot vectors, angle
+    matrices, and PDB IDs) iff all were successfully preprocessed."""
     all_ohs = []
     all_angs = []
     all_crds = []
@@ -329,11 +325,11 @@ def unpack_processed_results(results, pnids):
 
 
 def add_proteinnetID_to_idx_mapping(data):
-    """
-    Given an already processes ProteinNet data dictionary, this function adds
-    a mapping from ProteinNet ID to the subset and index number where that
-    protein can be looked up in the current dictionary. Useful if you'd like
-    to quickly extract a certain protein.
+    """Given an already processes ProteinNet data dictionary, this function adds a mapping
+    from ProteinNet ID to the subset and index number where that protein can be looked up
+    in the current dictionary.
+
+    Useful if you'd like to quickly extract a certain protein.
     """
     d = {}
     for subset in ["train", "test"] + [f"valid-{split}" for split in VALID_SPLITS]:

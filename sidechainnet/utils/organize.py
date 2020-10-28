@@ -79,14 +79,14 @@ def get_proteinnetIDs_by_split(proteinnet_dir, thinning):
 
 def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     """Given an unsorted Sidechainnet data dict, organizes into ProteinNet data splits.
-    
+
     Args:
         scnet_data: A dictionary mapping ProteinNet ids (pnids) to data recorded by
             SidechainNet ('seq', 'ang', 'crd', 'evo', 'msk').
-        proteinnet_dir: A string representing the path to where the preprocessed 
+        proteinnet_dir: A string representing the path to where the preprocessed
             ProteinNet files are stored.
         casp_version: A string describing the CASP version of this dataset.
-    
+
     Returns:
         A Python dictionary containing SidechainNet data, but this time, organized
         and divided into the data splits specified by ProteinNet.
@@ -130,7 +130,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     organized_data["settings"]["lengths"] = np.sort(
         np.asarray(list(map(len, (v['seq'] for k, v in scnet_data.items())))))
     organized_data['settings']['max_length'] = organized_data["settings"]["lengths"].max()
-    
+
     print(f"{n_proteins} included in CASP {casp_version} ({thinning}% thinning).")
 
     validate_data_dict(organized_data)

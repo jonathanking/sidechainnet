@@ -20,7 +20,9 @@ def get_local_sidechainnet_path(casp_version, thinning, scn_dir):
 
 def copyfileobj(fsrc, fdst, length=0, chunks=0.):
     """copy data from file-like object fsrc to file-like object fdst.
-    Modified from shutil.copyfileobj."""
+
+    Modified from shutil.copyfileobj.
+    """
     # Localize variable access to minimize overhead.
     if not length:
         length = 64 * 1024
@@ -98,11 +100,11 @@ def load(casp_version=12,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2):
     """Loads SidechainNet as a Python dictionary.
-    
+
     Args:
         force_download: Downloads SidechainNet data to regardless of whether or not it
-            has already been downloaded. 
-        casp_version: An integer between 7 and 12, representing which CASP contest (and 
+            has already been downloaded.
+        casp_version: An integer between 7 and 12, representing which CASP contest (and
             therefore which ProteinNet version) to load SidechainNet from.
         thinning: An integer (30, 50, 70, 90, 95, 100) representing the training set
             thinning to load. 100 means that 100% of the proteins will be loaded, while
@@ -115,12 +117,12 @@ def load(casp_version=12,
             to access the data for machine learning methods.
         aggregate_model_input: A boolean that, if True, yields batches of (protein_id,
             model_input, true_angles, true_coordinates) when iterating over the returned
-            PyTorch DataLoader. If False, this expands the model_input variable into 
+            PyTorch DataLoader. If False, this expands the model_input variable into
             its components (sequence, mask pssm).
-    
+
     Returns:
         By default, this method returns a Python dictionary that contains SidechainNet
-        organized by data splits (train, test, valid-X).    
+        organized by data splits (train, test, valid-X).
     """
     local_path = get_local_sidechainnet_path(casp_version, thinning, scn_dir)
     if not local_path:

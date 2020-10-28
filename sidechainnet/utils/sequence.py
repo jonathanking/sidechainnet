@@ -2,14 +2,11 @@
 
 import numpy as np
 
-from sidechainnet.utils.measure import empty_ang, empty_coord
-
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, NUM_ANGLES
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
 def trim_mask_and_true_seqs(mask_seq, true_seq):
-    """
-    Given a mask and true sequence of the same length, this removes gaps from
-    the ends of both.
-    """
+    """Given an equal-length mask and sequence, removes gaps from the ends of both."""
     mask_seq_no_left = mask_seq.lstrip('-')
     mask_seq_no_right = mask_seq.rstrip('-')
     n_removed_left = len(mask_seq) - len(mask_seq_no_left)
@@ -20,12 +17,26 @@ def trim_mask_and_true_seqs(mask_seq, true_seq):
     return mask_seq, true_seq
 
 
+def empty_coord():
+    """Return an empty coordinate tensor representing 1 residue-level pad character."""
+    coord_padding = np.zeros((NUM_COORDS_PER_RES, 3))
+    coord_padding[:] = GLOBAL_PAD_CHAR
+    return coord_padding
+
+
+def empty_ang():
+    """Return an empty angle tensor representing 1 residue-level pad character."""
+    dihe_padding = np.zeros(NUM_ANGLES)
+    dihe_padding[:] = GLOBAL_PAD_CHAR
+    return dihe_padding
+
+
 def use_mask_to_pad_coords_dihedrals(mask_seq, coords, dihedrals):
-    """
-    Given a mask sequence ('-' for gap, '+' for present), and python lists of
-    coordinates and dihedrals, this function places gaps in the relevant
-    locations for each before returning. At the end, both should have the
-    same length as the mask_seq.
+    """Given a mask sequence ('-' for gap, '+' for present), and python lists of
+    coordinates and dihedrals, this function places gaps in the relevant locations for
+    each before returning.
+
+    At the end, both should have the same length as the mask_seq.
     """
     new_coords = []
     new_angs = []
@@ -42,11 +53,10 @@ def use_mask_to_pad_coords_dihedrals(mask_seq, coords, dihedrals):
 
 
 def bin_sequence_data(seqs, maxlen):
-    """
-    Given a list of sequences and a maximum training length, this function
-    bins the sequences by their lengths (using numpy's 'auto' parameter),
-    and then records the histogram information, as well as some statistics.
-    This information is returned as a dictionary.
+    """Given a list of sequences and a maximum training length, this function bins the
+    sequences by their lengths (using numpy's 'auto' parameter), and then records the
+    histogram information, as well as some statistics. This information is returned as a
+    dictionary.
 
     This function allows the user to avoid computing this information at the
     start of each training run.
@@ -81,11 +91,10 @@ def bin_sequence_data(seqs, maxlen):
 
 
 class ProteinVocabulary(object):
-    """
-    Represents the 'vocabulary' of amino acids for encoding a protein sequence.
+    """Represents the 'vocabulary' of amino acids for encoding a protein sequence.
+
     Includes pad, sos, eos, and unknown characters as well as the 20 standard
     amino acids.
-    # TODO disable pad character for training
     """
 
     def __init__(self,

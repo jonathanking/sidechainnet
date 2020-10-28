@@ -1,3 +1,4 @@
+"""Implements a collating function for use with PyTorch's DataLoaders."""
 import numpy as np
 import torch
 import torch.utils.data
@@ -86,7 +87,7 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
     return collate_fn
 
 
-def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
+def pad_for_batch(items, batch_length, dtype="", seqs_as_onehot=False):
     """Pads a list of items to batch_length using values dependent on the item type.
     
     Args:
@@ -94,14 +95,14 @@ def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
             numbers, angles, coordinates, pssms).
         batch_length: The integer maximum length of any of the items in the input. All 
             items are padded so that their length matches this number.
-        type: A string ('seq', 'msk', 'pssm', 'ang', 'crd') reperesenting the type of
+        dtype: A string ('seq', 'msk', 'pssm', 'ang', 'crd') reperesenting the type of
             data included in items.
     
     Returns:
          A padded list of the input items, all independently converted to Torch tensors.
     """
     batch = []
-    if type == "seq":
+    if dtype == "seq":
         # Sequences are padded with a specific VOCAB pad character
         for seq in items:
             z = np.ones((batch_length - len(seq))) * VOCAB.pad_id
@@ -115,7 +116,7 @@ def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
             if VOCAB.include_pad_char:
                 # Delete the column for the pad character since it is implied (0-vector)
                 batch = batch[:, :, :-1]
-    elif type == "msk":
+    elif dtype == "msk":
         # Mask sequences (1 if present, 0 if absent) are padded with 0s
         for msk in items:
             z = np.zeros((batch_length - len(msk)))
@@ -124,7 +125,7 @@ def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
         batch = np.array(batch)
         batch = batch[:, :MAX_SEQ_LEN]
         batch = torch.LongTensor(batch)
-    elif type in ["pssm", "ang"]:
+    elif dtype in ["pssm", "ang"]:
         # Mask other features with 0-vectors of a matching shape
         for item in items:
             z = np.zeros((batch_length - len(item), item.shape[-1]))
@@ -133,7 +134,7 @@ def pad_for_batch(items, batch_length, type="", seqs_as_onehot=False):
         batch = np.array(batch)
         batch = batch[:, :MAX_SEQ_LEN]
         batch = torch.FloatTensor(batch)
-    elif type == "crd":
+    elif dtype == "crd":
         for item in items:
             z = np.zeros((batch_length * NUM_COORDS_PER_RES - len(item), item.shape[-1]))
             c = np.concatenate((item, z), axis=0)
@@ -167,7 +168,7 @@ def prepare_dataloaders(data,
             paper.
         aggregate_model_input: A boolean that, if True, yields batches of (protein_id,
             model_input, true_angles, true_coordinates) when iterating over the returned
-            PyTorch DataLoader. If False, this expands the model_input variable into 
+            PyTorch DataLoader. If False, this expands the model_input variable into
             its components (sequence, mask pssm).
         batch_size: Batch size to use when yielding batches from a DataLoader.
     """
@@ -225,18 +226,3 @@ def prepare_dataloaders(data,
     dataloaders.update({f'valid-{split}': valid_loaders[split] for split in VALID_SPLITS})
 
     return dataloaders
-
-
-if __name__ == "__main__":
-    import sidechainnet as scn
-    from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
-    d = scn.load(12,
-                 30,
-                 scn_dir="/home/jok120/dev_sidechainnet/data/sidechainnet",
-                 with_pytorch="dataloaders",
-                 aggregate_model_input=False,
-                 batch_size=4,
-                 num_workers=1)
-    for batch in d['train']:
-        print(batch)
-        break
