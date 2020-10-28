@@ -57,7 +57,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["seq"] = pn_entry["primary"]
         new_entry["evo"] = pn_entry["evolutionary"]
 
-        correct_gaps, bad_gap_len = assert_mask_gaps_are_correct(mask, crd, pnid)
+        correct_gaps, bad_gap_len = assert_mask_gaps_are_correct(mask, crd)
         if not correct_gaps:
             return {}, "bad gaps"
 

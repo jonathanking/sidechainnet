@@ -210,7 +210,7 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
                 best_alignment = a0
             # if masks_match(pn_mask, computed_mask) or assert_mask_gaps_are_correct(
             #         computed_mask, crd)[0]:
-            if assert_mask_gaps_are_correct(computed_mask, crd, pnid)[0]:
+            if assert_mask_gaps_are_correct(computed_mask, crd)[0]:
                 found_a_match = True
                 best_mask = computed_mask
                 best_alignment = a0
