@@ -9,8 +9,8 @@ import tqdm
 
 import sidechainnet.utils.errors as errors
 from sidechainnet.utils.astral_data import ASTRAL_SUMMARY
-from sidechainnet.utils.measure import (get_seq_coords_and_angles, no_nans_infs_allzeros)
-from sidechainnet.utils.parse import (get_chain_from_astral_id, parse_astral_summary_file)
+from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
+from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
