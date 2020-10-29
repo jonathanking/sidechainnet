@@ -30,10 +30,10 @@ import prody as pr
 from tqdm import tqdm
 
 from sidechainnet.utils.align import (assert_mask_gaps_are_correct, expand_data_with_mask,
-                                      init_aligner, manually_adjust_data, merge)
+                                      init_aligner, merge)
 from sidechainnet.utils.download import download_sidechain_data
 from sidechainnet.utils.errors import write_errors_to_files
-from sidechainnet.utils.manual_adjustment import (manually_correct_mask,
+from sidechainnet.utils.manual_adjustment import (manually_adjust_data, manually_correct_mask,
                                                   needs_manual_adjustment)
 from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 from sidechainnet.utils.organize import load_data, organize_data, save_data
