@@ -96,7 +96,7 @@ def load(casp_version=12,
          batch_size=32,
          return_masks=False,
          seq_as_onehot=None,
-         use_dynamic_batch_size=True,
+         dynamic_batching=True,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2):
@@ -108,7 +108,7 @@ def load(casp_version=12,
     (with_pytorch='dataloaders') for easy access for model training with PyTorch. Several
     arguments are also available to allow the user to specify how the data should be
     loaded and batched when provided as DataLoaders (aggregate_model_input, collate_fn,
-    batch_size, return_masks, seq_as_one_hot, use_dynamic_batch_size, num_workers,
+    batch_size, return_masks, seq_as_one_hot, dynamic_batching, num_workers,
     optimize_for_cpu_parallelism, and train_eval_downsample.)
 
     Args:
@@ -151,7 +151,7 @@ def load(casp_version=12,
             aggregate_model_input=True or to be represented as integer sequences (shape L,
             values 0 through 21 with 21 being a pad character). The user may override this
             option with seq_as_onehot=False only when aggregate_model_input=False.
-        use_dynamic_batch_size (bool, optional): If True, uses a dynamic batch size when
+        dynamic_batching (bool, optional): If True, uses a dynamic batch size when
             training that increases when the proteins within a batch have short sequences
             or decreases when the proteins within a batch have long sequences. Behind the
             scenes, this function bins the sequences in the training Dataset/DataLoader
@@ -214,7 +214,7 @@ def load(casp_version=12,
             randomly generates batches of proteins of similar length for faster training.
             The probability of selecting small-length batches is decreased so that each
             protein in SidechainNet is included in a batch with equal probability. See
-            `dynamic_batch_size` and  `collate_fn` arguments for more information on
+            `dynamic_batching` and  `collate_fn` arguments for more information on
             modifying this behavior. In the example below, `model_input` is a collated
             Tensor containing sequence and PSSM information.
 
@@ -261,7 +261,7 @@ def load(casp_version=12,
             num_workers=num_workers,
             return_masks=return_masks,
             seq_as_onehot=seq_as_onehot,
-            use_dynamic_batch_size=use_dynamic_batch_size,
+            dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
             train_eval_downsample=train_eval_downsample)
 

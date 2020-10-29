@@ -154,7 +154,7 @@ def prepare_dataloaders(data,
                         num_workers=1,
                         return_masks=False,
                         seq_as_onehot=None,
-                        use_dynamic_batch_size=True,
+                        dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
                         train_eval_downsample=0.1):
     """
@@ -187,7 +187,7 @@ def prepare_dataloaders(data,
             train_dataset,
             batch_size,
             dynamic_batch=batch_size *
-            data['settings']['lengths'].mean() if use_dynamic_batch_size else None,
+            data['settings']['lengths'].mean() if dynamic_batching else None,
             optimize_batch_for_cpus=optimize_for_cpu_parallelism,
         ))
 
