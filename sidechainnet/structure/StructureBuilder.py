@@ -9,24 +9,29 @@ from sidechainnet.structure.structure import nerf
 
 
 class StructureBuilder(object):
-    """
-    Given angles and protein sequence, reconstructs a single protein's structure.
+    """Reconstruct a protein's structure given its sequence and angles or coordinates.
 
     The hydroxyl-oxygen of terminal residues is not placed because this would
     mean that the number of coordinates per residue would not be constant, or
     cause other complications (i.e. what if the last atom of a structure is not
-    really a terminal atom because it's tail is masked out?). It is simpler to
-    ignore this atom for now.
+    really a terminal atom because it's tail is masked out?).
     """
 
     def __init__(self, seq, ang=None, crd=None, device=torch.device("cpu")):
-        """Initialize a StructureBuilder for a single protein.
+        """Initialize a StructureBuilder for a single protein. Does not build coordinates.
+
+        To generate coordinates after initialization, see build().
+        To create PDB/GLTF files or to generate a py3Dmol visualization, see
+        to_{pdb,gltf,3Dmol}.
 
         Args:
             seq: An integer tensor or a string of length L that represents the protein's
                 amino acid sequence.
             ang: A float tensor (L X NUM_PREDICTED_ANGLES) that contains all of the
                 protein's interior angles.
+            crd: A float tensor ((L X NUM_COORDS_PER_RES) X 3) that contains all of the
+                protein's atomic coordinates. Each residue must contain the same number
+                of coordinates, with empty coordinate entries padded with 0-vectors.
             device: An optional torch device on which to build the structure.
         """
         # Validate input data
@@ -74,6 +79,11 @@ class StructureBuilder(object):
         self.integer_coded_seq = np.asarray([VOCAB._char2int[s] for s in seq])
 
     def __len__(self):
+        """Return length of the protein sequence.
+
+        Returns:
+            int: Integer sequence length.
+        """
         return len(self.seq)
 
     def _iter_resname_angs(self, start=0):
@@ -81,7 +91,7 @@ class StructureBuilder(object):
             yield resname, angles
 
     def _build_first_two_residues(self):
-        """ Constructs the first two residues of the protein. """
+        """Construct the first two residues of the protein."""
         resname_ang_iter = self._iter_resname_angs()
         first_resname, first_ang = next(resname_ang_iter)
         second_resname, second_ang = next(resname_ang_iter)
@@ -100,10 +110,14 @@ class StructureBuilder(object):
         return first_res, second_res
 
     def build(self):
-        """
-        Construct all of the atoms for a residue. Special care must be taken
-        for the first residue in the sequence in order to place its CB, if
-        present.
+        """Construct all of the atoms for a residue.
+
+        Special care must be taken for the first residue in the sequence in
+        order to place its CB, if present.
+
+        Returns:
+            (numpy.ndarray, torch.Tensor): An array or tensor of the generated coordinates
+            with shape ((L X NUM_COORDS_PER_RES) X 3).
         """
         # If a StructureBuilder does not have angles, build returns its coordinates
         if self.ang is None:
@@ -113,7 +127,7 @@ class StructureBuilder(object):
         first, second = self._build_first_two_residues()
 
         # Combine the coordinates and build the rest of the protein
-        self.coords = first.stack_coords() + second.stack_coords()
+        self.coords = first._stack_coords() + second._stack_coords()
 
         # Build the rest of the structure
         prev_res = second
@@ -145,14 +159,36 @@ class StructureBuilder(object):
                 self.pdb_creator = PdbBuilder(self.seq, self.coords.numpy())
 
     def to_pdb(self, path, title="pred"):
+        """Save protein structure as a PDB file to given path.
+
+        Args:
+            path (str): Path to save PDB file.
+            title (str, optional): Title of structure for PDB file. Defaults to "pred".
+        """
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_pdb(path, title)
 
     def to_gltf(self, path, title="pred"):
+        """Save protein structure as a GLTF (3D-object) file to given path.
+
+        Args:
+            path (str): Path to save GLTF file.
+            title (str, optional): Title of structure for GLTF file. Defaults to "pred".
+        """
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_gltf(path, title)
 
     def to_3Dmol(self, style=None, **kwargs):
+        """Generate protein structure & return interactive py3Dmol.view for visualization.
+
+        Args:
+            style (str, optional): Style string to be passed to py3Dmol for
+                visualization. Defaults to None.
+
+        Returns:
+            py3Dmol.view object: A view object that is interactive in iPython notebook
+                settings.
+        """
         import py3Dmol
         if not style:
             style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
@@ -176,22 +212,22 @@ class ResidueBuilder(object):
                  next_res,
                  is_last_res=False,
                  device=torch.device("cpu")):
-        """Initialize a residue builder for building a residue's coordinates from angles.  
-        
-        If prev_{bb, ang} are None, then this is the first residue. 
+        """Initialize a residue builder for building a residue's coordinates from angles.
+
+        If prev_{bb, ang} are None, then this is the first residue.
 
         Args:
             name: The integer amino acid code for this residue.
             angles: A float tensor containing necessary angles to define this residue.
-            prev_bb: Tensor, None
-            Coordinate tensor (3 x 3) of previous residue, upon which this residue is extending.
-            prev_ang : Tensor, None
-            Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon which this residue is extending.
+            prev_bb: Coordinate tensor (3 x 3) of previous residue, upon which this
+                residue is extending.
+            prev_ang : Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon
+                which this residue is extending.
         """
-        if type(name) != np.int64 and type(name) != torch.Tensor:
+        if not isinstance(name, np.int64) and not isinstance(name, torch.Tensor):
             raise ValueError("Expected integer AA code." + str(name.shape) +
                              str(type(name)))
-        if type(angles) == np.ndarray:
+        if isinstance(angles, np.ndarray):
             angles = torch.tensor(angles, dtype=torch.float32)
         self.name = name
         self.ang = angles.squeeze()
@@ -206,14 +242,15 @@ class ResidueBuilder(object):
         self.coordinate_padding = torch.zeros(3)
 
     def build(self):
+        """Construct and return atomic coordinates for this protein."""
         self.build_bb()
         self.build_sc()
-        return self.stack_coords()
+        return self._stack_coords()
 
     def build_bb(self):
-        """ Builds backbone for residue. """
+        """Build backbone for residue."""
         if self.prev_res is None:
-            self.bb = self.init_bb()
+            self.bb = self._init_bb()
         else:
             pts = [self.prev_res.bb[0], self.prev_res.bb[1], self.prev_res.bb[2]]
             for j in range(4):
@@ -250,8 +287,11 @@ class ResidueBuilder(object):
 
         return self.bb
 
-    def init_bb(self):
-        """ Initialize the first 3 points of the protein's backbone. Placed in an arbitrary plane (z = .001). """
+    def _init_bb(self):
+        """Initialize the first 3 points of the protein's backbone.
+
+        Placed in an arbitrary plane (z = .001).
+        """
         n = torch.tensor([0, 0, 0.001], device=self.device)
         ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0, 0],
                               device=self.device)
@@ -264,12 +304,11 @@ class ResidueBuilder(object):
         return [n, ca, c, o]
 
     def build_sc(self):
-        """
-        Builds the sidechain atoms for this residue.
+        """Build the sidechain atoms for this residue.
 
         Care is taken when placing the first sc atom (the beta-Carbon). This is
-        because the dihedral angle that places this atom must be defined using
-        a neighboring (previous or next) residue.
+        because the dihedral angle that places this atom must be defined using a
+        neighboring (previous or next) residue.
         """
         assert len(self.bb) > 0, "Backbone must be built first."
         self.pts = {"N": self.bb[0], "CA": self.bb[1], "C": self.bb[2]}
@@ -279,9 +318,8 @@ class ResidueBuilder(object):
             self.pts["C-"] = self.prev_res.bb[2]
 
         last_torsion = None
-        for i, (bond_len, angle, torsion,
-                atom_names) in enumerate(get_residue_build_iter(self.name,
-                                                                SC_BUILD_INFO)):
+        for i, (bond_len, angle, torsion, atom_names) in enumerate(
+                _get_residue_build_iter(self.name, SC_BUILD_INFO)):
             # Select appropriate 3 points to build from
             if self.next_res and i == 0:
                 a, b, c = self.pts["N+"], self.pts["C"], self.pts["CA"]
@@ -290,7 +328,7 @@ class ResidueBuilder(object):
             else:
                 a, b, c = (self.pts[an] for an in atom_names[:-1])
 
-            # Select appropriate torsion angle, or infer it if it's part of a planar configuration
+            # Select appropriate torsion angle, or infer if part of a planar configuration
             if type(torsion) is str and torsion == "p":
                 torsion = self.ang[SC_ANGLES_START_POS + i]
             elif type(torsion) is str and torsion == "i" and last_torsion:
@@ -303,42 +341,59 @@ class ResidueBuilder(object):
 
         return self.sc
 
-    def stack_coords(self):
+    def _stack_coords(self):
         self.coords = self.bb + self.sc + (NUM_COORDS_PER_RES - len(self.bb) -
                                            len(self.sc)) * [self.coordinate_padding]
         return self.coords
 
     def __repr__(self):
+        """Return a string describing the name of the residue used for this object."""
         return f"ResidueBuilder({VOCAB.int2char(int(self.name))})"
 
 
-def get_residue_build_iter(res, build_dictionary):
-    """
-    For a given residue integer code and a residue building data dictionary,
-    this function returns an iterator that returns 4-tuples. Each tuple
-    contains the necessary information to generate the next atom in that
-    residue's sidechain. This includes the bond lengths, bond angles, and
-    torsional angles.
+def _get_residue_build_iter(res, build_dictionary):
+    """Return an iterator over (bond-lens, angles, torsions, atom names) for a residue.
+
+    This function makes it easy to iterate over the huge amount of data contained in
+    the dictionary sidechainnet.structure.build_info.SC_BUILD_INFO. This dictionary
+    contains all of the various standard bond and angle values that are used during atomic
+    reconstruction of a residue from its angles.
+
+    Args:
+        res (int): An interger representing the integer code for a particular amino acid,
+            e.g. 'Ala' == 'A' == 0 in sequence.py.
+        build_dictionary (dict): A dictionary mapping 3-letter amino acid codes to
+            dictionaries of information relevant to the construction of this amino acid
+            from angles (i.e. angle names, atom types, bond lengths, bond types, torsion
+            types, etc.). See sidechainnet.structure.build_info.SC_BUILD_INFO.
+
+    Returns:
+        iterator: An iterator that yields 4-tuples of (bond-value, angle-value,
+        torsion-value, atom-name). These values can be used to generating atomic
+        coordinates for a residue via the NeRF algorithm
+        (sidechainnet.structure.structure.nerf).
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
-    bvals = [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]]
-    avals = [torch.tensor(a, dtype=torch.float32) for a in r["angles-vals"]]
-    tvals = [
+    bond_vals = [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]]
+    angle_vals = [torch.tensor(a, dtype=torch.float32) for a in r["angles-vals"]]
+    torsion_vals = [
         torch.tensor(t, dtype=torch.float32) if t not in ["p", "i"] else t
         for t in r["torsion-vals"]
     ]
-    return iter(zip(bvals, avals, tvals, [t.split("-") for t in r["torsion-names"]]))
+    return iter(
+        zip(bond_vals, angle_vals, torsion_vals,
+            [t.split("-") for t in r["torsion-names"]]))
 
 
 if __name__ == '__main__':
     import pickle
 
-    def load_data(path):
+    def _load_data(path):
         with open(path, "rb") as f:
             data = pickle.load(f)
         return data
 
-    d = load_data(
+    d = _load_data(
         "/home/jok120/dev_sidechainnet/data/sidechainnet/sidechainnet_casp12_30.pkl")
 
     idx = 15
