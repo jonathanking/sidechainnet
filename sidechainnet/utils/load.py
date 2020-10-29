@@ -100,6 +100,7 @@ def load(casp_version=12,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2):
+    #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
     This function flexibly allows the user to load SidechainNet in a format that is most
@@ -130,9 +131,8 @@ def load(casp_version=12,
             use in a predictive model (sequences and PSSMs). This entry is a single
             Tensor. However, if False, when batching these entries are returned
             separately. See method description. Defaults to True.
-        collate_fn (Callable, optional): A collating function. See
-            https://pytorch.org/docs/stable/data.html#dataloader-collate-fn Defaults to
-            None.
+        collate_fn (Callable, optional): A collating function. Defaults to None. See:
+            https://pytorch.org/docs/stable/data.html#dataloader-collate-fn.
         batch_size (int, optional): Batch size to be used with PyTorch DataLoaders. Note
             that if dynamic_batching is True, then the size of the batch will not
             necessarily be equal to this number (though, on average, it will be close
@@ -163,7 +163,8 @@ def load(casp_version=12,
             amino acids. If False, uses a constant value (specified by batch_size) for
             batch size.
         num_workers (int, optional): Number of workers passed to DataLoaders. Defaults to
-            2. See https://pytorch.org/docs/stable/data.html#single-and-multi-process-data-loading.
+            2. See the description of workers in the PyTorch documentation:
+            https://pytorch.org/docs/stable/data.html#single-and-multi-process-data-loading.
         optimize_for_cpu_parallelism (bool, optional): If True, ensure that the size of
             each batch is a multiple of the number of available CPU cores. Defaults to
             False.
