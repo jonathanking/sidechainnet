@@ -229,13 +229,12 @@ def load(casp_version=12,
                                             true_angles, true_coords)
                 ....    ...
 
-            We have also made it possible to access the protein sequence, mask, and PSSM
-            data directly when training by adding `aggregate_model_input=False` to
-            `scn.load`.
+            We have also made it possible to access the protein sequence and PSSM data
+            directly when training by adding `aggregate_model_input=False` to `scn.load`.
 
                 >>> dataloaders = scn.load(casp_version=12, with_pytorch="dataloaders",
                                         aggregate_model_input=False)
-                >>> for (protein_id, sequence, mask, pssm, true_angles,
+                >>> for (protein_id, sequence, pssm, true_angles,
                         true_coords) in dataloaders['train']:
                 ....    prediction = model(sequence, pssm)
                 ....    ...
