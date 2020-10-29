@@ -29,9 +29,8 @@ from multiprocessing import Pool, cpu_count
 import prody as pr
 from tqdm import tqdm
 
-from sidechainnet.utils.align import (assert_mask_gaps_are_correct,
-                                      expand_data_with_mask, init_aligner,
-                                      manually_adjust_data, merge)
+from sidechainnet.utils.align import (assert_mask_gaps_are_correct, expand_data_with_mask,
+                                      init_aligner, manually_adjust_data, merge)
 from sidechainnet.utils.download import download_sidechain_data
 from sidechainnet.utils.errors import write_errors_to_files
 from sidechainnet.utils.manual_adjustment import (manually_correct_mask,

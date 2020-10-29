@@ -1,6 +1,4 @@
-"""
-Unit and regression test for the sidechainnet package.
-"""
+"""Unit and regression test for the sidechainnet package."""
 
 # Import package, test suite, and other packages as needed
 import sidechainnet

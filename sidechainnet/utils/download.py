@@ -74,6 +74,7 @@ def download_sidechain_data(pnids,
 
 def get_sidechain_data(pnids, limit):
     """Acquires sidechain data for specified ProteinNet IDs.
+    
     Args:
         pnids: List of ProteinNet IDs to download data for.
         limit: Number of IDs to process (use small value for debugging).

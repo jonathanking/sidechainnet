@@ -115,7 +115,12 @@ def pad_for_batch(items, batch_length, dtype="", seqs_as_onehot=False):
             batch = torch.nn.functional.one_hot(batch, len(VOCAB))
             if VOCAB.include_pad_char:
                 # Delete the column for the pad character since it is implied (0-vector)
-                batch = batch[:, :, :-1]
+                if len(batch.shape) == 3:
+                    batch = batch[:, :, :-1]
+                elif len(batch.shape) == 2:
+                    batch = batch[:, :-1]
+                else:
+                    raise ValueError(f"Unexpected batch dimension {str(batch.shape)}.")
     elif dtype == "msk":
         # Mask sequences (1 if present, 0 if absent) are padded with 0s
         for msk in items:
