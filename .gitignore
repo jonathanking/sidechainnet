@@ -111,3 +111,6 @@ errors/
 *.cif
 .idea/
 .vscode/*
+*.pdb
+.DS_Store
+*errors*/
