@@ -1,5 +1,6 @@
 """A class for generating/visualizing protein atomic coordinates from measured angles."""
 
+from io import UnsupportedOperation
 import numpy as np
 import torch
 
@@ -34,10 +35,29 @@ class StructureBuilder(object):
                 of coordinates, with empty coordinate entries padded with 0-vectors.
             device: An optional torch device on which to build the structure.
         """
+        self.seq_as_str = seq if type(seq) == str else self._convert_seq_to_str(seq)
+        self.seq_as_ints = np.asarray([VOCAB._char2int[s] for s in self.seq_as_str])
+        self.ang = ang
+        self.device = device
+
         # Validate input data
+        if crd is not None:
+            self.coords = crd
+            self.data_type = "torch" if isinstance(crd, torch.Tensor) else "numpy"
+            if len(crd.shape) == 3:
+                raise ValueError("Batches of structures are not supported by "
+                                 "StructureBuilder. See BatchedStructureBuilder instead.")
+        else:
+            self.coords = []
+            self.data_type = "torch" if isinstance(ang, torch.Tensor) else "numpy"
+            if len(ang.shape) == 3:
+                raise ValueError("Batches of structures are not supported by "
+                                 "StructureBuilder. See BatchedStructureBuilder instead.")
+
         if (ang is None and crd is None) or (ang is not None and crd is not None):
             raise ValueError("You must provide exactly one of either coordinates (crd) "
                              "or angles (ang).")
+
         # Perhaps the user mistakenly passed coordinates for the angle arguments
         if ang is not None and crd is None and ang.shape[-1] == 3:
             crd = ang.copy()
@@ -48,7 +68,8 @@ class StructureBuilder(object):
         if (crd is not None and crd.shape[-1] != 3):
             raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
                              f"You have provided {tuple(crd.shape)}.")
-        if (crd is not None and (crd.shape[0] // NUM_COORDS_PER_RES) != len(seq)):
+        if (crd is not None and
+            (crd.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str)):
             raise ValueError(
                 f"The length of the coordinate matrix must match the sequence length "
                 f"times {NUM_COORDS_PER_RES}. You have provided {crd.shape[0]} // "
@@ -60,23 +81,33 @@ class StructureBuilder(object):
                              f"{list(missing_loc[0])}. Protein structures with missing "
                              "residues are only supported if built directly from "
                              "coordinates (also supported by StructureBuilder).")
-        if crd is not None:
-            self.coords = crd
-            self.coord_type = "numpy" if type(crd) is np.ndarray else 'torch'
-        else:
-            self.coords = []
-            self.coord_type = "numpy" if type(ang) is np.ndarray else 'torch'
-
-        self.seq = seq
-        self.ang = ang
-        self.device = device
 
         self.prev_ang = None
         self.prev_bb = None
         self.next_bb = None
 
         self.pdb_creator = None
-        self.integer_coded_seq = np.asarray([VOCAB._char2int[s] for s in seq])
+
+    @staticmethod
+    def _convert_seq_to_str(seq):
+        """Assuming seq is an int list or int tensor, returns its str representation."""
+        seq_as_str = ""
+        seq_dim = seq.shape[-1]
+        if isinstance(seq, torch.Tensor):
+            seq = seq.numpy()
+        if len(seq.shape) != 3 and seq_dim != 20:
+            # The seq is represented as an integer sequence
+            if len(seq.shape) == 1:
+                seq_as_str = VOCAB.ints2str(seq)
+            elif len(seq.shape) == 2:
+                if seq.shape[0] != 1:
+                    raise ValueError(f"Seq shape {seq.shape} is not supported.")
+                else:
+                    seq_as_str = VOCAB.ints2str(seq[0])
+        else:
+            raise UnsupportedOperation(f"Seq shape {seq.shape} is not supported.")
+
+        return seq_as_str
 
     def __len__(self):
         """Return length of the protein sequence.
@@ -84,10 +115,10 @@ class StructureBuilder(object):
         Returns:
             int: Integer sequence length.
         """
-        return len(self.seq)
+        return len(self.seq_as_str)
 
     def _iter_resname_angs(self, start=0):
-        for resname, angles in zip(self.integer_coded_seq[start:], self.ang[start:]):
+        for resname, angles in zip(self.seq_as_ints[start:], self.ang[start:]):
             yield resname, angles
 
     def _build_first_two_residues(self):
@@ -136,11 +167,11 @@ class StructureBuilder(object):
                                  ang,
                                  prev_res=prev_res,
                                  next_res=None,
-                                 is_last_res=i + 2 == len(self.seq) - 1)
+                                 is_last_res=i + 2 == len(self.seq_as_str) - 1)
             self.coords += res.build()
             prev_res = res
 
-        if self.coord_type == 'torch':
+        if self.data_type == 'torch':
             self.coords = torch.stack(self.coords)
         else:
             self.coords = np.stack(self.coords)
@@ -153,10 +184,10 @@ class StructureBuilder(object):
 
         if not self.pdb_creator:
             from sidechainnet.structure.PdbBuilder import PdbBuilder
-            if self.coord_type == 'numpy':
-                self.pdb_creator = PdbBuilder(self.seq, self.coords)
+            if self.data_type == 'numpy':
+                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords)
             else:
-                self.pdb_creator = PdbBuilder(self.seq, self.coords.numpy())
+                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords.numpy())
 
     def to_pdb(self, path, title="pred"):
         """Save protein structure as a PDB file to given path.
