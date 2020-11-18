@@ -2,6 +2,7 @@
 *.pt
 *.pkl
 *_ids.txt
+*.pdb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -111,3 +112,4 @@ errors/
 *.cif
 .idea/
 .vscode/*
+.DS_Store
