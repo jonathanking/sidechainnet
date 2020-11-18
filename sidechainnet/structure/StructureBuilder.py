@@ -35,47 +35,51 @@ class StructureBuilder(object):
                 of coordinates, with empty coordinate entries padded with 0-vectors.
             device: An optional torch device on which to build the structure.
         """
-        self.seq_as_str = seq if type(seq) == str else self._convert_seq_to_str(seq)
-        self.seq_as_ints = np.asarray([VOCAB._char2int[s] for s in self.seq_as_str])
-        self.ang = ang
-        self.device = device
-
-        # Validate input data
-        if crd is not None:
+        # TODO support one-hot sequences
+        # Perhaps the user mistakenly passed coordinates for the angle arguments
+        if ang is not None and crd is None and ang.shape[-1] == 3:
+            self.coords = ang
+            self.ang =  None
+        elif crd is not None and ang is None:
+            self.ang = None
             self.coords = crd
-            self.data_type = "torch" if isinstance(crd, torch.Tensor) else "numpy"
-            if len(crd.shape) == 3:
+            if len(self.coords.shape) == 3:
                 raise ValueError("Batches of structures are not supported by "
                                  "StructureBuilder. See BatchedStructureBuilder instead.")
-        else:
-            self.coords = []
-            self.data_type = "torch" if isinstance(ang, torch.Tensor) else "numpy"
-            if len(ang.shape) == 3:
+        elif crd is None and ang is not None:
+            self.coords = None
+            self.ang = ang
+            if len(self.ang.shape) == 3:
                 raise ValueError("Batches of structures are not supported by "
                                  "StructureBuilder. See BatchedStructureBuilder instead.")
-
-        if (ang is None and crd is None) or (ang is not None and crd is not None):
+        elif (ang is None and crd is None) or (ang is not None and crd is not None):
             raise ValueError("You must provide exactly one of either coordinates (crd) "
                              "or angles (ang).")
 
-        # Perhaps the user mistakenly passed coordinates for the angle arguments
-        if ang is not None and crd is None and ang.shape[-1] == 3:
-            crd = ang.copy()
-            ang = None
-        if ang is not None and ang.shape[-1] != NUM_ANGLES:
+        self.seq_as_str = seq if type(seq) == str else self._convert_seq_to_str(seq)
+        self.seq_as_ints = np.asarray([VOCAB._char2int[s] for s in self.seq_as_str])
+        self.device = device
+
+        # Validate input data
+        if self.coords is not None:
+            self.data_type = "torch" if isinstance(self.coords, torch.Tensor) else "numpy"
+        else:
+            self.data_type = "torch" if isinstance(self.ang, torch.Tensor) else "numpy"
+
+        if self.ang is not None and self.ang.shape[-1] != NUM_ANGLES:
             raise ValueError(f"Angle matrix dimensions must match (L x {NUM_ANGLES}). "
-                             f"You have provided {tuple(ang.shape)}.")
-        if (crd is not None and crd.shape[-1] != 3):
+                             f"You have provided {tuple(self.ang.shape)}.")
+        if (self.coords is not None and self.coords.shape[-1] != 3):
             raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
-                             f"You have provided {tuple(crd.shape)}.")
-        if (crd is not None and
-            (crd.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str)):
+                             f"You have provided {tuple(self.coords.shape)}.")
+        if (self.coords is not None and
+            (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str)):
             raise ValueError(
                 f"The length of the coordinate matrix must match the sequence length "
-                f"times {NUM_COORDS_PER_RES}. You have provided {crd.shape[0]} // "
-                f"{NUM_COORDS_PER_RES} = {crd.shape[0] // NUM_COORDS_PER_RES}.")
-        if ang is not None and np.any(np.all(ang == 0, axis=1)):
-            missing_loc = np.where(np.all(ang == 0, axis=1))
+                f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
+                f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
+        if self.ang is not None and (self.ang == 0).all(axis=1).any():
+            missing_loc = np.where((self.ang == 0).all(axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "
@@ -92,10 +96,10 @@ class StructureBuilder(object):
     def _convert_seq_to_str(seq):
         """Assuming seq is an int list or int tensor, returns its str representation."""
         seq_as_str = ""
-        seq_dim = seq.shape[-1]
         if isinstance(seq, torch.Tensor):
             seq = seq.numpy()
-        if len(seq.shape) != 3 and seq_dim != 20:
+        seq = seq.flatten()
+        if len(seq.shape) == 1:
             # The seq is represented as an integer sequence
             if len(seq.shape) == 1:
                 seq_as_str = VOCAB.ints2str(seq)
@@ -179,7 +183,7 @@ class StructureBuilder(object):
         return self.coords
 
     def _initialize_coordinates_and_PdbCreator(self):
-        if len(self.coords) == 0:
+        if self.coords is None or len(self.coords) == 0:
             self.build()
 
         if not self.pdb_creator:
@@ -187,7 +191,8 @@ class StructureBuilder(object):
             if self.data_type == 'numpy':
                 self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords)
             else:
-                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords.numpy())
+                self.pdb_creator = PdbBuilder(self.seq_as_str, 
+                                              self.coords.detach().numpy())
 
     def to_pdb(self, path, title="pred"):
         """Save protein structure as a PDB file to given path.
