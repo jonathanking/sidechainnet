@@ -42,6 +42,33 @@ class BatchedStructureBuilder(object):
             return pad_for_batch(all_coords, self.max_seq_len, dtype='crd')
 
 
+    def to_3Dmol(self, idx, style=None, **kwargs):
+        """Generate protein structure & return interactive py3Dmol.view for visualization.
+
+        Args:
+            idx (int): index of the StructureBuilder to visualize.
+            style (str, optional): Style string to be passed to py3Dmol for
+                visualization. Defaults to None.
+            
+
+        Returns:
+            py3Dmol.view object: A view object that is interactive in iPython notebook
+                settings.
+        """
+        if not 0 <= idx < len(self.structure_builders):
+            raise ValueError("provided index is not available.")
+        return self.structure_builders[idx].to_3Dmol(style, **kwargs)
+
+    def __delitem__(self, key):
+        raise NotImplementedError("Deletion is not supported.")
+
+    def __getitem__(self, key):
+        return self.structure_builders[key]
+
+    def __setitem__(self, key, value):
+        self.structure_builders[key] = value
+
+
 def unpad_tensors(sequence, other):
     """Unpads both sequence and other tensor based on the batch padding in sequence.
 
@@ -69,4 +96,3 @@ def unpad_tensors(sequence, other):
         raise ValueError(f"Unknown other shape, {other.shape}.")
 
     return sequence, other
-
