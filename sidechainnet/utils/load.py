@@ -356,5 +356,6 @@ BOXURLS = {
         "",
 
     # Other
-    "debug.pkl": "https://pitt.box.com/s/t1t9ahdhgv5h8937rdani9ihp34gs7bu"
+    "debug.pkl":
+        "https://pitt.box.com/shared/static/t1t9ahdhgv5h8937rdani9ihp34gs7bu.pkl"
 }
