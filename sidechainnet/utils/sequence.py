@@ -170,10 +170,12 @@ class ProteinVocabulary(object):
         else:
             return [self[aa] for aa in seq]
 
-    def ints2str(self, ints, include_sos_eos=False):
+    def ints2str(self, ints, include_sos_eos=False, exclude_pad=False):
         seq = ""
         for i in ints:
             c = self.int2char(i)
+            if exclude_pad and c == self.pad_char:
+                continue
             if include_sos_eos or (c not in [self.sos_char, self.eos_char, self.pad_char
                                             ]):
                 seq += c

@@ -2,6 +2,7 @@
 *.pt
 *.pkl
 *_ids.txt
+*.pdb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

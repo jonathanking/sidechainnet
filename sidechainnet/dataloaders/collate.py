@@ -11,8 +11,8 @@ from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
 def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
-    """Returns a collate function for collating ProteinDataset batches.
-    
+    """Return a collate function for collating ProteinDataset batches.
+
     Args:
         aggregate_input: Boolean. If true, combine input items (seq, pssms) into a single
             tensor, as opposed to separate tensors.
@@ -22,7 +22,7 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
             vectors during aggregation or represented as integer sequences when not
             aggregated. The user may also specify True if they would like one-hot vectors
             returned iff aggregate_input is False.
-    
+
     Returns:
         A collate function capable of collating batches from a ProteinDataset.
     """
@@ -39,20 +39,19 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
 
     def collate_fn(insts):
         """Collates items extracted from a ProteinDataset, returning all items separately.
-        
+
         Args:
-            insts: A list of tuples, each containing one pnid, sequence, mask, pssm, 
+            insts: A list of tuples, each containing one pnid, sequence, mask, pssm,
                 angle, and coordinate extracted from a corresponding ProteinDataset.
-            aggregate_input: A boolean that, if True, aggregates the 'model input' 
-                components of the data, or the data items (seqs, pssms) from which 
+            aggregate_input: A boolean that, if True, aggregates the 'model input'
+                components of the data, or the data items (seqs, pssms) from which
                 coordinates and angles are predicted.
-        
+
         Returns:
-            A tuple of the same information provided in the input, where each data type 
-            has been extracted in a list of its own. In other words, the returned tuple 
+            A tuple of the same information provided in the input, where each data type
+            has been extracted in a list of its own. In other words, the returned tuple
             has one list for each of (pnids, seqs, msks, pssms, angs, crds). Each item in
             each list is padded to the maximum length of sequences in the batch.
-                 
         """
         # Instead of working with a list of tuples, we extract out each category of info
         # so it can be padded and re-provided to the user.
@@ -77,27 +76,32 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
         # Aggregated model input
         elif aggregate_input:
             model_input = torch.cat([padded_seqs.float(), padded_pssms], dim=-1)
+            integer_seqs = pad_for_batch(sequences,
+                                         max_batch_len,
+                                         'seq',
+                                         seqs_as_onehot=False)
 
             if return_masks:
-                return pnids, model_input, padded_msks, padded_angs, padded_crds
+                return (pnids, integer_seqs, model_input, padded_msks, padded_angs,
+                        padded_crds)
             else:
                 # Default return value, no masks
-                return pnids, model_input, padded_angs, padded_crds
+                return pnids, integer_seqs, model_input, padded_angs, padded_crds
 
     return collate_fn
 
 
 def pad_for_batch(items, batch_length, dtype="", seqs_as_onehot=False):
-    """Pads a list of items to batch_length using values dependent on the item type.
-    
+    """Pad a list of items to batch_length using values dependent on the item type.
+
     Args:
-        items: List of items to pad (i.e. sequences or masks represented as arrays of 
+        items: List of items to pad (i.e. sequences or masks represented as arrays of
             numbers, angles, coordinates, pssms).
-        batch_length: The integer maximum length of any of the items in the input. All 
+        batch_length: The integer maximum length of any of the items in the input. All
             items are padded so that their length matches this number.
         dtype: A string ('seq', 'msk', 'pssm', 'ang', 'crd') reperesenting the type of
             data included in items.
-    
+
     Returns:
          A padded list of the input items, all independently converted to Torch tensors.
     """
@@ -162,11 +166,12 @@ def prepare_dataloaders(data,
                         dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
                         train_eval_downsample=0.1):
-    """
+    """Return dataloaders for model training according to user specifications.
+
     Using the pre-processed data, stored in a nested Python dictionary, this
     function returns train, validation, and test set dataloaders with 2 workers
     each. Note that there are multiple validation sets in ProteinNet.
-    
+
     Args:
         data: A dictionary storing the entirety of a SidechainNet version (i.e. CASP 12).
             It must be organized in the manner described in this code's README, or in the
