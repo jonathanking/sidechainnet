@@ -1,5 +1,6 @@
 """A module for the handling of specific, problematic ProteinNet entries."""
 
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.align import binary_mask_to_str
 
 
@@ -30,3 +31,28 @@ def needs_manual_adjustment(pnid):
         "2XXU_1_A", "3VSC_1_A", "3S1T_1_A", "2AV4_1_A", "3RNN_1_A", "1WNU_1_A",
         "4BDL_1_A", "3J9M_79_AY"
     ]
+
+
+def manually_adjust_data(pnid, sc_entry):
+    """Returns a modified version of sc_entry to fix some issues manually.
+
+    Args:
+        pnid: string, ProteinNet ID
+        sc_entry: dictionary containing "seq", "ang", "crd" data
+
+    Returns:
+        If sc_entry must be modified, then it is corrected and returned.
+        Otherwise, it is returned without modifications.
+    """
+
+    # In the case of 5FXN, ProDy mistakenly parses two extranneous residues "VK"
+    # from the file due to the file not distinguishing these resides as being
+    # on a different segment. We can manually remove this data here before
+    # proceeding with alignment.
+    # https://github.com/prody/ProDy/issues/1045
+    if "5FXN" in pnid and len(sc_entry["seq"]) == 316 and sc_entry["seq"][-3:] == "VVK":
+        sc_entry["seq"] = sc_entry["seq"][:-2]
+        sc_entry["ang"] = sc_entry["ang"][:-2]
+        sc_entry["crd"] = sc_entry["crd"][:-NUM_COORDS_PER_RES * 2]
+
+    return sc_entry
