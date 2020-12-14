@@ -353,5 +353,8 @@ BOXURLS = {
     "sidechainnet_casp7_95.pkl":
         "",
     "sidechainnet_casp7_100.pkl":
-        ""
+        "",
+
+    # Other
+    "debug.pkl": "https://pitt.box.com/s/t1t9ahdhgv5h8937rdani9ihp34gs7bu"
 }
