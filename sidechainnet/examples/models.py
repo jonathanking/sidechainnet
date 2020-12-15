@@ -78,13 +78,12 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
         output, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(output,
                                                                         batch_first=True)
         output = self.hidden2out(output)
-        # We push the output through a tanh layer and multiply by pi to ensure
-        # values are within [-pi, pi].
-        output = self.output_activation(output) * np.pi
         if self.sincos_output:
             output = self.output_activation(output)
             output = output.view(output.shape[0], output.shape[1], int(self.d_out / 2), 2)
         else:
+            # We push the output through a tanh layer and multiply by pi to ensure
+            # values are within [-pi, pi] for predicting raw angles.
             output = self.output_activation(output) * np.pi
             output = output.view(output.shape[0], output.shape[1], self.d_out)
         return output
@@ -121,12 +120,12 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
         output, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(output,
                                                                         batch_first=True)
         output = self.hidden2out(output)
-        # We push the output through a tanh layer and multiply by pi to ensure
-        # values are within [-pi, pi].
         if self.sincos_output:
             output = self.output_activation(output)
             output = output.view(output.shape[0], output.shape[1], int(self.d_out / 2), 2)
         else:
+            # We push the output through a tanh layer and multiply by pi to ensure
+            # values are within [-pi, pi] for predicting raw angles.
             output = self.output_activation(output) * np.pi
             output = output.view(output.shape[0], output.shape[1], self.d_out)
         return output
