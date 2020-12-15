@@ -11,7 +11,6 @@ from ._version import get_versions
 from .structure.StructureBuilder import StructureBuilder
 from .structure.BatchedStructureBuilder import BatchedStructureBuilder
 from .utils.load import load
-import sidechainnet.examples
 
 versions = get_versions()
 __version__ = versions['version']

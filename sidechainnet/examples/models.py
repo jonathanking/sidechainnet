@@ -12,22 +12,24 @@ class BaseProteinAngleRNN(torch.nn.Module):
                  size,
                  n_layers=1,
                  d_in=20,
-                 d_out=NUM_ANGLES,
+                 n_angles=NUM_ANGLES,
                  bidirectional=True,
+                 sincos_output=True,
                  device=torch.device('cpu')):
         super(BaseProteinAngleRNN, self).__init__()
         self.size = size
         self.n_layers = n_layers
+        self.sincos_output = sincos_output
+        self.d_out = n_angles * 2 if sincos_output else n_angles
         self.lstm = torch.nn.LSTM(d_in,
                                   size,
                                   n_layers,
                                   bidirectional=bidirectional,
                                   batch_first=True)
         self.n_direction = 2 if bidirectional else 1
-        self.hidden2out = torch.nn.Linear(self.n_direction * size, d_out)
+        self.hidden2out = torch.nn.Linear(self.n_direction * size, self.d_out)
         self.output_activation = torch.nn.Tanh()
         self.device = device
-        self.d_out = d_out
 
     def init_hidden(self, batch_size):
         """Initialize the hidden state vectors at the start of a batch iteration."""
@@ -49,10 +51,10 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
                  size,
                  n_layers=1,
                  d_in=20,
-                 d_out=NUM_ANGLES,
+                 n_angles=NUM_ANGLES,
                  bidirectional=True,
                  device=torch.device('cpu')):
-        super(IntegerSequenceProteinRNN, self).__init__(size, n_layers, d_in, d_out,
+        super(IntegerSequenceProteinRNN, self).__init__(size, n_layers, d_in, n_angles,
                                                         bidirectional, device)
 
         self.input_embedding = torch.nn.Embedding(21, 20, padding_idx=20)
@@ -60,7 +62,7 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
     def forward(self, sequence):
         """Run one forward step of the model."""
         # First, we compute the length of each sequence to use pack_padded_sequence
-        lengths = sequence.shape[-1] - (sequence == 20).sum(axis=1)
+        lengths = sequence.shape[-1] - (sequence == 20).sum(axis=1).cpu()
         h, c = self.init_hidden(len(lengths))
         # Our inputs are sequences of integers, allowing us to use torch.nn.Embeddings
         sequence = self.input_embedding(sequence)
@@ -75,7 +77,10 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
         # We push the output through a tanh layer and multiply by pi to ensure
         # values are within [-pi, pi].
         output = self.output_activation(output) * np.pi
-        output = output.view(output.shape[0], output.shape[1], self.d_out)
+        if self.sincos_output:
+            output = output.view(output.shape[0], output.shape[1], self.d_out / 2, 2)
+        else:
+            output = output.view(output.shape[0], output.shape[1], self.d_out)
         return output
 
 
@@ -86,17 +91,17 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
                  size,
                  n_layers=1,
                  d_in=41,
-                 d_out=NUM_ANGLES,
+                 n_angles=NUM_ANGLES,
                  bidirectional=True,
                  device=torch.device('cpu')):
         """Create a PSSMSequenceProteinRNN model with input dimensionality 41."""
-        super(PSSMProteinRNN, self).__init__(size, n_layers, d_in, d_out,
+        super(PSSMProteinRNN, self).__init__(size, n_layers, d_in, n_angles,
                                              bidirectional, device)
 
     def forward(self, sequence):
         """Run one forward step of the model."""
         # First, we compute the length of each sequence to use pack_padded_sequence
-        lengths = sequence.shape[1] - (sequence == 0).all(axis=2).sum(axis=1)
+        lengths = sequence.shape[1] - (sequence == 0).all(axis=2).sum(axis=1).cpu()
         h, c = self.init_hidden(len(lengths))
         sequence = torch.nn.utils.rnn.pack_padded_sequence(sequence,
                                                            lengths,
@@ -109,5 +114,8 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
         # We push the output through a tanh layer and multiply by pi to ensure
         # values are within [-pi, pi].
         output = self.output_activation(output) * np.pi
-        output = output.view(output.shape[0], output.shape[1], self.d_out)
+        if self.sincos_output:
+            output = output.view(output.shape[0], output.shape[1], self.d_out/2, 2)
+        else:
+            output = output.view(output.shape[0], output.shape[1], self.d_out)
         return output

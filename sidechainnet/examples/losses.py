@@ -4,7 +4,7 @@ import numpy as np
 import prody as pr
 import torch
 
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.structure.build_info import NUM_ANGLES, NUM_COORDS_PER_RES
 
 
 def compute_batch_drmsd(true_coordinates, pred_coordinates, seq, verbose=False):
@@ -28,7 +28,7 @@ def compute_batch_drmsd(true_coordinates, pred_coordinates, seq, verbose=False):
     raw_drmsds = torch.tensor(0.0)
     for pc, tc, s in zip(pred_coordinates, true_coordinates, seq):
         # Remove batch_padding from true coords
-        batch_padding = tile((s != 20), 0, NUM_COORDS_PER_RES)
+        batch_padding = _tile((s != 20), 0, NUM_COORDS_PER_RES)
         tc = tc[batch_padding]
         missing_atoms = (tc == 0).all(axis=-1)
         tc = tc[~missing_atoms]
@@ -99,7 +99,28 @@ def pairwise_internal_dist(x):
     return res
 
 
-def tile(a, dim, n_tile):
+def inverse_trig_transform(t):
+    """Computes the atan2 of the last 2 dimensions of a given tensor.
+
+    Given a (BATCH x L X NUM_PREDICTED_ANGLES ) tensor, returns (BATCH X
+    L X NUM_PREDICTED_ANGLES) tensor. Performs atan2 transformation from sin
+    and cos values.
+
+    Args:
+        t (torch.tensor): Tensor of shape (batch, L, NUM_ANGLES, 2).
+
+    Returns:
+        torch.tensor: Tensor of angles with the last two dimensions reduced 
+        via atan2.
+    """
+    t = t.view(t.shape[0], -1, NUM_ANGLES, 2)
+    t_cos = t[:, :, :, 0]
+    t_sin = t[:, :, :, 1]
+    t = torch.atan2(t_sin, t_cos)
+    return t
+
+
+def _tile(a, dim, n_tile):
     # https://discuss.pytorch.org/t/how-to-tile-a-tensor/13853/4
     init_dim = a.size(dim)
     repeat_idx = [1] * a.dim()
