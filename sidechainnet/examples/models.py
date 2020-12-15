@@ -53,13 +53,15 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
                  d_in=20,
                  n_angles=NUM_ANGLES,
                  bidirectional=True,
-                 device=torch.device('cpu')):
+                 device=torch.device('cpu'),
+                 sincos_output=True):
         super(IntegerSequenceProteinRNN, self).__init__(size=size,
                                                         n_layers=n_layers,
                                                         d_in=d_in,
                                                         n_angles=n_angles,
                                                         bidirectional=bidirectional,
-                                                        device=device)
+                                                        device=device,
+                                                        sincos_output=sincos_output)
 
         self.input_embedding = torch.nn.Embedding(21, 20, padding_idx=20)
 
@@ -98,14 +100,16 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
                  d_in=41,
                  n_angles=NUM_ANGLES,
                  bidirectional=True,
-                 device=torch.device('cpu')):
+                 device=torch.device('cpu'),
+                 sincos_output=True):
         """Create a PSSMSequenceProteinRNN model with input dimensionality 41."""
         super(PSSMProteinRNN, self).__init__(size=size,
                                              n_layers=n_layers,
                                              d_in=d_in,
                                              n_angles=n_angles,
                                              bidirectional=bidirectional,
-                                             device=device)
+                                             device=device,
+                                             sincos_output=sincos_output)
 
     def forward(self, sequence):
         """Run one forward step of the model."""
