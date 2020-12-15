@@ -29,14 +29,14 @@ class BaseProteinAngleRNN(torch.nn.Module):
         self.n_direction = 2 if bidirectional else 1
         self.hidden2out = torch.nn.Linear(self.n_direction * size, self.d_out)
         self.output_activation = torch.nn.Tanh()
-        self.device = device
+        self.device_ = device
 
     def init_hidden(self, batch_size):
         """Initialize the hidden state vectors at the start of a batch iteration."""
         h, c = (torch.zeros(self.n_layers * self.n_direction, batch_size,
-                            self.size).to(self.device),
+                            self.size).to(self.device_),
                 torch.zeros(self.n_layers * self.n_direction, batch_size,
-                            self.size).to(self.device))
+                            self.size).to(self.device_))
         return h, c
 
     def forward(self, *args, **kwargs):
@@ -62,12 +62,12 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
     def forward(self, sequence):
         """Run one forward step of the model."""
         # First, we compute the length of each sequence to use pack_padded_sequence
-        lengths = sequence.shape[-1] - (sequence == 20).sum(axis=1).cpu()
+        lengths = sequence.shape[-1] - (sequence == 20).sum(axis=1)
         h, c = self.init_hidden(len(lengths))
         # Our inputs are sequences of integers, allowing us to use torch.nn.Embeddings
         sequence = self.input_embedding(sequence)
         sequence = torch.nn.utils.rnn.pack_padded_sequence(sequence,
-                                                           lengths,
+                                                           lengths.cpu(),
                                                            batch_first=True,
                                                            enforce_sorted=False)
         output, (h, c) = self.lstm(sequence, (h, c))
@@ -101,10 +101,10 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
     def forward(self, sequence):
         """Run one forward step of the model."""
         # First, we compute the length of each sequence to use pack_padded_sequence
-        lengths = sequence.shape[1] - (sequence == 0).all(axis=2).sum(axis=1).cpu()
+        lengths = sequence.shape[1] - (sequence == 0).all(axis=2).sum(axis=1)
         h, c = self.init_hidden(len(lengths))
         sequence = torch.nn.utils.rnn.pack_padded_sequence(sequence,
-                                                           lengths,
+                                                           lengths.cpu(),
                                                            batch_first=True,
                                                            enforce_sorted=False)
         output, (h, c) = self.lstm(sequence, (h, c))
