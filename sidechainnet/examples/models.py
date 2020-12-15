@@ -82,7 +82,7 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
         # values are within [-pi, pi].
         output = self.output_activation(output) * np.pi
         if self.sincos_output:
-            output = output.view(output.shape[0], output.shape[1], self.d_out / 2, 2)
+            output = output.view(output.shape[0], output.shape[1], int(self.d_out / 2), 2)
         else:
             output = output.view(output.shape[0], output.shape[1], self.d_out)
         return output
@@ -123,7 +123,7 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
         # values are within [-pi, pi].
         output = self.output_activation(output) * np.pi
         if self.sincos_output:
-            output = output.view(output.shape[0], output.shape[1], self.d_out / 2, 2)
+            output = output.view(output.shape[0], output.shape[1], int(self.d_out / 2), 2)
         else:
             output = output.view(output.shape[0], output.shape[1], self.d_out)
         return output
