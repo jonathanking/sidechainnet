@@ -54,8 +54,12 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
                  n_angles=NUM_ANGLES,
                  bidirectional=True,
                  device=torch.device('cpu')):
-        super(IntegerSequenceProteinRNN, self).__init__(size, n_layers, d_in, n_angles,
-                                                        bidirectional, device)
+        super(IntegerSequenceProteinRNN, self).__init__(size=size,
+                                                        n_layers=n_layers,
+                                                        d_in=d_in,
+                                                        n_angles=n_angles,
+                                                        bidirectional=bidirectional,
+                                                        device=device)
 
         self.input_embedding = torch.nn.Embedding(21, 20, padding_idx=20)
 
@@ -95,8 +99,12 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
                  bidirectional=True,
                  device=torch.device('cpu')):
         """Create a PSSMSequenceProteinRNN model with input dimensionality 41."""
-        super(PSSMProteinRNN, self).__init__(size, n_layers, d_in, n_angles,
-                                             bidirectional, device)
+        super(PSSMProteinRNN, self).__init__(size=size,
+                                             n_layers=n_layers,
+                                             d_in=d_in,
+                                             n_angles=n_angles,
+                                             bidirectional=bidirectional,
+                                             device=device)
 
     def forward(self, sequence):
         """Run one forward step of the model."""
@@ -115,7 +123,7 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
         # values are within [-pi, pi].
         output = self.output_activation(output) * np.pi
         if self.sincos_output:
-            output = output.view(output.shape[0], output.shape[1], self.d_out/2, 2)
+            output = output.view(output.shape[0], output.shape[1], self.d_out / 2, 2)
         else:
             output = output.view(output.shape[0], output.shape[1], self.d_out)
         return output
