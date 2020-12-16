@@ -260,7 +260,8 @@ class ResidueBuilder(object):
             prev_ang : Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon
                 which this residue is extending.
         """
-        if not isinstance(name, np.int64) and not isinstance(name, torch.Tensor):
+        if (not isinstance(name, np.int64) and not isinstance(name, np.int32)
+                and not isinstance(name, torch.Tensor)):
             raise ValueError("Expected integer AA code." + str(name.shape) +
                              str(type(name)))
         if isinstance(angles, np.ndarray):
