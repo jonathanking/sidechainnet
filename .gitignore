@@ -115,3 +115,4 @@ errors/
 *.pdb
 .DS_Store
 *errors*/
+*ignored/
