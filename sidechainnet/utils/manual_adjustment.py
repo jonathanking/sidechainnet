@@ -45,7 +45,7 @@ def manually_adjust_data(pnid, sc_entry):
         Otherwise, it is returned without modifications.
     """
 
-    # In the case of 5FXN, ProDy mistakenly parses two extranneous residues "VK"
+    # In the case of 5FXN, ProDy mistakenly parses two extraneous residues "VK"
     # from the file due to the file not distinguishing these resides as being
     # on a different segment. We can manually remove this data here before
     # proceeding with alignment.
