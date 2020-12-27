@@ -16,6 +16,10 @@ MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
 ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
 del ASTRAL_SUMMARY
+D_AMINO_ACID_CODES = [
+    "DAL", "DSN", "DTH", "DCY", "DVA", "DLE", "DIL", "MED", "DPR", "DPN", "DTY", "DTR",
+    "DSP", "DGL", "DSG", "DGN", "DHI", "DLY", "DAR"
+]
 
 
 def download_sidechain_data(pnids,
@@ -25,7 +29,7 @@ def download_sidechain_data(pnids,
                             limit,
                             proteinnet_in,
                             regenerate_scdata=False):
-    """Downloads the sidechain data for the corresponding ProteinNet IDs.
+    """Download the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
         pnids: List of ProteinNet IDs to download sidechain data for
@@ -42,7 +46,7 @@ def download_sidechain_data(pnids,
     """
     from sidechainnet.utils.organize import load_data, save_data
 
-    # Initalize directories.
+    # Initialize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
     output_name = f"sidechain-only_{casp_version}_{training_set}.pkl"
@@ -74,7 +78,7 @@ def download_sidechain_data(pnids,
 
 def get_sidechain_data(pnids, limit):
     """Acquires sidechain data for specified ProteinNet IDs.
-    
+
     Args:
         pnids: List of ProteinNet IDs to download data for.
         limit: Number of IDs to process (use small value for debugging).
@@ -109,7 +113,7 @@ def get_sidechain_data(pnids, limit):
 
 
 def process_id(pnid):
-    """Creates dictionary of sidechain data for a single ProteinNet ID.
+    """Create dictionary of sidechain data for a single ProteinNet ID.
 
     For a single ProteinNet ID i.e. ('1A9U_1_A'), fetches that PDB chain
     from the PDB and extracts its angles, coordinates, and sequence. Missing
@@ -158,7 +162,7 @@ def process_id(pnid):
 
 
 def determine_pnid_type(pnid):
-    """Returns the 'type' of a ProteinNet ID (i.e. train, valid, test, ASTRAL).
+    """Return the 'type' of a ProteinNet ID (i.e. train, valid, test, ASTRAL).
 
     Args:
         pnid: ProteinNet ID string.
@@ -255,6 +259,9 @@ def get_chain_from_trainid(pnid):
     if modified_model_number:
         return chain, "MODIFIED_MODEL"
 
+    if contains_d_amino_acids(chain):
+        return pnid, errors.ERRORS["D_AMINO_ACIDS"]
+
     return chain
 
 
@@ -297,6 +304,7 @@ def get_chain_from_proteinnetid(pnid, pnid_type):
     # If the ProteinNet ID is from the train or validation set
     else:
         chain = get_chain_from_trainid(pnid)
+
     return chain
 
 
@@ -339,3 +347,16 @@ def add_proteinnetID_to_idx_mapping(data):
 
     data["pnids"] = d
     return data
+
+
+def contains_d_amino_acids(chain):
+    """Return True iff the ProDy chain contains D amino acids.
+
+    D amino acids should be excluded because their structure is not compatible
+    with L amino acids and cannot be assumed to be the same.
+
+    Args:
+        chain (prody Chain): A ProDy chain representing one polypeptide molecule.
+    """
+    resnames = chain.getResnames()
+    return any((d_aa in resnames for d_aa in D_AMINO_ACID_CODES))

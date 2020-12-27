@@ -27,7 +27,8 @@ ERROR_CODES = [
     ("MISSING_ATOMS_ERROR", "structures failed because they had missing atoms."),
     ("NONE_STRUCTURE_ERRORS", "structures were returned as None from subroutine."),
     ("NONE_CHAINS", "chains became none when parsing."),
-    ("COORDSET_INDEX_ERROR", "structures failed to correctly select ACSIndex.")
+    ("COORDSET_INDEX_ERROR", "structures failed to correctly select ACSIndex."),
+    ("D_AMINO_ACIDS", "structures contain d amino acids.")
 ]
 
 
@@ -58,18 +59,18 @@ class ProteinErrors(object):
         self.error_codes_inv = None
 
     def __getitem__(self, error_name):
-        """Returns the error code for a certain error name."""
+        """Return the error code for a certain error name."""
         return self.name_to_code[error_name]
 
     def count(self, ec, pnid):
-        """Creates a record of a certain PNID exhibiting a certain error."""
+        """Create a record of a certain PNID exhibiting a certain error."""
         if not self.counts:
             self.counts = {ec: [] for ec in self.name_to_code.values()}
 
         self.counts[ec].append(pnid)
 
     def summarize(self, total_processed=None):
-        """Prints a summary of all errors that have been recorded."""
+        """Print a summary of all errors that have been recorded."""
         if not self.counts:
             print("No errors recorded.")
             return
