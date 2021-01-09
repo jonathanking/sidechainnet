@@ -4,6 +4,7 @@ import itertools
 import multiprocessing
 import os
 import pickle
+import re
 from glob import glob
 
 import numpy as np
@@ -260,11 +261,32 @@ def get_chain_from_astral_id(astral_id, d):
 
     a = pr.parsePDB(pdbid, chain=chain)
     if resnums != "":
-        if resnums[0] == "-":
-            # Ranges with negative numbers must be escaped with ` character
-            a = a.select(f"resnum `{resnums[0] + resnums[1:].replace('-', ' to ')}`")
-        else:
-            a = a.select(f"resnum {resnums.replace('-', ' to ')}")
+        # This pattern matches ASTRAL number ranges like 1-100, 1A-100, -1-39, -4--1, etc.
+        p = re.compile(r"((?P<d1>-?\d+)(?P<ic1>\w?))-((?P<d2>-?\d+)(?P<ic2>\w?))")
+        match = p.match(resnums)
+        start, start_icode = int(match.group("d1")), match.group("ic1")
+        end, end_icode = int(match.group("d2")), match.group("ic2")
+
+        # Ranges with negative numbers must be escaped with ` character
+        range_str = f"{start} to {end}"
+        if start < 0 or end < 0:
+            range_str = f"`{range_str}`"
+
+        if not start_icode and not end_icode:
+            # There are no insertion codes. Easy case.
+            selection_str = f"resnum {range_str}"
+        elif (start_icode and not end_icode) or (not start_icode and end_icode):
+            # If there's only one insertion code, this selection is not well defined
+            # and we pretend the insertion code doesn't exist.
+            selection_str = f"resnum {range_str}"
+        elif start_icode and end_icode:
+            if start_icode == end_icode:
+                selection_str = f"resnum {range_str} and icode {start_icode}"
+            else:
+                raise ValueError(f"Unsupported ASTRAL range {astral_id}.")
+
+        a = a.select(selection_str)
+
     return a
 
 
