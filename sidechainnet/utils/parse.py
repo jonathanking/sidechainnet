@@ -261,8 +261,9 @@ def get_chain_from_astral_id(astral_id, d):
 
     # Handle special case https://github.com/prody/ProDy/issues/1197
     if astral_id == "d1tocr1":
+        # a = pr.performDSSP("1toc")
         a = pr.parsePDB("1toc", chain="R")
-        a = a.select("resnum 2 to 59 or resnum 1A")  # Note there is no 1B
+        a = a.select("(chain R) and (resnum 2 to 59 or resnum 1A)")  # Note there is no 1B
         return a
 
     a = pr.parsePDB(pdbid, chain=chain)
