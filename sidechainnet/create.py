@@ -41,6 +41,7 @@ from sidechainnet.utils.organize import load_data, organize_data, save_data
 from sidechainnet.utils.parse import parse_raw_proteinnet
 
 pr.confProDy(verbosity="none")
+pr.confProDy(auto_secondary=True)
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
