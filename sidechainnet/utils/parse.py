@@ -259,6 +259,12 @@ def get_chain_from_astral_id(astral_id, d):
         chain = "A"
         resnums = ""
 
+    # Handle special case https://github.com/prody/ProDy/issues/1197
+    if astral_id == "d1tocr1":
+        a = pr.parsePDB("1toc")
+        a = a.select("resnum 1 to 56 and not resnum 1B")
+        return a
+
     a = pr.parsePDB(pdbid, chain=chain)
     if resnums != "":
         # This pattern matches ASTRAL number ranges like 1-100, 1A-100, -1-39, -4--1, etc.
@@ -277,8 +283,8 @@ def get_chain_from_astral_id(astral_id, d):
             selection_str = f"resnum {range_str}"
         elif (start_icode and not end_icode) or (not start_icode and end_icode):
             # If there's only one insertion code, this selection is not well defined
-            # and we pretend the insertion code doesn't exist.
-            selection_str = f"resnum {range_str}"
+            # and must be handled by special cases above.
+            raise ValueError(f"Unsupported ASTRAL range {astral_id}.")
         elif start_icode and end_icode:
             if start_icode == end_icode:
                 selection_str = f"resnum {range_str} and icode {start_icode}"
