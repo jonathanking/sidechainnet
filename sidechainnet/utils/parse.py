@@ -1,6 +1,7 @@
 """Functionality for parsing raw ProteinNet files."""
 
 import itertools
+import json
 import multiprocessing
 import os
 import pickle
@@ -245,6 +246,16 @@ def parse_astral_summary_file(lines):
         if line_items[3] not in d.keys():
             d[line_items[3]] = (line_items[4], line_items[5])
     return d
+
+
+def parse_dssp_file(path):
+    """Parse AlQuraishi's DSSP files provided from ProteinNet."""
+    with open(path, "r") as f:
+        data = json.load(f)
+    new_dict = {}
+    for key in data:
+        new_dict[key] = data[key]["DSSP"]
+    return new_dict
 
 
 def get_chain_from_astral_id(astral_id, d):

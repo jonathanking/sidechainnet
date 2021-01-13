@@ -30,14 +30,15 @@ def validate_data_dict(data):
 
 
 def create_empty_dictionary():
-    """Creates an empty SidechainNet dictionary ready to hold SidechainNet data."""
+    """Create an empty SidechainNet dictionary ready to hold SidechainNet data."""
     basic_data_entries = {
         "seq": [],
         "ang": [],
         "ids": [],
         "evo": [],
         "msk": [],
-        "crd": []
+        "crd": [],
+        "sec": []
     }
 
     data = {
@@ -114,6 +115,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
             organized_data[realsplit]['crd'].append(scnet_data[pnid]['crd'])
             organized_data[realsplit]['msk'].append(scnet_data[pnid]['msk'])
             organized_data[realsplit]['evo'].append(scnet_data[pnid]['evo'])
+            organized_data[realsplit]['sec'].append(scnet_data[pnid]['sec'])
             organized_data[realsplit]['ids'].append(pnid)
             n_proteins += 1
 

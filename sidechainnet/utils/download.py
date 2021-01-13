@@ -7,19 +7,21 @@ from glob import glob
 import prody as pr
 import tqdm
 
+from sidechainnet import get_data
 import sidechainnet.utils.errors as errors
-from sidechainnet.utils.astral_data import ASTRAL_SUMMARY
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
-from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file
+from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
-ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
-del ASTRAL_SUMMARY
+with open(get_data("astral_data.txt"), "r") as astral_file:
+    ASTRAL_ID_MAPPING = parse_astral_summary_file(astral_file.read().splitlines())
 D_AMINO_ACID_CODES = [
     "DAL", "DSN", "DTH", "DCY", "DVA", "DLE", "DIL", "MED", "DPR", "DPN", "DTY", "DTR",
     "DSP", "DGL", "DSG", "DGN", "DHI", "DLY", "DAR"
 ]
+PROTEIN_DSSP_DATA = parse_dssp_file(get_data("full_protein_dssp_annotations.json"))
+PROTEIN_DSSP_DATA.update(parse_dssp_file(get_data("single_domain_dssp_annotations.json")))
 
 
 def download_sidechain_data(pnids,
@@ -155,7 +157,14 @@ def process_id(pnid):
 
     # If we've made it this far, we can unpack the data and return it
     dihedrals, coords, sequence = dihedrals_coords_sequence
-    data = {"ang": dihedrals, "crd": coords, "seq": sequence}
+    if "#" not in pnid:
+        try:
+            dssp = PROTEIN_DSSP_DATA[pnid]
+        except KeyError:
+            dssp = " " * len(sequence)
+    else:
+        dssp = " " * len(sequence)
+    data = {"ang": dihedrals, "crd": coords, "seq": sequence, "sec": dssp}
     if message:
         data["msg"] = message
     return pnid, data

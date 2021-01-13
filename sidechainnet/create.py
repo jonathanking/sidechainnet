@@ -41,7 +41,7 @@ from sidechainnet.utils.organize import load_data, organize_data, save_data
 from sidechainnet.utils.parse import parse_raw_proteinnet
 
 pr.confProDy(verbosity="none")
-pr.confProDy(auto_secondary=True)
+pr.confProDy(auto_secondary=False)
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
@@ -66,9 +66,10 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if needs_manual_adjustment(pnid):
         return {}, "needs manual adjustment"
 
-    mask, alignment, ang, crd, warning = merge(aligner, pn_entry["primary"],
-                                               sc_entry["seq"], sc_entry["ang"],
-                                               sc_entry["crd"], pn_entry["mask"], pnid)
+    mask, alignment, ang, crd, dssp, warning = merge(aligner, pn_entry["primary"],
+                                                     sc_entry["seq"], sc_entry["ang"],
+                                                     sc_entry["crd"], sc_entry["sec"],
+                                                     pn_entry["mask"], pnid)
     new_entry = {}
 
     if alignment:
@@ -84,6 +85,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         mask = manually_correct_mask(pnid, pn_entry, mask)
         new_entry["ang"] = expand_data_with_mask(ang, mask)
         new_entry["crd"] = expand_data_with_mask(crd, mask)
+        new_entry["sec"] = expand_data_with_mask(dssp, mask)
         new_entry["msk"] = mask
 
         l = len(pn_entry["primary"])
