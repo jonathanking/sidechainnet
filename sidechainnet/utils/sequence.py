@@ -5,6 +5,7 @@ import numpy as np
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, NUM_ANGLES
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
+
 def trim_mask_and_true_seqs(mask_seq, true_seq):
     """Given an equal-length mask and sequence, removes gaps from the ends of both."""
     mask_seq_no_left = mask_seq.lstrip('-')

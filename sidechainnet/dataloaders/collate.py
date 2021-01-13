@@ -26,8 +26,7 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
     Returns:
         A collate function capable of collating batches from a ProteinDataset.
     """
-
-    if seqs_as_onehot == False and aggregate_input:
+    if not seqs_as_onehot and aggregate_input:
         raise ValueError("Sequences must be represented as one-hot vectors if model input"
                          " is to be aggregated.")
 
