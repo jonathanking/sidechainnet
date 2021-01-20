@@ -425,7 +425,7 @@ def get_pdbid_from_pnid(pnid):
 
 
 def get_resolution_from_pnid(pnid):
-    """Return RCSB-reported resolution for a given ProteinNet identifier. """
+    """Return RCSB-reported resolution for a given ProteinNet identifier."""
     if determine_pnid_type(pnid) == "test":
         return None
     return get_resolution_from_pdbid(get_pdbid_from_pnid(pnid))
