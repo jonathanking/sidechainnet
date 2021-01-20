@@ -26,6 +26,7 @@ class ProteinDataset(torch.utils.data.Dataset):
         ]
         self.evos = scn_data_split['evo']
         self.ids = scn_data_split['ids']
+        self.ress = scn_data_split['res']
 
         # Add metadata
         self.casp_version = scn_data_settings['casp_version']
@@ -51,17 +52,17 @@ class ProteinDataset(torch.utils.data.Dataset):
         self.msks = [self.msks[i] for i in sorted_len_indices]
         self.evos = [self.evos[i] for i in sorted_len_indices]
         self.ids = [self.ids[i] for i in sorted_len_indices]
+        self.ress = [self.ress[i] for i in sorted_len_indices]
 
     def __len__(self):
         return len(self.seqs)
 
     def __getitem__(self, idx):
-
         return (self.ids[idx], self.seqs[idx], self.msks[idx], self.evos[idx],
                 self.angs[idx], self.crds[idx])
 
     def __str__(self):
-        """Describes this dataset to the user."""
+        """Describe this dataset to the user."""
         if self.thinning:
             return (f"ProteinDataset(casp_version={self.casp_version}, "
                     f"split='{self.split_name}', "

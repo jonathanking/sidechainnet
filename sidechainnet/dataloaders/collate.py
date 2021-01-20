@@ -26,15 +26,15 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
     Returns:
         A collate function capable of collating batches from a ProteinDataset.
     """
-    if not seqs_as_onehot and aggregate_input:
-        raise ValueError("Sequences must be represented as one-hot vectors if model input"
-                         " is to be aggregated.")
-
     if seqs_as_onehot is None:
         if aggregate_input:
             seqs_as_onehot = True
         else:
             seqs_as_onehot = False
+
+    if not seqs_as_onehot and aggregate_input:
+        raise ValueError("Sequences must be represented as one-hot vectors if model input"
+                         " is to be aggregated.")
 
     def collate_fn(insts):
         """Collates items extracted from a ProteinDataset, returning all items separately.

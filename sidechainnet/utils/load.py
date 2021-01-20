@@ -99,7 +99,8 @@ def load(casp_version=12,
          dynamic_batching=True,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
-         train_eval_downsample=.2):
+         train_eval_downsample=.2,
+         filter_by_resolution=False):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -174,6 +175,12 @@ def load(casp_version=12,
             epoch of training (which can be expensive), we can first downsample the
             training set at the start of training, and use that downsampled dataset during
             the whole of model training. Defaults to .2.
+        filter_by_resolution (float, bool, optional): If True, only use structures with a
+            reported resolution < 3 Angstroms. Structures wit no reported resolutions will
+            also be excluded. If filter_by_resolution is a float, then only structures having
+            a resolution value LESS than or equal this threshold will be included. For
+            example, a value of 2.5 will exclude all structures with resolution greater
+            than 2.5 Angstrom. Only the training set is filtered
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -248,6 +255,7 @@ def load(casp_version=12,
         local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
 
     scn_dict = _load_dict(local_path)
+    scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
 
     # By default, the load function returns a dictionary
     if not with_pytorch:
@@ -267,6 +275,59 @@ def load(casp_version=12,
             train_eval_downsample=train_eval_downsample)
 
     return
+
+
+def filter_dictionary_by_resolution(raw_data, threshold=False):
+    """Filter SidechainNet data by removing poor-resolution training entries.
+
+    Args:
+        raw_data (dict): SidechainNet dictionary.
+        threshold (float, bool): Entries with resolution values greater than this value 
+            are discarded. Test set entries have no measured resolution and are not
+            excluded. Default is 3 Angstroms. If False, nothing is filtered.
+
+    Returns:
+        Filtered dictionary.
+    """
+    if not threshold:
+        return raw_data
+    if isinstance(threshold, bool) and threshold is True:
+        threshold = 3
+    new_data = {
+        "seq": [],
+        "ang": [],
+        "ids": [],
+        "evo": [],
+        "msk": [],
+        "crd": [],
+        "sec": [],
+        "res": []
+    }
+    train = raw_data["train"]
+    n_filtered_entries = 0
+    total_entires = 0.
+    for seq, ang, crd, msk, evo, _id, res, sec in zip(train['seq'], train['ang'],
+                                                      train['crd'], train['msk'],
+                                                      train['evo'], train['ids'],
+                                                      train['res'], train['sec']):
+        total_entires += 1
+        if not res or res > threshold:
+            n_filtered_entries += 1
+            continue
+        else:
+            new_data["seq"].append(seq)
+            new_data["ang"].append(ang)
+            new_data["ids"].append(_id)
+            new_data["evo"].append(evo)
+            new_data["msk"].append(msk)
+            new_data["crd"].append(crd)
+            new_data["sec"].append(sec)
+            new_data["res"].append(res)
+    if n_filtered_entries:
+        print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
+              " training set entries were excluded based on resolution.")
+    raw_data["train"] = new_data
+    return raw_data
 
 
 # TODO: Finish uploading files to Box for distribution
