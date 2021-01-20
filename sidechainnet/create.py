@@ -87,16 +87,19 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["sec"] = expand_data_with_mask(dssp, mask)
         new_entry["msk"] = mask
+        new_entry["res"] = sc_entry["res"]
 
-        l = len(pn_entry["primary"])
+        length = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
-                if len(v) // NUM_COORDS_PER_RES != l:
+                if len(v) // NUM_COORDS_PER_RES != length:
                     return {}, "failed"
-            else:
-                if len(v) != l:
+            elif k != "res":
+                if len(v) != length:
                     return {}, "failed"
-                assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
+                assert len(
+                    v
+                ) == length, f"{k} does not have correct length {length} (is {len(v)})."
 
     return new_entry, warning
 

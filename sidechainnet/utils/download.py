@@ -3,6 +3,7 @@
 import multiprocessing
 import os
 from glob import glob
+import requests
 
 import prody as pr
 import tqdm
@@ -164,7 +165,14 @@ def process_id(pnid):
             dssp = " " * len(sequence)
     else:
         dssp = " " * len(sequence)
-    data = {"ang": dihedrals, "crd": coords, "seq": sequence, "sec": dssp}
+    resolution = get_resolution_from_pnid(pnid)
+    data = {
+        "ang": dihedrals,
+        "crd": coords,
+        "seq": sequence,
+        "sec": dssp,
+        "res": resolution
+    }
     if message:
         data["msg"] = message
     return pnid, data
@@ -369,3 +377,55 @@ def contains_d_amino_acids(chain):
     """
     resnames = chain.getResnames()
     return any((d_aa in resnames for d_aa in D_AMINO_ACID_CODES))
+
+
+def get_resolution_from_pdbid(pdbid):
+    """Return RCSB-reported resolution for a PDB ID.
+
+    Args:
+        pdbid (string): RCSB PDB identifier.
+    """
+    query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
+                    "\"){pdbx_vrpt_summary{PDB_resolution}}}")
+    r = requests.get(query_string)
+    if r.status_code != 200:
+        res = None
+    try:
+        res = float(r.json()['data']['entry']['pdbx_vrpt_summary']['PDB_resolution'])
+    except (KeyError, TypeError):
+        res = None
+
+    return res
+
+
+def get_pdbid_from_pnid(pnid):
+    """Return RCSB PDB ID associated with a given ProteinNet ID.
+
+    Args:
+        pnid (string): A ProteinNet entry identifier.
+    """
+    # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
+    try:
+        pdbid, chnum, chid = pnid.split("_")
+        chnum = int(chnum)
+        # If this is a validation set pnid, separate the annotation from the ID
+        if "#" in pdbid:
+            pdbid = pdbid.split("#")[1]
+    except ValueError:
+        try:
+            pdbid, astral_id = pnid.split("_")
+            if "#" in pdbid:
+                val_split, pdbid = pdbid.split("#")
+        except Exception as e:
+            print(e)
+            print(pnid)
+            exit(1)
+
+    return pdbid
+
+
+def get_resolution_from_pnid(pnid):
+    """Return RCSB-reported resolution for a given ProteinNet identifier. """
+    if determine_pnid_type(pnid) == "test":
+        return None
+    return get_resolution_from_pdbid(get_pdbid_from_pnid(pnid))
