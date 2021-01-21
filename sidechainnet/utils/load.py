@@ -100,7 +100,8 @@ def load(casp_version=12,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2,
-         filter_by_resolution=False):
+         filter_by_resolution=False,
+         include_secondary=True):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -177,10 +178,13 @@ def load(casp_version=12,
             the whole of model training. Defaults to .2.
         filter_by_resolution (float, bool, optional): If True, only use structures with a
             reported resolution < 3 Angstroms. Structures wit no reported resolutions will
-            also be excluded. If filter_by_resolution is a float, then only structures having
-            a resolution value LESS than or equal this threshold will be included. For
-            example, a value of 2.5 will exclude all structures with resolution greater
-            than 2.5 Angstrom. Only the training set is filtered
+            also be excluded. If filter_by_resolution is a float, then only structures
+            having a resolution value LESS than or equal this threshold will be included.
+            For example, a value of 2.5 will exclude all structures with resolution
+            greater than 2.5 Angstrom. Only the training set is filtered.
+        include_secondary (bool, optional): If True (by default), include protein
+            secondary structure info when iterating over a Dataloader. Note that this
+            information is only available for training data and comes from ProteinNet.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -272,7 +276,8 @@ def load(casp_version=12,
             seq_as_onehot=seq_as_onehot,
             dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
-            train_eval_downsample=train_eval_downsample)
+            train_eval_downsample=train_eval_downsample,
+            include_secondary=include_secondary)
 
     return
 
