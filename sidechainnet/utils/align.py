@@ -103,14 +103,12 @@ def shorten_ends(s1, s2, s1_ang, s1_crd, s1_dssp):
         s1 = s1[:-1]
         s1_ang = s1_ang[:-1]
         s1_crd = s1_crd[:-NUM_COORDS_PER_RES]
-        s1_dssp = s1_dssp[:-1]
         mask = mask[:-1]
         i -= 1
     while mask[0] == "-":
         s1 = s1[1:]
         s1_ang = s1_ang[1:]
         s1_crd = s1_crd[NUM_COORDS_PER_RES:]
-        s1_dssp = s1_dssp[1:]
         mask = mask[1:]
     return s1, s1_ang, s1_crd, s1_dssp
 
@@ -130,7 +128,7 @@ def merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid, attempt_number
     except OverflowError:
         n_alignments = 50
         warning = "failed"
-        return None, None, ang, crd, warning
+        return None, None, ang, crd, dssp, warning
 
     if n_alignments == 0 and attempt_number == 0:
         # Use aligner with a typical set of assumptions.
@@ -305,7 +303,7 @@ def expand_data_with_mask(data, mask):
     """
     if (
         (isinstance(data, str) and mask.count("-") == 0 and len(data) == len(mask)) or
-        (mask.count("-") == 0 and data.shape[0] == len(mask))
+        (not isinstance(data, str) and mask.count("-") == 0 and data.shape[0] == len(mask))
        ):
         return data
 

@@ -58,9 +58,6 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     Returns:
         A dictionary that has unified the two sets of information.
     """
-    if "secondary" in pn_entry:
-        print("WARNING: secondary structure information is not yet supported. "
-              "As of October 2020, it is not included in ProteinNet.")
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
     if needs_manual_adjustment(pnid):
@@ -97,9 +94,6 @@ def combine(pn_entry, sc_entry, aligner, pnid):
             elif k != "res":
                 if len(v) != length:
                     return {}, "failed"
-                assert len(
-                    v
-                ) == length, f"{k} does not have correct length {length} (is {len(v)})."
 
     return new_entry, warning
 
