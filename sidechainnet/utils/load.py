@@ -422,6 +422,6 @@ BOXURLS = {
         "",
 
     # Other
-    "debug.pkl":
-        "https://pitt.box.com/shared/static/t1t9ahdhgv5h8937rdani9ihp34gs7bu.pkl"
+    "sidechainnet_debug.pkl":
+        "https://pitt.box.com/shared/static/wtmcirlef152iwk8kcg7fgka2ki7tlyj.pkl"
 }

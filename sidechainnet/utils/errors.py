@@ -269,7 +269,7 @@ def make_debug_dataset(dataset, n=500):
     indicies = np.random.randint(0, len(dataset['train']['seq']), n)
     indicies = sorted(indicies, key=lambda idx: len(dataset['train']['seq'][idx]))
 
-    for i in ['seq', 'crd', 'msk', 'ang', 'evo']:
+    for i in ['seq', 'crd', 'msk', 'ang', 'evo', 'sec']:
         dataset['train'][i] = [dataset['train'][i][idx] for idx in indicies]
 
     return dataset
