@@ -12,8 +12,7 @@ from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
-def get_collate_fn(aggregate_input,
-                   seqs_as_onehot=None):
+def get_collate_fn(aggregate_input, seqs_as_onehot=None):
     """Return a collate function for collating ProteinDataset batches.
 
     Args:
@@ -36,8 +35,9 @@ def get_collate_fn(aggregate_input,
     if not seqs_as_onehot and aggregate_input:
         raise ValueError("Sequences must be represented as one-hot vectors if model input"
                          " is to be aggregated.")
-    
-     Batch = collections.named_tuple("Batch", "pids seqs msks evos secs angs crds int_seqs seq_evo_sec")
+
+    Batch = collections.named_tuple(
+        "Batch", "pids seqs msks evos secs angs crds int_seqs seq_evo_sec")
 
     def collate_fn(insts):
         """Collates items extracted from a ProteinDataset, returning all items separately.
@@ -61,10 +61,10 @@ def get_collate_fn(aggregate_input,
         max_batch_len = max(len(s) for s in sequences)
 
         int_seqs = pad_for_batch(sequences,
-                                         max_batch_len,
-                                         'seq',
-                                         seqs_as_onehot=False,
-                                         vocab=VOCAB)
+                                 max_batch_len,
+                                 'seq',
+                                 seqs_as_onehot=False,
+                                 vocab=VOCAB)
         padded_seqs = pad_for_batch(sequences,
                                     max_batch_len,
                                     'seq',
@@ -83,30 +83,30 @@ def get_collate_fn(aggregate_input,
         # Non-aggregated model input
         if not aggregate_input:
             return Batch(pids=pnids,
-                        seqs=padded_seqs,
-                        msks=padded_msks,
-                        evos=padded_pssms,
-                        secs=padded_secs,
-                        angs=padded_angs,
-                        crds=padded_crds,
-                        int_seqs=int_seqs,
-                        seq_evo_sec=None)
-        
+                         seqs=padded_seqs,
+                         msks=padded_msks,
+                         evos=padded_pssms,
+                         secs=padded_secs,
+                         angs=padded_angs,
+                         crds=padded_crds,
+                         int_seqs=int_seqs,
+                         seq_evo_sec=None)
+
         # Aggregated model input
         elif aggregate_input:
             seq_evo_sec = torch.cat(
-                [padded_seqs.float(), padded_pssms, padded_secs.float()], dim=-1)
+                [padded_seqs.float(), padded_pssms,
+                 padded_secs.float()], dim=-1)
 
             return Batch(pids=pnids,
-                        seqs=padded_seqs,
-                        msks=padded_msks,
-                        evos=padded_pssms,
-                        secs=padded_secs,
-                        angs=padded_angs,
-                        crds=padded_crds,
-                        int_seqs=int_seqs,
-                        seq_evo_sec=seq_evo_sec)
-            
+                         seqs=padded_seqs,
+                         msks=padded_msks,
+                         evos=padded_pssms,
+                         secs=padded_secs,
+                         angs=padded_angs,
+                         crds=padded_crds,
+                         int_seqs=int_seqs,
+                         seq_evo_sec=seq_evo_sec)
 
     return collate_fn
 
@@ -206,8 +206,7 @@ def prepare_dataloaders(data,
         batch_size: Batch size to use when yielding batches from a DataLoader.
     """
     if collate_fn is None:
-        collate_fn = get_collate_fn(aggregate_model_input,
-                                    seqs_as_onehot=seq_as_onehot)
+        collate_fn = get_collate_fn(aggregate_model_input, seqs_as_onehot=seq_as_onehot)
 
     train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
 
