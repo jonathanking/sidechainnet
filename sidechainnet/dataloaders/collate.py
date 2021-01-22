@@ -12,6 +12,10 @@ from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
+Batch = collections.namedtuple("Batch",
+                               "pids seqs msks evos secs angs crds int_seqs seq_evo_sec")
+
+
 def get_collate_fn(aggregate_input, seqs_as_onehot=None):
     """Return a collate function for collating ProteinDataset batches.
 
@@ -35,9 +39,6 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
     if not seqs_as_onehot and aggregate_input:
         raise ValueError("Sequences must be represented as one-hot vectors if model input"
                          " is to be aggregated.")
-
-    Batch = collections.namedtuple(
-        "Batch", "pids seqs msks evos secs angs crds int_seqs seq_evo_sec")
 
     def collate_fn(insts):
         """Collates items extracted from a ProteinDataset, returning all items separately.
