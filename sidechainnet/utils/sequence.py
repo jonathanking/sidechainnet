@@ -191,9 +191,9 @@ class DSSPVocabulary(object):
         self.pad_char = " "  # Pad character
         self.sos_char = "<"  # SOS character
         self.eos_char = ">"  # EOS character
-        
+
         codes = DSSP_CODES + " "
-        
+
         if add_sos_eos:
             codes += "<>"
         self._char2int = {c: i for (i, c) in enumerate(codes)}
@@ -220,7 +220,8 @@ class DSSPVocabulary(object):
 
     def str2ints(self, seq, add_sos_eos=True):
         if add_sos_eos:
-            return [self._char2int["<"]] + [self._char2int[c] for c in seq] + [self._char2int[">"]]
+            return [self._char2int["<"]] + [self._char2int[c] for c in seq
+                                           ] + [self._char2int[">"]]
         else:
             return [self._char2int[c] for c in seq]
 

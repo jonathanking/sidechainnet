@@ -61,7 +61,7 @@ class ProteinDataset(torch.utils.data.Dataset):
         return len(self.seqs)
 
     def __getitem__(self, idx):
-        return (self.ids[idx], self.seqs[idx], self.msks[idx], self.evos[idx], 
+        return (self.ids[idx], self.seqs[idx], self.msks[idx], self.evos[idx],
                 self.secs[idx], self.angs[idx], self.crds[idx])
 
     def __str__(self):

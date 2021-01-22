@@ -202,12 +202,11 @@ def create_all():
     sidechainnet_raw_100 = combine_datasets(args.proteinnet_out, sc_only_data, 100)
 
     # Generate debug dataset with 200 training examples
-    sc_outfile = os.path.join(args.sidechainnet_out,
-                              format_sidechainnet_path("debug", 0))
+    sc_outfile = os.path.join(args.sidechainnet_out, format_sidechainnet_path("debug", 0))
     debug = organize_data(sidechainnet_raw_100, args.proteinnet_out, "debug", "debug")
     save_data(debug, sc_outfile)
     print(f"SidechainNet for CASP {args.casp_version} (debug) written to {sc_outfile}.")
-    
+
     # Generate the rest of the training sets
     for training_set in [100, 95, 90, 70, 50, 30]:
         sc_outfile = os.path.join(

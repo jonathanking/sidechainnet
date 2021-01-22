@@ -133,7 +133,14 @@ def merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid, attempt_number
     if n_alignments == 0 and attempt_number == 0:
         # Use aligner with a typical set of assumptions.
         aligner = init_aligner()
-        return merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid,
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     dssp,
+                     pn_mask,
+                     pnid,
                      attempt_number=1)
 
     if n_alignments == 0 and attempt_number == 1:
@@ -142,27 +149,41 @@ def merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid, attempt_number
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
         my_seq, ang, crd, dssp = shorten_ends(my_seq, pn_seq, ang, crd, dssp)
-        return merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid,
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     dssp,
+                     pn_mask,
+                     pnid,
                      attempt_number=2)
 
     if n_alignments == 0 and attempt_number == 2:
         # Try making very few assumptions about gaps before allowing mismatches/gaps in
         # the target sequence.
         aligner = init_basic_aligner(allow_mismatches=True)
-        return merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid,
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     dssp,
+                     pn_mask,
+                     pnid,
                      attempt_number=3)
 
     elif n_alignments == 0 and attempt_number == 3:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
-        mask, a0, ang, crd, dssp,  warning = merge(aligner,
-                                                   pn_seq,
-                                                   my_seq,
-                                                   ang,
-                                                   crd,
-                                                   dssp,
-                                                   pn_mask,
-                                                   pnid,
-                                                   attempt_number=4)
+        mask, a0, ang, crd, dssp, warning = merge(aligner,
+                                                  pn_seq,
+                                                  my_seq,
+                                                  ang,
+                                                  crd,
+                                                  dssp,
+                                                  pn_mask,
+                                                  pnid,
+                                                  attempt_number=4)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return mask, a0, ang, crd, dssp, warning
 
@@ -301,10 +322,9 @@ def expand_data_with_mask(data, mask):
         Data in the same format, possibly extending L to match the length of
         the mask, that now contains padding.
     """
-    if (
-        (isinstance(data, str) and mask.count("-") == 0 and len(data) == len(mask)) or
-        (not isinstance(data, str) and mask.count("-") == 0 and data.shape[0] == len(mask))
-       ):
+    if ((isinstance(data, str) and mask.count("-") == 0 and len(data) == len(mask)) or
+        (not isinstance(data, str) and mask.count("-") == 0 and
+         data.shape[0] == len(mask))):
         return data
 
     if isinstance(data, str):
