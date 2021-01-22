@@ -3,7 +3,7 @@ SidechainNet
 [//]: # (Badges)
 [![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
 
-**[Colab Walkthrough](https://colab.research.google.com/drive/1WLaXUK0n2t1FLapFbr1hPQI5o23WAgqm?usp=sharing)**
+**[Colab Walkthrough](https://colab.research.google.com/drive/11ZZyqwfu7ZTyUKdqt9uy59AqqYccRVcU?usp=sharing)**
 
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
