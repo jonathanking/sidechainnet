@@ -92,17 +92,17 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
 
 
 class PSSMProteinRNN(BaseProteinAngleRNN):
-    """A protein sequence-to-angle model that consumes 1-hot sequences and PSSMs."""
+    """A protein structure model consuming 1-hot sequences, 2-ary structures, & PSSMs."""
 
     def __init__(self,
                  size,
                  n_layers=1,
-                 d_in=41,
+                 d_in=49,
                  n_angles=NUM_ANGLES,
                  bidirectional=True,
                  device=torch.device('cpu'),
                  sincos_output=True):
-        """Create a PSSMSequenceProteinRNN model with input dimensionality 41."""
+        """Create a PSSMProteinRNN model with input dimensionality 41."""
         super(PSSMProteinRNN, self).__init__(size=size,
                                              n_layers=n_layers,
                                              d_in=d_in,

@@ -3,23 +3,26 @@
 import multiprocessing
 import os
 from glob import glob
+import requests
 
 import prody as pr
 import tqdm
 
+from sidechainnet import get_data
 import sidechainnet.utils.errors as errors
-from sidechainnet.utils.astral_data import ASTRAL_SUMMARY
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
-from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file
+from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
-ASTRAL_ID_MAPPING = parse_astral_summary_file(ASTRAL_SUMMARY.splitlines())
-del ASTRAL_SUMMARY
+with open(get_data("astral_data.txt"), "r") as astral_file:
+    ASTRAL_ID_MAPPING = parse_astral_summary_file(astral_file.read().splitlines())
 D_AMINO_ACID_CODES = [
     "DAL", "DSN", "DTH", "DCY", "DVA", "DLE", "DIL", "MED", "DPR", "DPN", "DTY", "DTR",
     "DSP", "DGL", "DSG", "DGN", "DHI", "DLY", "DAR"
 ]
+PROTEIN_DSSP_DATA = parse_dssp_file(get_data("full_protein_dssp_annotations.json"))
+PROTEIN_DSSP_DATA.update(parse_dssp_file(get_data("single_domain_dssp_annotations.json")))
 
 
 def download_sidechain_data(pnids,
@@ -155,7 +158,21 @@ def process_id(pnid):
 
     # If we've made it this far, we can unpack the data and return it
     dihedrals, coords, sequence = dihedrals_coords_sequence
-    data = {"ang": dihedrals, "crd": coords, "seq": sequence}
+    if "#" not in pnid:
+        try:
+            dssp = PROTEIN_DSSP_DATA[pnid]
+        except KeyError:
+            dssp = " " * len(sequence)
+    else:
+        dssp = " " * len(sequence)
+    resolution = get_resolution_from_pnid(pnid)
+    data = {
+        "ang": dihedrals,
+        "crd": coords,
+        "seq": sequence,
+        "sec": dssp,
+        "res": resolution
+    }
     if message:
         data["msg"] = message
     return pnid, data
@@ -360,3 +377,55 @@ def contains_d_amino_acids(chain):
     """
     resnames = chain.getResnames()
     return any((d_aa in resnames for d_aa in D_AMINO_ACID_CODES))
+
+
+def get_resolution_from_pdbid(pdbid):
+    """Return RCSB-reported resolution for a PDB ID.
+
+    Args:
+        pdbid (string): RCSB PDB identifier.
+    """
+    query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
+                    "\"){pdbx_vrpt_summary{PDB_resolution}}}")
+    r = requests.get(query_string)
+    if r.status_code != 200:
+        res = None
+    try:
+        res = float(r.json()['data']['entry']['pdbx_vrpt_summary']['PDB_resolution'])
+    except (KeyError, TypeError):
+        res = None
+
+    return res
+
+
+def get_pdbid_from_pnid(pnid):
+    """Return RCSB PDB ID associated with a given ProteinNet ID.
+
+    Args:
+        pnid (string): A ProteinNet entry identifier.
+    """
+    # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
+    try:
+        pdbid, chnum, chid = pnid.split("_")
+        chnum = int(chnum)
+        # If this is a validation set pnid, separate the annotation from the ID
+        if "#" in pdbid:
+            pdbid = pdbid.split("#")[1]
+    except ValueError:
+        try:
+            pdbid, astral_id = pnid.split("_")
+            if "#" in pdbid:
+                val_split, pdbid = pdbid.split("#")
+        except Exception as e:
+            print(e)
+            print(pnid)
+            exit(1)
+
+    return pdbid
+
+
+def get_resolution_from_pnid(pnid):
+    """Return RCSB-reported resolution for a given ProteinNet identifier."""
+    if determine_pnid_type(pnid) == "test":
+        return None
+    return get_resolution_from_pdbid(get_pdbid_from_pnid(pnid))

@@ -30,14 +30,16 @@ def validate_data_dict(data):
 
 
 def create_empty_dictionary():
-    """Creates an empty SidechainNet dictionary ready to hold SidechainNet data."""
+    """Create an empty SidechainNet dictionary ready to hold SidechainNet data."""
     basic_data_entries = {
         "seq": [],
         "ang": [],
         "ids": [],
         "evo": [],
         "msk": [],
-        "crd": []
+        "crd": [],
+        "sec": [],
+        "res": []
     }
 
     data = {
@@ -58,6 +60,8 @@ def create_empty_dictionary():
 
 def get_proteinnetIDs_by_split(proteinnet_dir, thinning):
     """Returns a dict of ProteinNet IDs organized by data split (train/test/valid)."""
+    if thinning == "debug":
+        thinning = 100
     pn_files = [
         os.path.join(proteinnet_dir, f"training_{thinning}_ids.txt"),
         os.path.join(proteinnet_dir, "validation_ids.txt"),
@@ -101,7 +105,13 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     # Now, we organize the data by its data splits
     n_proteins = 0
     for split in ["train", "test", "valid"]:
-        for pnid in ids[split]:
+        if split == "train" and thinning == "debug":
+            thinning = 0
+            np.random.seed(0)
+            split_ids = np.random.choice(ids[split], 200, replace=False)
+        else:
+            split_ids = ids[split]
+        for pnid in split_ids:
             if pnid not in scnet_data:
                 continue
             if 'primary' in scnet_data[pnid]:
@@ -114,6 +124,8 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
             organized_data[realsplit]['crd'].append(scnet_data[pnid]['crd'])
             organized_data[realsplit]['msk'].append(scnet_data[pnid]['msk'])
             organized_data[realsplit]['evo'].append(scnet_data[pnid]['evo'])
+            organized_data[realsplit]['sec'].append(scnet_data[pnid]['sec'])
+            organized_data[realsplit]['res'].append(scnet_data[pnid]['res'])
             organized_data[realsplit]['ids'].append(pnid)
             n_proteins += 1
 
@@ -123,7 +135,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
 
     # Add settings
     organized_data["description"] = f"SidechainNet {casp_version}"
-    organized_data["settings"]["casp_version"] = int(casp_version)
+    organized_data["settings"]["casp_version"] = int(casp_version) if casp_version != "debug" else casp_version
     organized_data["settings"]["thinning"] = int(thinning)
     organized_data["settings"]["n_proteins"] = n_proteins
     organized_data["settings"]["angle_means"] = compute_angle_means(

@@ -94,12 +94,12 @@ def load(casp_version=12,
          aggregate_model_input=True,
          collate_fn=None,
          batch_size=32,
-         return_masks=False,
          seq_as_onehot=None,
          dynamic_batching=True,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
-         train_eval_downsample=.2):
+         train_eval_downsample=.2,
+         filter_by_resolution=False):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -109,7 +109,7 @@ def load(casp_version=12,
     (with_pytorch='dataloaders') for easy access for model training with PyTorch. Several
     arguments are also available to allow the user to specify how the data should be
     loaded and batched when provided as DataLoaders (aggregate_model_input, collate_fn,
-    batch_size, return_masks, seq_as_one_hot, dynamic_batching, num_workers,
+    batch_size, seq_as_one_hot, dynamic_batching, num_workers,
     optimize_for_cpu_parallelism, and train_eval_downsample.)
 
     Args:
@@ -138,14 +138,6 @@ def load(casp_version=12,
             necessarily be equal to this number (though, on average, it will be close
             to this number). Only applicable when with_pytorch='dataloaders' is provided.
             Defaults to 32.
-        return_masks (bool, optional): If True, when batching, returns sequence masks as a
-            Tensor of 1s and 0s (with 0s representing missing residues). In the batch,
-            masks are always provided in the tuple following the model input or sequences.
-            For example, with aggregated model input and return_masks=True, batching
-            yields tuples of (protein_ids, model_input, masks, angles, coordinates). If
-            aggregate_model_input=False, and return_masks=True, batching yields tuples of
-            (protein_ids, sequences, masks, PSSMs, angles, coordinates). Defaults to
-            False.
         seq_as_onehot (bool, optional): By default, the None value of this argument causes
             sequence data to be represented as one-hot vectors (L x 20) when batching and
             aggregate_model_input=True or to be represented as integer sequences (shape L,
@@ -174,6 +166,12 @@ def load(casp_version=12,
             epoch of training (which can be expensive), we can first downsample the
             training set at the start of training, and use that downsampled dataset during
             the whole of model training. Defaults to .2.
+        filter_by_resolution (float, bool, optional): If True, only use structures with a
+            reported resolution < 3 Angstroms. Structures wit no reported resolutions will
+            also be excluded. If filter_by_resolution is a float, then only structures
+            having a resolution value LESS than or equal this threshold will be included.
+            For example, a value of 2.5 will exclude all structures with resolution
+            greater than 2.5 Angstrom. Only the training set is filtered.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -248,6 +246,7 @@ def load(casp_version=12,
         local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
 
     scn_dict = _load_dict(local_path)
+    scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
 
     # By default, the load function returns a dictionary
     if not with_pytorch:
@@ -260,13 +259,65 @@ def load(casp_version=12,
             collate_fn=collate_fn,
             batch_size=batch_size,
             num_workers=num_workers,
-            return_masks=return_masks,
             seq_as_onehot=seq_as_onehot,
             dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
             train_eval_downsample=train_eval_downsample)
 
     return
+
+
+def filter_dictionary_by_resolution(raw_data, threshold=False):
+    """Filter SidechainNet data by removing poor-resolution training entries.
+
+    Args:
+        raw_data (dict): SidechainNet dictionary.
+        threshold (float, bool): Entries with resolution values greater than this value 
+            are discarded. Test set entries have no measured resolution and are not
+            excluded. Default is 3 Angstroms. If False, nothing is filtered.
+
+    Returns:
+        Filtered dictionary.
+    """
+    if not threshold:
+        return raw_data
+    if isinstance(threshold, bool) and threshold is True:
+        threshold = 3
+    new_data = {
+        "seq": [],
+        "ang": [],
+        "ids": [],
+        "evo": [],
+        "msk": [],
+        "crd": [],
+        "sec": [],
+        "res": []
+    }
+    train = raw_data["train"]
+    n_filtered_entries = 0
+    total_entires = 0.
+    for seq, ang, crd, msk, evo, _id, res, sec in zip(train['seq'], train['ang'],
+                                                      train['crd'], train['msk'],
+                                                      train['evo'], train['ids'],
+                                                      train['res'], train['sec']):
+        total_entires += 1
+        if not res or res > threshold:
+            n_filtered_entries += 1
+            continue
+        else:
+            new_data["seq"].append(seq)
+            new_data["ang"].append(ang)
+            new_data["ids"].append(_id)
+            new_data["evo"].append(evo)
+            new_data["msk"].append(msk)
+            new_data["crd"].append(crd)
+            new_data["sec"].append(sec)
+            new_data["res"].append(res)
+    if n_filtered_entries:
+        print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
+              " training set entries were excluded based on resolution.")
+    raw_data["train"] = new_data
+    return raw_data
 
 
 # TODO: Finish uploading files to Box for distribution
@@ -356,6 +407,6 @@ BOXURLS = {
         "",
 
     # Other
-    "debug.pkl":
-        "https://pitt.box.com/shared/static/t1t9ahdhgv5h8937rdani9ihp34gs7bu.pkl"
+    "sidechainnet_debug.pkl":
+        "https://pitt.box.com/shared/static/wtmcirlef152iwk8kcg7fgka2ki7tlyj.pkl"
 }

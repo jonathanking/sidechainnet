@@ -3,7 +3,7 @@ SidechainNet
 [//]: # (Badges)
 [![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
 
-**[Colab Walkthrough](https://colab.research.google.com/drive/1WLaXUK0n2t1FLapFbr1hPQI5o23WAgqm?usp=sharing)**
+**[Colab Walkthrough](https://colab.research.google.com/drive/11ZZyqwfu7ZTyUKdqt9uy59AqqYccRVcU?usp=sharing)**
 
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
@@ -20,17 +20,21 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 | Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
 | :---: | :---: |  :---: | :---: | :---: | 
 | Primary sequence | *L x 1* | `seq` | X | X | 
+| Secondary structure ([DSSP](https://swift.cmbi.umcn.nl/gv/dssp/DSSP_2.html))<sup>\*\*</sup> | *L x 1* | `sec` | X | X |
 | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` | X | X | 
 | Missing residue mask | *L x 1* |  `msk` | X | X | 
-| Backbone coordinates | *L x 4<sup>\*\*</sup> x 3* |  `crd`, subset `[0:4]` | X | X | 
+| Backbone coordinates | *L x 4<sup>\*\*\*</sup> x 3* |  `crd`, subset `[0:4]` | X | X | 
 | Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` |  | X | 
 | Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` |  | X | 
 | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |  | X | 
 | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X | 
+| Structure resolution | *1* | `res` | | X |
 
 **L* reperesents the length of any given protein in the dataset.
 
-<sup>**</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
+<sup>*\*</sup>Secondary structure is acquired from ProteinNet for training sets only. (Added January 2020)
+
+<sup>**\*</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
 ## Installation
 To run this code, it's recommended to first clone the repo into an appropriate source directory with `git clone <CLONE_URL>`. Then, perform a developmental install of the package with pip in your current environment with `pip install -e .`. This will install the `sidechainnet` package in your environment.
@@ -51,6 +55,7 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences
                   "ang": [ang1, ang2, ...],  # Angles
                   "crd": [crd1, crd2, ...],  # Coordinates
                   "evo": [evo1, evo2, ...],  # PSSMs and Information Content
+                  "sec": [sec1, sec2, ...],  # Secondary structure labels (DSSP)
                   "ids": [id1, id2,   ...],  # Corresponding ProteinNet IDs
                   },
         "valid-10": {...},
@@ -59,7 +64,7 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences
         "test":     {...},
         "settings": {...},
         "description" : "SidechainNet for CASP 12."
-        "date": "September 20, 2020"
+        "date": "January 20, 2020"
         }
 ```
 By default, the `load` function downloads the data from the web into the current directory and loads it as a Python dictionary. If the data already exists locally, it reads it from disk. Other than the requirement that the data must be loaded using Python, this method of data loading is agnostic to any downstream analyses
@@ -85,12 +90,13 @@ ProteinDataset(casp_version=12, split='train', n_proteins=81454,
 
 ```
 
-We have also made it possible to access the protein sequence and PSSM data directly when training by adding `aggregate_model_input=False` to `scn.load`.
+We have also made it possible to access the protein sequence, secondary structure, and PSSM
+ data directly when training by adding `aggregate_model_input=False` to `scn.load`.
 
 ```python
 >>> dataloaders = scn.load(casp_version=12, with_pytorch="dataloaders",
                            aggregate_model_input=False)
->>> for (protein_id, sequence, mask, pssm, true_angles,
+>>> for (protein_id, sequence, mask, pssm, sec_str, true_angles,
          true_coords) in dataloaders['train']:
 ....    prediction = model(sequence, pssm)
 ....    ...

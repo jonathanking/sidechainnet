@@ -261,15 +261,3 @@ def write_errors_to_files(results_warnings, pnids):
             f.write(f"{failed_id}\n")
 
     return combined_data, errors
-
-
-def make_debug_dataset(dataset, n=500):
-    """Downsamples a given dataset's train split to have n entries."""
-    import numpy as np
-    indicies = np.random.randint(0, len(dataset['train']['seq']), n)
-    indicies = sorted(indicies, key=lambda idx: len(dataset['train']['seq'][idx]))
-
-    for i in ['seq', 'crd', 'msk', 'ang', 'evo']:
-        dataset['train'][i] = [dataset['train'][i][idx] for idx in indicies]
-
-    return dataset

@@ -84,7 +84,7 @@ def masks_match(pn, new):
         return False
 
 
-def shorten_ends(s1, s2, s1_ang, s1_crd):
+def shorten_ends(s1, s2, s1_ang, s1_crd, s1_dssp):
     """Shortens s1 by removing characters at either end that don't match s2.
 
     Args:
@@ -110,10 +110,10 @@ def shorten_ends(s1, s2, s1_ang, s1_crd):
         s1_ang = s1_ang[1:]
         s1_crd = s1_crd[NUM_COORDS_PER_RES:]
         mask = mask[1:]
-    return s1, s1_ang, s1_crd
+    return s1, s1_ang, s1_crd, s1_dssp
 
 
-def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
+def merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid, attempt_number=0):
     """Returns True iff when pn_seq and my_seq are aligned, the resultant mask is the same
     as reported by ProteinNet.
 
@@ -128,43 +128,68 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
     except OverflowError:
         n_alignments = 50
         warning = "failed"
-        return None, None, ang, crd, warning
+        return None, None, ang, crd, dssp, warning
 
     if n_alignments == 0 and attempt_number == 0:
         # Use aligner with a typical set of assumptions.
         aligner = init_aligner()
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=1)
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     dssp,
+                     pn_mask,
+                     pnid,
+                     attempt_number=1)
 
     if n_alignments == 0 and attempt_number == 1:
         # If there appear to be no alignments, it may be the case that there
         # were residues observed that were not present in the ProteinNet
         # sequence. If this occurs at the edges, we can safely trim the
         # observed sequence and try alignment once again
-        my_seq, ang, crd = shorten_ends(my_seq, pn_seq, ang, crd)
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=2)
+        my_seq, ang, crd, dssp = shorten_ends(my_seq, pn_seq, ang, crd, dssp)
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     dssp,
+                     pn_mask,
+                     pnid,
+                     attempt_number=2)
 
     if n_alignments == 0 and attempt_number == 2:
         # Try making very few assumptions about gaps before allowing mismatches/gaps in
         # the target sequence.
         aligner = init_basic_aligner(allow_mismatches=True)
-        return merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=3)
+        return merge(aligner,
+                     pn_seq,
+                     my_seq,
+                     ang,
+                     crd,
+                     dssp,
+                     pn_mask,
+                     pnid,
+                     attempt_number=3)
 
     elif n_alignments == 0 and attempt_number == 3:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
-        mask, a0, ang, crd, warning = merge(aligner,
-                                            pn_seq,
-                                            my_seq,
-                                            ang,
-                                            crd,
-                                            pn_mask,
-                                            pnid,
-                                            attempt_number=4)
+        mask, a0, ang, crd, dssp, warning = merge(aligner,
+                                                  pn_seq,
+                                                  my_seq,
+                                                  ang,
+                                                  crd,
+                                                  dssp,
+                                                  pn_mask,
+                                                  pnid,
+                                                  attempt_number=4)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
-        return mask, a0, ang, crd, warning
+        return mask, a0, ang, crd, dssp, warning
 
     elif n_alignments == 0 and attempt_number == 4:
         warning = "failed"
-        return None, None, ang, crd, warning
+        return None, None, ang, crd, dssp, warning
 
     elif n_alignments == 1:
         a0 = a[0]
@@ -187,7 +212,7 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
                     warning = "single alignment, mask mismatch"
             else:
                 warning = "single alignment, mask mismatch"
-        return computed_mask, a0, ang, crd, warning
+        return computed_mask, a0, ang, crd, dssp, warning
 
     elif n_alignments > 1:
         best_mask = None
@@ -220,13 +245,13 @@ def merge(aligner, pn_seq, my_seq, ang, crd, pn_mask, pnid, attempt_number=0):
             warning = "multiple alignments, found matching mask" if not warning else warning + ", multiple alignments, found matching mask"
             if has_many_alignments:
                 warning += ", many alignments"
-            return best_mask, best_alignment, ang, crd, warning
+            return best_mask, best_alignment, ang, crd, dssp, warning
         else:
             mask = get_mask_from_alignment(a[0])
             warning = "multiple alignments, mask mismatch" if not warning else warning + ", multiple alignments, mask mismatch"
             if has_many_alignments:
                 warning += ", many alignments"
-            return mask, a[0], ang, crd, warning
+            return mask, a[0], ang, crd, dssp, warning
 
 
 def other_alignments_with_same_score(all_alignments, cur_alignment_idx,
@@ -297,29 +322,40 @@ def expand_data_with_mask(data, mask):
         Data in the same format, possibly extending L to match the length of
         the mask, that now contains padding.
     """
-    if mask.count("-") == 0 and data.shape[0] == len(mask):
+    if ((isinstance(data, str) and mask.count("-") == 0 and len(data) == len(mask)) or
+        (not isinstance(data, str) and mask.count("-") == 0 and
+         data.shape[0] == len(mask))):
         return data
 
-    size = data.shape[-1]
-    if size == 3:
-        data = coordinate_iterator(data, NUM_COORDS_PER_RES)
-        blank = np.empty((NUM_COORDS_PER_RES, 3))
+    if isinstance(data, str):
+        size = len(data)
+        blank = " "
+        data_iter = iter(data)
     else:
-        data = iter(data)
-        blank = np.empty((size,))
-
-    blank[:] = GLOBAL_PAD_CHAR
+        size = data.shape[-1]
+        if size == 3:
+            data_iter = coordinate_iterator(data, NUM_COORDS_PER_RES)
+            blank = np.empty((NUM_COORDS_PER_RES, 3))
+        else:
+            data_iter = iter(data)
+            blank = np.empty((size,))
+        blank[:] = GLOBAL_PAD_CHAR
 
     new_data = []
     for m in mask:
         if m == "+" or m == ".":
-            new_data.append(next(data))
+            new_data.append(next(data_iter))
+        elif m == "-" and isinstance(data, str):
+            new_data.append(blank)
         elif m == "-":
             new_data.append(blank.copy())
         else:
             raise ValueError(f"Unknown mask character '{m}'.")
 
-    return np.vstack(new_data)
+    if isinstance(data, str):
+        return "".join(new_data)
+    else:
+        return np.vstack(new_data)
 
 
 def pad_seq_with_mask(seq, mask):

@@ -1,6 +1,7 @@
 """Functionality for parsing raw ProteinNet files."""
 
 import itertools
+import json
 import multiprocessing
 import os
 import pickle
@@ -247,6 +248,16 @@ def parse_astral_summary_file(lines):
     return d
 
 
+def parse_dssp_file(path):
+    """Parse AlQuraishi's DSSP files provided from ProteinNet."""
+    with open(path, "r") as f:
+        data = json.load(f)
+    new_dict = {}
+    for key in data:
+        new_dict[key] = data[key]["DSSP"]
+    return new_dict
+
+
 def get_chain_from_astral_id(astral_id, d):
     """Given an ASTRAL ID and the ASTRAL->PDB/chain mapping dictionary, this function
     attempts to return the relevant, parsed ProDy object."""
@@ -261,8 +272,9 @@ def get_chain_from_astral_id(astral_id, d):
 
     # Handle special case https://github.com/prody/ProDy/issues/1197
     if astral_id == "d1tocr1":
+        # a = pr.performDSSP("1toc")
         a = pr.parsePDB("1toc", chain="R")
-        a = a.select("resnum 2 to 59 or resnum 1A")  # Note there is no 1B
+        a = a.select("(chain R) and (resnum 2 to 59 or resnum 1A)")  # Note there is no 1B
         return a
 
     a = pr.parsePDB(pdbid, chain=chain)

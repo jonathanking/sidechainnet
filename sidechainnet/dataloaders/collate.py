@@ -1,23 +1,27 @@
 """Implements a collating function for use with PyTorch's DataLoaders."""
+import collections
+
 import numpy as np
 import torch
 import torch.utils.data
 
 from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatchSampler
 from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
-from sidechainnet.utils.sequence import VOCAB
+from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
-def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
+Batch = collections.namedtuple("Batch",
+                               "pids seqs msks evos secs angs crds int_seqs seq_evo_sec")
+
+
+def get_collate_fn(aggregate_input, seqs_as_onehot=None):
     """Return a collate function for collating ProteinDataset batches.
 
     Args:
         aggregate_input: Boolean. If true, combine input items (seq, pssms) into a single
             tensor, as opposed to separate tensors.
-        return_masks: Boolean. If true, return the sequence masks marking missing residues
-            along with the other data types when iterating.
         seqs_as_onehot: Boolean or None. If None, sequences are represented as one-hot
             vectors during aggregation or represented as integer sequences when not
             aggregated. The user may also specify True if they would like one-hot vectors
@@ -26,16 +30,15 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
     Returns:
         A collate function capable of collating batches from a ProteinDataset.
     """
-
-    if seqs_as_onehot == False and aggregate_input:
-        raise ValueError("Sequences must be represented as one-hot vectors if model input"
-                         " is to be aggregated.")
-
     if seqs_as_onehot is None:
         if aggregate_input:
             seqs_as_onehot = True
         else:
             seqs_as_onehot = False
+
+    if not seqs_as_onehot and aggregate_input:
+        raise ValueError("Sequences must be represented as one-hot vectors if model input"
+                         " is to be aggregated.")
 
     def collate_fn(insts):
         """Collates items extracted from a ProteinDataset, returning all items separately.
@@ -55,43 +58,61 @@ def get_collate_fn(aggregate_input, return_masks=False, seqs_as_onehot=None):
         """
         # Instead of working with a list of tuples, we extract out each category of info
         # so it can be padded and re-provided to the user.
-        pnids, sequences, masks, pssms, angles, coords, = list(zip(*insts))
+        pnids, sequences, masks, pssms, secs, angles, coords, = list(zip(*insts))
         max_batch_len = max(len(s) for s in sequences)
 
+        int_seqs = pad_for_batch(sequences,
+                                 max_batch_len,
+                                 'seq',
+                                 seqs_as_onehot=False,
+                                 vocab=VOCAB)
         padded_seqs = pad_for_batch(sequences,
                                     max_batch_len,
                                     'seq',
-                                    seqs_as_onehot=seqs_as_onehot)
+                                    seqs_as_onehot=seqs_as_onehot,
+                                    vocab=VOCAB)
+        padded_secs = pad_for_batch(secs,
+                                    max_batch_len,
+                                    'seq',
+                                    seqs_as_onehot=seqs_as_onehot,
+                                    vocab=DSSPVocabulary())
         padded_msks = pad_for_batch(masks, max_batch_len, 'msk')
         padded_pssms = pad_for_batch(pssms, max_batch_len, 'pssm')
         padded_angs = pad_for_batch(angles, max_batch_len, 'ang')
         padded_crds = pad_for_batch(coords, max_batch_len, 'crd')
 
         # Non-aggregated model input
-        if not aggregate_input and not return_masks:
-            return pnids, padded_seqs, padded_pssms, padded_angs, padded_crds
-        elif not aggregate_input and return_masks:
-            return pnids, padded_seqs, padded_msks, padded_pssms, padded_angs, padded_crds
+        if not aggregate_input:
+            return Batch(pids=pnids,
+                         seqs=padded_seqs,
+                         msks=padded_msks,
+                         evos=padded_pssms,
+                         secs=padded_secs,
+                         angs=padded_angs,
+                         crds=padded_crds,
+                         int_seqs=int_seqs,
+                         seq_evo_sec=None)
 
         # Aggregated model input
         elif aggregate_input:
-            model_input = torch.cat([padded_seqs.float(), padded_pssms], dim=-1)
-            integer_seqs = pad_for_batch(sequences,
-                                         max_batch_len,
-                                         'seq',
-                                         seqs_as_onehot=False)
+            seq_evo_sec = torch.cat(
+                [padded_seqs.float(), padded_pssms,
+                 padded_secs.float()], dim=-1)
 
-            if return_masks:
-                return (pnids, integer_seqs, model_input, padded_msks, padded_angs,
-                        padded_crds)
-            else:
-                # Default return value, no masks
-                return pnids, integer_seqs, model_input, padded_angs, padded_crds
+            return Batch(pids=pnids,
+                         seqs=padded_seqs,
+                         msks=padded_msks,
+                         evos=padded_pssms,
+                         secs=padded_secs,
+                         angs=padded_angs,
+                         crds=padded_crds,
+                         int_seqs=int_seqs,
+                         seq_evo_sec=seq_evo_sec)
 
     return collate_fn
 
 
-def pad_for_batch(items, batch_length, dtype="", seqs_as_onehot=False):
+def pad_for_batch(items, batch_length, dtype="", seqs_as_onehot=False, vocab=None):
     """Pad a list of items to batch_length using values dependent on the item type.
 
     Args:
@@ -101,6 +122,10 @@ def pad_for_batch(items, batch_length, dtype="", seqs_as_onehot=False):
             items are padded so that their length matches this number.
         dtype: A string ('seq', 'msk', 'pssm', 'ang', 'crd') reperesenting the type of
             data included in items.
+        seqs_as_onehot: Boolean. If True, sequence-type data will be returned in 1-hot
+            vector form.
+        vocab: DSSPVocabulary or ProteinVocabulary. Vocabulary object for translating
+            and handling sequence-type data.
 
     Returns:
          A padded list of the input items, all independently converted to Torch tensors.
@@ -109,15 +134,15 @@ def pad_for_batch(items, batch_length, dtype="", seqs_as_onehot=False):
     if dtype == "seq":
         # Sequences are padded with a specific VOCAB pad character
         for seq in items:
-            z = np.ones((batch_length - len(seq))) * VOCAB.pad_id
+            z = np.ones((batch_length - len(seq))) * vocab.pad_id
             c = np.concatenate((seq, z), axis=0)
             batch.append(c)
         batch = np.array(batch)
         batch = batch[:, :MAX_SEQ_LEN]
         batch = torch.LongTensor(batch)
         if seqs_as_onehot:
-            batch = torch.nn.functional.one_hot(batch, len(VOCAB))
-            if VOCAB.include_pad_char:
+            batch = torch.nn.functional.one_hot(batch, len(vocab))
+            if vocab.include_pad_char:
                 # Delete the column for the pad character since it is implied (0-vector)
                 if len(batch.shape) == 3:
                     batch = batch[:, :, :-1]
@@ -161,7 +186,6 @@ def prepare_dataloaders(data,
                         collate_fn=None,
                         batch_size=32,
                         num_workers=1,
-                        return_masks=False,
                         seq_as_onehot=None,
                         dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
@@ -183,9 +207,7 @@ def prepare_dataloaders(data,
         batch_size: Batch size to use when yielding batches from a DataLoader.
     """
     if collate_fn is None:
-        collate_fn = get_collate_fn(aggregate_model_input,
-                                    return_masks=return_masks,
-                                    seqs_as_onehot=seq_as_onehot)
+        collate_fn = get_collate_fn(aggregate_model_input, seqs_as_onehot=seq_as_onehot)
 
     train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
 

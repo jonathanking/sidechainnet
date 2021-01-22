@@ -116,3 +116,5 @@ errors/
 .DS_Store
 *errors*/
 *ignored/
+*.dssp
+*.stride

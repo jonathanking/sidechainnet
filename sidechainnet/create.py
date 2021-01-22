@@ -41,6 +41,7 @@ from sidechainnet.utils.organize import load_data, organize_data, save_data
 from sidechainnet.utils.parse import parse_raw_proteinnet
 
 pr.confProDy(verbosity="none")
+pr.confProDy(auto_secondary=False)
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
@@ -57,17 +58,15 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     Returns:
         A dictionary that has unified the two sets of information.
     """
-    if "secondary" in pn_entry:
-        print("WARNING: secondary structure information is not yet supported. "
-              "As of October 2020, it is not included in ProteinNet.")
 
     sc_entry = manually_adjust_data(pnid, sc_entry)
     if needs_manual_adjustment(pnid):
         return {}, "needs manual adjustment"
 
-    mask, alignment, ang, crd, warning = merge(aligner, pn_entry["primary"],
-                                               sc_entry["seq"], sc_entry["ang"],
-                                               sc_entry["crd"], pn_entry["mask"], pnid)
+    mask, alignment, ang, crd, dssp, warning = merge(aligner, pn_entry["primary"],
+                                                     sc_entry["seq"], sc_entry["ang"],
+                                                     sc_entry["crd"], sc_entry["sec"],
+                                                     pn_entry["mask"], pnid)
     new_entry = {}
 
     if alignment:
@@ -83,17 +82,18 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         mask = manually_correct_mask(pnid, pn_entry, mask)
         new_entry["ang"] = expand_data_with_mask(ang, mask)
         new_entry["crd"] = expand_data_with_mask(crd, mask)
+        new_entry["sec"] = expand_data_with_mask(dssp, mask)
         new_entry["msk"] = mask
+        new_entry["res"] = sc_entry["res"]
 
-        l = len(pn_entry["primary"])
+        length = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
-                if len(v) // NUM_COORDS_PER_RES != l:
+                if len(v) // NUM_COORDS_PER_RES != length:
                     return {}, "failed"
-            else:
-                if len(v) != l:
+            elif k != "res":
+                if len(v) != length:
                     return {}, "failed"
-                assert len(v) == l, f"{k} does not have correct length {l} (is {len(v)})."
 
     return new_entry, warning
 
@@ -151,7 +151,7 @@ def get_tuple(pndata, scdata, pnid):
 def format_sidechainnet_path(casp_version, training_split):
     """Returns a string representing a .pkl file for a CASP version and training set."""
     if casp_version == "debug":
-        return "debug.pkl"
+        return "sidechainnet_debug.pkl"
     return f"sidechainnet_casp{casp_version}_{training_split}.pkl"
 
 
@@ -201,6 +201,13 @@ def create_all():
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet_raw_100 = combine_datasets(args.proteinnet_out, sc_only_data, 100)
 
+    # Generate debug dataset with 200 training examples
+    sc_outfile = os.path.join(args.sidechainnet_out, format_sidechainnet_path("debug", 0))
+    debug = organize_data(sidechainnet_raw_100, args.proteinnet_out, "debug", "debug")
+    save_data(debug, sc_outfile)
+    print(f"SidechainNet for CASP {args.casp_version} (debug) written to {sc_outfile}.")
+
+    # Generate the rest of the training sets
     for training_set in [100, 95, 90, 70, 50, 30]:
         sc_outfile = os.path.join(
             args.sidechainnet_out,

@@ -5,6 +5,7 @@ import numpy as np
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, NUM_ANGLES
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
+
 def trim_mask_and_true_seqs(mask_seq, true_seq):
     """Given an equal-length mask and sequence, removes gaps from the ends of both."""
     mask_seq_no_left = mask_seq.lstrip('-')
@@ -181,6 +182,51 @@ class ProteinVocabulary(object):
                 seq += c
         return seq
 
+
+class DSSPVocabulary(object):
+    """Represents the 'vocabulary' of DSSP secondary structure codes."""
+
+    def __init__(self, add_sos_eos=False):
+        self.include_pad_char = True
+        self.pad_char = " "  # Pad character
+        self.sos_char = "<"  # SOS character
+        self.eos_char = ">"  # EOS character
+
+        codes = DSSP_CODES + " "
+
+        if add_sos_eos:
+            codes += "<>"
+        self._char2int = {c: i for (i, c) in enumerate(codes)}
+        self._int2char = {v: k for (k, v) in self._char2int.items()}
+        self.pad_id = self._char2int[" "]
+
+    def __getitem__(self, aa):
+        if self.include_unknown_char:
+            return self._char2int.get(aa, self._char2int[self.unk_char])
+        else:
+            return self._char2int.get(aa, self._char2int[self.pad_char])
+
+    def __contains__(self, aa):
+        return aa in self._char2int
+
+    def __len__(self):
+        return len(self._char2int)
+
+    def __repr__(self):
+        return f"DSSPVocabulary[size={len(self)}]"
+
+    def int2char(self, idx):
+        return self._int2char[idx]
+
+    def str2ints(self, seq, add_sos_eos=True):
+        if add_sos_eos:
+            return [self._char2int["<"]] + [self._char2int[c] for c in seq
+                                           ] + [self._char2int[">"]]
+        else:
+            return [self._char2int[c] for c in seq]
+
+
+DSSP_CODES = dssp_codes = "BEGHILST"
 
 ONE_TO_THREE_LETTER_MAP = {
     "R": "ARG",
