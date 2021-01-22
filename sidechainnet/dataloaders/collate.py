@@ -36,7 +36,7 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
         raise ValueError("Sequences must be represented as one-hot vectors if model input"
                          " is to be aggregated.")
 
-    Batch = collections.named_tuple(
+    Batch = collections.namedtuple(
         "Batch", "pids seqs msks evos secs angs crds int_seqs seq_evo_sec")
 
     def collate_fn(insts):
