@@ -1,4 +1,6 @@
 """Implements a collating function for use with PyTorch's DataLoaders."""
+import collections
+
 import numpy as np
 import torch
 import torch.utils.data
@@ -11,25 +13,16 @@ from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
 
 
 def get_collate_fn(aggregate_input,
-                   return_masks=False,
-                   seqs_as_onehot=None,
-                   include_secondary=True):
+                   seqs_as_onehot=None):
     """Return a collate function for collating ProteinDataset batches.
 
     Args:
         aggregate_input: Boolean. If true, combine input items (seq, pssms) into a single
             tensor, as opposed to separate tensors.
-        return_masks: Boolean. If true, return the sequence masks marking missing residues
-            along with the other data types when iterating.
         seqs_as_onehot: Boolean or None. If None, sequences are represented as one-hot
             vectors during aggregation or represented as integer sequences when not
             aggregated. The user may also specify True if they would like one-hot vectors
             returned iff aggregate_input is False.
-        include_secondary: Boolean. If true, return secondary structure while batching.
-            Data ordering = pnids, sequences, pssms, secondary, angles, coordinates. If
-            data is aggregated, then sequences, pssms, and secondary are all stacked,
-            with sequences and secondary information first converted into one-hot
-            sequences with 0-vectors representing padding.
 
     Returns:
         A collate function capable of collating batches from a ProteinDataset.
@@ -43,6 +36,8 @@ def get_collate_fn(aggregate_input,
     if not seqs_as_onehot and aggregate_input:
         raise ValueError("Sequences must be represented as one-hot vectors if model input"
                          " is to be aggregated.")
+    
+     Batch = collections.named_tuple("Batch", "pids seqs msks evos secs angs crds int_seqs seq_evo_sec")
 
     def collate_fn(insts):
         """Collates items extracted from a ProteinDataset, returning all items separately.
@@ -65,6 +60,11 @@ def get_collate_fn(aggregate_input,
         pnids, sequences, masks, pssms, secs, angles, coords, = list(zip(*insts))
         max_batch_len = max(len(s) for s in sequences)
 
+        int_seqs = pad_for_batch(sequences,
+                                         max_batch_len,
+                                         'seq',
+                                         seqs_as_onehot=False,
+                                         vocab=VOCAB)
         padded_seqs = pad_for_batch(sequences,
                                     max_batch_len,
                                     'seq',
@@ -81,37 +81,32 @@ def get_collate_fn(aggregate_input,
         padded_crds = pad_for_batch(coords, max_batch_len, 'crd')
 
         # Non-aggregated model input
-        if not aggregate_input and not return_masks:
-            if include_secondary:
-                return pnids, padded_seqs, padded_pssms, padded_secs, padded_angs, padded_crds
-            else:
-                return pnids, padded_seqs, padded_pssms, padded_angs, padded_crds
-        elif not aggregate_input and return_masks:
-            if include_secondary:
-                return pnids, padded_seqs, padded_msks, padded_pssms, padded_secs, padded_angs, padded_crds
-            else:
-                return pnids, padded_seqs, padded_msks, padded_pssms, padded_angs, padded_crds
-
+        if not aggregate_input:
+            return Batch(pids=pnids,
+                        seqs=padded_seqs,
+                        msks=padded_msks,
+                        evos=padded_pssms,
+                        secs=padded_secs,
+                        angs=padded_angs,
+                        crds=padded_crds,
+                        int_seqs=int_seqs,
+                        seq_evo_sec=None)
+        
         # Aggregated model input
         elif aggregate_input:
-            if include_secondary:
-                model_input = torch.cat(
-                    [padded_seqs.float(), padded_pssms,
-                     padded_secs.float()], dim=-1)
-            else:
-                model_input = torch.cat([padded_seqs.float(), padded_pssms], dim=-1)
-            integer_seqs = pad_for_batch(sequences,
-                                         max_batch_len,
-                                         'seq',
-                                         seqs_as_onehot=False,
-                                         vocab=VOCAB)
+            seq_evo_sec = torch.cat(
+                [padded_seqs.float(), padded_pssms, padded_secs.float()], dim=-1)
 
-            if return_masks:
-                return (pnids, integer_seqs, model_input, padded_msks, padded_angs,
-                        padded_crds)
-            else:
-                # Default return value, no masks
-                return pnids, integer_seqs, model_input, padded_angs, padded_crds
+            return Batch(pids=pnids,
+                        seqs=padded_seqs,
+                        msks=padded_msks,
+                        evos=padded_pssms,
+                        secs=padded_secs,
+                        angs=padded_angs,
+                        crds=padded_crds,
+                        int_seqs=int_seqs,
+                        seq_evo_sec=seq_evo_sec)
+            
 
     return collate_fn
 
@@ -190,12 +185,10 @@ def prepare_dataloaders(data,
                         collate_fn=None,
                         batch_size=32,
                         num_workers=1,
-                        return_masks=False,
                         seq_as_onehot=None,
                         dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
-                        train_eval_downsample=0.1,
-                        include_secondary=True):
+                        train_eval_downsample=0.1):
     """Return dataloaders for model training according to user specifications.
 
     Using the pre-processed data, stored in a nested Python dictionary, this
@@ -214,9 +207,7 @@ def prepare_dataloaders(data,
     """
     if collate_fn is None:
         collate_fn = get_collate_fn(aggregate_model_input,
-                                    return_masks=return_masks,
-                                    seqs_as_onehot=seq_as_onehot,
-                                    include_secondary=include_secondary)
+                                    seqs_as_onehot=seq_as_onehot)
 
     train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
 

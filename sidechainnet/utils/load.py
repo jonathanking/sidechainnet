@@ -94,14 +94,12 @@ def load(casp_version=12,
          aggregate_model_input=True,
          collate_fn=None,
          batch_size=32,
-         return_masks=False,
          seq_as_onehot=None,
          dynamic_batching=True,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2,
-         filter_by_resolution=False,
-         include_secondary=True):
+         filter_by_resolution=False):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -111,7 +109,7 @@ def load(casp_version=12,
     (with_pytorch='dataloaders') for easy access for model training with PyTorch. Several
     arguments are also available to allow the user to specify how the data should be
     loaded and batched when provided as DataLoaders (aggregate_model_input, collate_fn,
-    batch_size, return_masks, seq_as_one_hot, dynamic_batching, num_workers,
+    batch_size, seq_as_one_hot, dynamic_batching, num_workers,
     optimize_for_cpu_parallelism, and train_eval_downsample.)
 
     Args:
@@ -140,14 +138,6 @@ def load(casp_version=12,
             necessarily be equal to this number (though, on average, it will be close
             to this number). Only applicable when with_pytorch='dataloaders' is provided.
             Defaults to 32.
-        return_masks (bool, optional): If True, when batching, returns sequence masks as a
-            Tensor of 1s and 0s (with 0s representing missing residues). In the batch,
-            masks are always provided in the tuple following the model input or sequences.
-            For example, with aggregated model input and return_masks=True, batching
-            yields tuples of (protein_ids, model_input, masks, angles, coordinates). If
-            aggregate_model_input=False, and return_masks=True, batching yields tuples of
-            (protein_ids, sequences, masks, PSSMs, angles, coordinates). Defaults to
-            False.
         seq_as_onehot (bool, optional): By default, the None value of this argument causes
             sequence data to be represented as one-hot vectors (L x 20) when batching and
             aggregate_model_input=True or to be represented as integer sequences (shape L,
@@ -182,9 +172,6 @@ def load(casp_version=12,
             having a resolution value LESS than or equal this threshold will be included.
             For example, a value of 2.5 will exclude all structures with resolution
             greater than 2.5 Angstrom. Only the training set is filtered.
-        include_secondary (bool, optional): If True (by default), include protein
-            secondary structure info when iterating over a Dataloader. Note that this
-            information is only available for training data and comes from ProteinNet.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -272,12 +259,10 @@ def load(casp_version=12,
             collate_fn=collate_fn,
             batch_size=batch_size,
             num_workers=num_workers,
-            return_masks=return_masks,
             seq_as_onehot=seq_as_onehot,
             dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
-            train_eval_downsample=train_eval_downsample,
-            include_secondary=include_secondary)
+            train_eval_downsample=train_eval_downsample)
 
     return
 
