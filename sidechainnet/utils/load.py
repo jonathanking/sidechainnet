@@ -324,17 +324,17 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
 BOXURLS = {
     # CASP 12
     "sidechainnet_casp12_30.pkl":
-        "https://pitt.box.com/shared/static/sjnecyqfm8hkqf0nk5yz1cf3ct4dygyf.pkl",
+        "https://pitt.box.com/shared/static/hbatd2a750tx8e27yizwinc3hsceeeui.pkl",
     "sidechainnet_casp12_50.pkl":
-        "https://pitt.box.com/shared/static/h2sdnmxgobh9duamfzqvinjbx0tswn1i.pkl",
+        "https://pitt.box.com/shared/static/7cng5zdi2s4doruh1m512d281w2cmk0z.pkl",
     "sidechainnet_casp12_70.pkl":
-        "https://pitt.box.com/shared/static/7ikrp46bej1wylieqjpw76ceabcnc7r4.pkl",
+        "https://pitt.box.com/shared/static/xfaktrj8ole0eqktxi5fa4qp9efum8f2.pkl",
     "sidechainnet_casp12_90.pkl":
-        "https://pitt.box.com/shared/static/yn5ucsxwo9bp01yp23jltseg4j8sb3f8.pkl",
+        "https://pitt.box.com/shared/static/nh7vybjjm224m1nezrgmnywxsa4st2uk.pkl",
     "sidechainnet_casp12_95.pkl":
-        "https://pitt.box.com/shared/static/k3fr29s5dyckj6f535silvqab6ikai43.pkl",
+        "https://pitt.box.com/shared/static/wcz1kex8idnpy8zx7a59r3h6e216tlq1.pkl",
     "sidechainnet_casp12_100.pkl":
-        "https://pitt.box.com/shared/static/52ggdgl60optmp57b5mcwocv4cabwmbv.pkl",
+        "https://pitt.box.com/shared/static/ey5xh6l4p8iwzrxtxwpxt7oeg70eayl4.pkl",
 
     # CASP 11
     "sidechainnet_casp11_30.pkl":
