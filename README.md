@@ -32,7 +32,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 **L* reperesents the length of any given protein in the dataset.
 
-<sup>*\*</sup>Secondary structure is acquired from ProteinNet for training sets only. (Added January 2020)
+<sup>*\*</sup>Secondary structure is acquired from ProteinNet for training sets only. (Added January 2021)
 
 <sup>**\*</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
@@ -202,4 +202,4 @@ Project structure (continuous integration, docs, testing) based on the
 
 ## Copyright
 
-Copyright (c) 2020, Jonathan King
+Copyright (c) 2021, Jonathan King
