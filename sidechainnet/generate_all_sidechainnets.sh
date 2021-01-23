@@ -28,7 +28,7 @@
 PATH_TO_PROTEINNET_REPO=/home/jok120/proteinnet
 PATH_TO_SIDECHAINNET_REPO=/home/jok120/sidechainnet
 
-cd {PATH_TO_SIDECHAINNET_REPO}/sidechainnet
+cd ${PATH_TO_SIDECHAINNET_REPO}/sidechainnet
 
 echo "Processing CASP7..."
 PN_PATH=${PATH_TO_PROTEINNET_REPO}/data/casp7/casp7
