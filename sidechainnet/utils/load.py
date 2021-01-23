@@ -408,5 +408,5 @@ BOXURLS = {
 
     # Other
     "sidechainnet_debug.pkl":
-        "https://pitt.box.com/shared/static/wtmcirlef152iwk8kcg7fgka2ki7tlyj.pkl"
+        "https://pitt.box.com/shared/static/tevlb6nuii6kk520vi4x0u7li0eoxuep.pkl"
 }
