@@ -1,4 +1,6 @@
 # Reproducing SidechainNet
+
+*A boilerplate script for generation of all datasets (very time-consuming) can be found at [sidechainnet/generate_all_sidechainnets.sh](sidechainnet/generate_all_sidechainnets.sh). For a more detailed/piece-wise generation of SidechainNet, see below.*
  
  For steps 1 and 2, pay careful attention to the subdirectory structure indicated by `cd` and `mkdir` commands when downloading the raw ProteinNet data. **You will not need to download the ProteinNet repository, only the data linked to by ProteinNet's README.** 
 

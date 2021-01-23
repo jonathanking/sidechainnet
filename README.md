@@ -139,31 +139,31 @@ data = scn.load(casp_version=12,thinning=30, with_pytorch="dataloaders")
 
 for epoch in range(100):
     # Training epoch
-    for protein_ids, protein_seqs, model_input, tgt_angles, tgt_coords in data['train']:
-        predictions = model(model_input)
-        loss = loss_fn(predictions, tgt_angles, tgt_coords)
+    for batch in data['train']:
+        predictions = model(batch.seqs)
+        loss = loss_fn(predictions, batch.angs, batch.crds)
         loss.backwards()
         ...
     
     # Evaluate performance on down-sampled training set for efficiency
-    for protein_ids, protein_seqs, model_input, tgt_angles, tgt_coords in data['train-eval']:
-        predictions = model(model_input)
-        loss = loss_fn(predictions, tgt_angles, tgt_coords)
+    for batch in data['train-eval']:
+        predictions = model(batch.seqs)
+        loss = loss_fn(predictions, batch.angs, batch.crds)
         loss.backwards()
         ...
 
     # Evaluate performance on each of the 7 validation sets
     for valid_set in [data[f'valid-{split}'] for split in scn.utils.download.VALID_SPLITS]:
-        for protein_ids, protein_seqs, model_input, tgt_angles, tgt_coords in valid_set:
-            predictions = model(model_input)
-            loss = loss_fn(predictions, tgt_angles, tgt_coords)
+        for batch in valid_set:
+            predictions = model(batch.seqs)
+            loss = loss_fn(predictions, batch.angs, batch.crds)
             loss.backwards()
             ...
 
 # Evaluate performance on test set
-for protein_ids, protein_seqs, model_input, tgt_angles, tgt_coords in data['test']:
-    predictions = model(model_input)
-    loss = loss_fn(predictions, tgt_angles, tgt_coords)
+for batch in data['test']:
+    predictions = model(batch.seqs)
+    loss = loss_fn(predictions, batch.angs, batch.crds)
     ...
 ```
 

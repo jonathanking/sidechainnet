@@ -22,10 +22,10 @@
 # Temporarily parsed ProteinNet files will live in sidechainnet/data/proteinnet.
 # Generated SidechainNet files will live in sidechainnet/data/sidechainnet.
 #
-# To run, replace the first two variables with the path to your respective repos.
+# To run, replace the first two variables with the paths to your respective repos.
 
 
-PATH_TO_PROTEINNET_REPO=/home/jok120/proteinnet/
+PATH_TO_PROTEINNET_REPO=/home/jok120/proteinnet
 PATH_TO_SIDECHAINNET_REPO=/home/jok120/sidechainnet
 
 cd {PATH_TO_SIDECHAINNET_REPO}/sidechainnet
