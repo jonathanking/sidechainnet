@@ -175,7 +175,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 
 ## Reproducing SidechainNet
 
-If you would like to reproduce our work or make modifications to the dataset, you may follow [these directions](how_to_reproduce.md) below to generate SidechainNet from scratch.
+If you would like to reproduce our work or make modifications to the dataset, you may follow [these directions](how_to_reproduce.md) to generate SidechainNet from scratch.
 
 
 ## Package Requirements
