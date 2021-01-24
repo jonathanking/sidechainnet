@@ -320,7 +320,6 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
     return raw_data
 
 
-# TODO: Finish uploading files to Box for distribution
 BOXURLS = {
     # CASP 12
     "sidechainnet_casp12_30.pkl":
@@ -338,59 +337,59 @@ BOXURLS = {
 
     # CASP 11
     "sidechainnet_casp11_30.pkl":
-        "",
+        "https://pitt.box.com/shared/static/fzil4bgxt4fqpp416xw0e3y0ew4c7yct.pkl",
     "sidechainnet_casp11_50.pkl":
-        "",
+        "https://pitt.box.com/shared/static/rux3p18k523y8zbo40u1l856826buvui.pkl",
     "sidechainnet_casp11_70.pkl":
-        "",
+        "https://pitt.box.com/shared/static/tl51ym0hzjdvq4qs5f5shsj0sl9mkvd0.pkl",
     "sidechainnet_casp11_90.pkl":
-        "",
+        "https://pitt.box.com/shared/static/iheqs3vqszoxsdq46nkzf5kylt8ecjbx.pkl",
     "sidechainnet_casp11_95.pkl":
-        "",
+        "https://pitt.box.com/shared/static/gbme2a5yifpugtmthwu2989xxyg5b8i6.pkl",
     "sidechainnet_casp11_100.pkl":
-        "",
+        "https://pitt.box.com/shared/static/3cfx02k2yw4ux2mrbvwrrj91zsftcpbj.pkl",
 
     # CASP 10
     "sidechainnet_casp10_30.pkl":
-        "",
+        "https://pitt.box.com/shared/static/fe0hpjrldi2y1g374mgdzfpdipajd6s4.pkl",
     "sidechainnet_casp10_50.pkl":
-        "",
+        "https://pitt.box.com/shared/static/tsnt6s07txas0h37cpzepck580yme9vv.pkl",
     "sidechainnet_casp10_70.pkl":
-        "",
+        "https://pitt.box.com/shared/static/awmzr4jj68p61ab031smixryt69p8ykm.pkl",
     "sidechainnet_casp10_90.pkl":
-        "",
+        "https://pitt.box.com/shared/static/it6zcugy997c1550kima3m3fu8kamnh8.pkl",
     "sidechainnet_casp10_95.pkl":
-        "",
+        "https://pitt.box.com/shared/static/q6ld9h276kobhmmtvdq581qnm61oevup.pkl",
     "sidechainnet_casp10_100.pkl":
-        "",
+        "https://pitt.box.com/shared/static/fpixgzh9n86xyzpwtlc74lle4fd3p5es.pkl",
 
     # CASP 9
     "sidechainnet_casp9_30.pkl":
-        "",
+        "https://pitt.box.com/shared/static/j1h3181d2mibqvc7jrqm17dprzj6pxmc.pkl",
     "sidechainnet_casp9_50.pkl":
-        "",
+        "https://pitt.box.com/shared/static/l363lu9ztpdmcybthtytwnrvvkib2228.pkl",
     "sidechainnet_casp9_70.pkl":
-        "",
+        "https://pitt.box.com/shared/static/4uh1yggpdhm0aoeisomnyfuac4j20qzc.pkl",
     "sidechainnet_casp9_90.pkl":
-        "",
+        "https://pitt.box.com/shared/static/scv7l6qfr2j93pn4cu40ouhmxbns6k7x.pkl",
     "sidechainnet_casp9_95.pkl":
-        "",
+        "https://pitt.box.com/shared/static/tqpugpr7wamvmkyrtd8tqnzft6u53zha.pkl",
     "sidechainnet_casp9_100.pkl":
-        "",
+        "https://pitt.box.com/shared/static/jjtubu2lxwlv1aw8tfc7u27vcf2yz39v.pkl",
 
     # CASP 8
     "sidechainnet_casp8_30.pkl":
-        "",
+        "https://pitt.box.com/shared/static/1hx2n3y2gn3flnlsw2wb1e4l4nlru5mz.pkl",
     "sidechainnet_casp8_50.pkl":
-        "",
+        "https://pitt.box.com/shared/static/4u8tuqkm5pv34hm139uw9dqc4ieebsue.pkl",
     "sidechainnet_casp8_70.pkl":
-        "",
+        "https://pitt.box.com/shared/static/vj58yaeph55zjb04jezmqams66mn4bil.pkl",
     "sidechainnet_casp8_90.pkl":
-        "",
+        "https://pitt.box.com/shared/static/1ry2j47lde7zk5fxzvuffv05k1gq29oh.pkl",
     "sidechainnet_casp8_95.pkl":
-        "",
+        "https://pitt.box.com/shared/static/9uaw2tv61xyfd8gtw9n8e3hfcken4t4x.pkl",
     "sidechainnet_casp8_100.pkl":
-        "",
+        "https://pitt.box.com/shared/static/crk59vz6dw9cbbvne10owa450zgv1j79.pkl",
 
     # CASP 7
     "sidechainnet_casp7_30.pkl":
