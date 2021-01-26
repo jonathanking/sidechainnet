@@ -81,10 +81,11 @@ The `load` function can also be used to load SidechainNet data as a dictionary o
 ProteinDataset(casp_version=12, split='train', n_proteins=81454,
                created='Sep 20, 2020')
 >>> for batch in dataloaders['train']:
-....    predicted_angles = model(batch.seqs)             
-....    predicted_coords = angles_to_coordinates(batch.angs)
+....    predicted_angles = model(batch.seqs)
+....    sb = scn.BatchedStructureBuilder(batch.int_seqs, predicted_angles)
+....    predicted_coords = sb.build()
 ....    loss = compute_loss(batch.angs, batch.crds,               # True values
-                            predicted_angles, predicted_coords)   # Predicted values
+....                        predicted_angles, predicted_coords)   # Predicted values
 ....    ...
 
 ```
