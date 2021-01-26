@@ -3,7 +3,7 @@ SidechainNet
 [//]: # (Badges)
 [![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
 
-**[Colab Walkthrough](https://colab.research.google.com/drive/11ZZyqwfu7ZTyUKdqt9uy59AqqYccRVcU?usp=sharing)**
+**[Colab Walkthrough](https://colab.research.google.com/drive/11ZZyqwfu7ZTyUKdqt9uy59AqqYccRVcU?usp=sharing), [arXiv](https://arxiv.org/abs/2010.08162)**
 
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
@@ -201,6 +201,7 @@ Project structure (continuous integration, docs, testing) based on the
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
 
 ## References
+1. [SidechainNet: An All-Atom Protein Structure Dataset for Machine Learning](https://arxiv.org/abs/2010.08162). J.E. King, D. Koes. arXiv (2020).
 1. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). M. AlQuraishi. BMC Bioinformatics 20, 311 (2019).
 2. [3dmol.js: molecular visualization with WebGL.](https://doi.org/10.1093/bioinformatics/btu829) N. Rego and D. Koes. Bioinformatics, 31(8):1322–1324, (2014).
  
