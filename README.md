@@ -162,7 +162,7 @@ for batch in data['test']:
 
 The `batch` variable above is a `collections.namedtuple` that has the following attributes:
 
-| Atribute | Description |
+| Attribute | Description |
 | :---: | :--- |
  | `batch.pids` | Tuple of ProteinNet/SidechainNet IDs for proteins in this batch |
  | `batch.seqs` | Tensor of sequences, either as integers or as one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
@@ -171,7 +171,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
 | `batch.angs` | Tensor of angles |
 | `batch.crds` | Tensor of coordinates |
-| `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)`.
+| `batch.seq_evo_sec` |t
 
 
 ## Reproducing SidechainNet
