@@ -171,7 +171,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
 | `batch.angs` | Tensor of angles |
 | `batch.crds` | Tensor of coordinates |
-| `batch.seq_evo_sec` |t
+| `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
 
 
 ## Reproducing SidechainNet
