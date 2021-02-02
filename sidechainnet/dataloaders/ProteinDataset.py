@@ -62,7 +62,7 @@ class ProteinDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         return (self.ids[idx], self.seqs[idx], self.msks[idx], self.evos[idx],
-                self.secs[idx], self.angs[idx], self.crds[idx])
+                self.secs[idx], self.angs[idx], self.crds[idx], self.ress[idx])
 
     def __str__(self):
         """Describe this dataset to the user."""
