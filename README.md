@@ -56,7 +56,8 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences
                   "crd": [crd1, crd2, ...],  # Coordinates
                   "evo": [evo1, evo2, ...],  # PSSMs and Information Content
                   "sec": [sec1, sec2, ...],  # Secondary structure labels (DSSP)
-                  "ids": [id1, id2,   ...],  # Corresponding ProteinNet IDs
+                  "res": [res1, res2, ...],  # X-ray crystallographic resolution
+                  "ids": [id1, id2,   ...]   # Corresponding ProteinNet IDs
                   },
         "valid-10": {...},
             ...
@@ -171,6 +172,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
 | `batch.angs` | Tensor of angles |
 | `batch.crds` | Tensor of coordinates |
+| `batch.ress` | Tuple of X-ray crystallographic resolutions, when available. |
 | `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
 
 
