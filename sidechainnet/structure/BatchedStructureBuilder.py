@@ -1,3 +1,5 @@
+import numpy as np
+
 from sidechainnet.dataloaders.collate import pad_for_batch
 from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
@@ -19,16 +21,28 @@ class BatchedStructureBuilder(object):
                 "The batch of sequences must have shape (batch_size x sequence_length). "
                 "One-hot vectors are not yet supported.")
         if ang_batch is not None:
-            ang_or_crd_batch = ang_batch
+            self.ang_or_crd_batch = ang_batch
+            self.uses_coords = False
         else:
-            ang_or_crd_batch = crd_batch
+            self.ang_or_crd_batch = crd_batch
+            self.uses_coords = True
 
         self.return_as_list = return_as_list
         self.structure_builders = []
+        self.unbuildable_structures = []
         self.max_seq_len = 0
-        for seq, ang_or_crd in zip(seq_batch, ang_or_crd_batch):
+        for i, (seq, ang_or_crd) in enumerate(zip(seq_batch, self.ang_or_crd_batch)):
             seq, ang_or_crd = unpad_tensors(seq, ang_or_crd)
-            self.structure_builders.append(scn.StructureBuilder(seq, ang_or_crd))
+            try:
+                self.structure_builders.append(scn.StructureBuilder(seq, ang_or_crd))
+            except ValueError as e:
+                if self.uses_coords:
+                    raise e
+                # This means that we attempted to create StructureBuilder objects using
+                # incomplete angle tensors (this is undefined/unsupported).
+                self.unbuildable_structures.append(i)
+                self.structure_builders.append(None)
+
             if len(seq) > self.max_seq_len:
                 self.max_seq_len = len(seq)
 
@@ -41,7 +55,6 @@ class BatchedStructureBuilder(object):
         else:
             return pad_for_batch(all_coords, self.max_seq_len, dtype='crd')
 
-
     def to_3Dmol(self, idx, style=None, **kwargs):
         """Generate protein structure & return interactive py3Dmol.view for visualization.
 
@@ -49,7 +62,6 @@ class BatchedStructureBuilder(object):
             idx (int): index of the StructureBuilder to visualize.
             style (str, optional): Style string to be passed to py3Dmol for
                 visualization. Defaults to None.
-            
 
         Returns:
             py3Dmol.view object: A view object that is interactive in iPython notebook
@@ -57,7 +69,32 @@ class BatchedStructureBuilder(object):
         """
         if not 0 <= idx < len(self.structure_builders):
             raise ValueError("provided index is not available.")
+        if idx in self.unbuildable_structures:
+            self._missing_residue_error(idx)
         return self.structure_builders[idx].to_3Dmol(style, **kwargs)
+
+    def to_pdb(self, idx, path, title=None):
+        """Generate protein structure & create a PDB file for specified protein.
+
+        Args:
+            idx (int): index of the StructureBuilder to visualize.
+            path (str): Path to save PDB file.
+            title (str, optional): Title of generated structure (default = 'pred').
+        """
+        if not 0 <= idx < len(self.structure_builders):
+            raise ValueError("provided index is not available.")
+        if idx in self.unbuildable_structures:
+            self._missing_residue_error(idx)
+        return self.structure_builders[idx].to_pdb(path, title)
+
+    def _missing_residue_error(self, structure_idx):
+        """Raises a ValueError describing missing residues."""
+        missing_loc = np.where((self.ang_or_crd_batch[structure_idx] == 0).all(axis=-1))
+        raise ValueError(f"Building atomic coordinates from angles is not supported "
+                         f"for structures with missing residues. Missing residues = "
+                         f"{list(missing_loc[0])}. Protein structures with missing "
+                         "residues are only supported if built directly from "
+                         "coordinates (also supported by StructureBuilder).")
 
     def __delitem__(self, key):
         raise NotImplementedError("Deletion is not supported.")
