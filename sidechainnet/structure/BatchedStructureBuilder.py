@@ -87,6 +87,20 @@ class BatchedStructureBuilder(object):
             self._missing_residue_error(idx)
         return self.structure_builders[idx].to_pdb(path, title)
 
+    def to_gltf(self, idx, path, title=None):
+        """Save protein structure as a GLTF (3D-object) file to given path.
+
+        Args:
+            idx (int): index of the StructureBuilder to visualize.
+            path (str): Path to save GLTF file.
+            title (str, optional): Title of generated structure (default = 'pred').
+        """
+        if not 0 <= idx < len(self.structure_builders):
+            raise ValueError("provided index is not available.")
+        if idx in self.unbuildable_structures:
+            self._missing_residue_error(idx)
+        return self.structure_builders[idx].to_gltf(path, title)
+
     def _missing_residue_error(self, structure_idx):
         """Raises a ValueError describing missing residues."""
         missing_loc = np.where((self.ang_or_crd_batch[structure_idx] == 0).all(axis=-1))
