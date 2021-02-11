@@ -310,7 +310,7 @@ class ResidueBuilder(object):
                     # Placing N
                     t = self.prev_res.ang[4]  # thetas["ca-c-n"]
                     b = BB_BUILD_INFO["BONDLENS"]["c-n"]
-                    pb = b = BB_BUILD_INFO["BONDLENS"]["ca-c"]
+                    pb = b = BB_BUILD_INFO["BONDLENS"]["ca-c"]  # pb is previous bond len
                     dihedral = self.prev_res.ang[1]  # psi of previous residue
                 elif j == 1:
                     # Placing Ca
@@ -337,8 +337,14 @@ class ResidueBuilder(object):
                         # the angle for placing oxygen is opposite to psi of current res
                         dihedral = self.ang[1] - np.pi
 
-                next_pt = nerf(pts[-3], pts[-2], pts[-1], b, t, dihedral, pb,
-                               self.nerf_method)
+                next_pt = nerf(pts[-3],
+                               pts[-2],
+                               pts[-1],
+                               b,
+                               t,
+                               dihedral,
+                               l_bc=pb,
+                               nerf_method=self.nerf_method)
                 pts.append(next_pt)
             self.bb = pts[3:]
 
@@ -362,8 +368,8 @@ class ResidueBuilder(object):
             torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"]),
             torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"]),
             self.ang[1] - np.pi,  # opposite to current residue's psi
-            torch.tensor(BB_BUILD_INFO["BONDLENS"]["ca-c"]),  # Previous bond length
-            self.nerf_method)
+            l_bc=torch.tensor(BB_BUILD_INFO["BONDLENS"]["ca-c"]),  # Previous bond length
+            nerf_method=self.nerf_method)
         return [n, ca, c, o]
 
     def build_sc(self):
@@ -397,7 +403,14 @@ class ResidueBuilder(object):
             elif type(torsion) is str and torsion == "i" and last_torsion:
                 torsion = last_torsion - np.pi
 
-            new_pt = nerf(a, b, c, pbond_len, bond_len, angle, torsion)
+            new_pt = nerf(a,
+                          b,
+                          c,
+                          bond_len,
+                          angle,
+                          torsion,
+                          l_bc=pbond_len,
+                          nerf_method=self.nerf_method)
             self.pts[atom_names[-1]] = new_pt
             self.sc.append(new_pt)
             last_torsion = torsion
