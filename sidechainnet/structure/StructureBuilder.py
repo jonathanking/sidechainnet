@@ -18,7 +18,12 @@ class StructureBuilder(object):
     really a terminal atom because it's tail is masked out?).
     """
 
-    def __init__(self, seq, ang=None, crd=None, device=torch.device("cpu")):
+    def __init__(self,
+                 seq,
+                 ang=None,
+                 crd=None,
+                 device=torch.device("cpu"),
+                 nerf_method="standard"):
         """Initialize a StructureBuilder for a single protein. Does not build coordinates.
 
         To generate coordinates after initialization, see build().
@@ -34,6 +39,10 @@ class StructureBuilder(object):
                 protein's atomic coordinates. Each residue must contain the same number
                 of coordinates, with empty coordinate entries padded with 0-vectors.
             device: An optional torch device on which to build the structure.
+            nerf_method (str, optional): Which NeRF implementation to use. "standard" uses
+                the standard NeRF formulation described in many papers. "sn_nerf" uses an
+                optimized version with less vector normalizations. Defaults to
+                "standard".
         """
         # TODO support one-hot sequences
         # Perhaps the user mistakenly passed coordinates for the angle arguments
@@ -89,8 +98,8 @@ class StructureBuilder(object):
         self.prev_ang = None
         self.prev_bb = None
         self.next_bb = None
-
         self.pdb_creator = None
+        self.nerf_method = nerf_method
 
     @staticmethod
     def _convert_seq_to_str(seq):
@@ -247,7 +256,8 @@ class ResidueBuilder(object):
                  prev_res,
                  next_res,
                  is_last_res=False,
-                 device=torch.device("cpu")):
+                 device=torch.device("cpu"),
+                 nerf_method="standard"):
         """Initialize a residue builder for building a residue's coordinates from angles.
 
         If prev_{bb, ang} are None, then this is the first residue.
@@ -259,6 +269,10 @@ class ResidueBuilder(object):
                 residue is extending.
             prev_ang : Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon
                 which this residue is extending.
+            nerf_method (str, optional): Which NeRF implementation to use. "standard" uses
+                the standard NeRF formulation described in many papers. "sn_nerf" uses an
+                optimized version with less vector normalizations. Defaults to
+                "standard".
         """
         if (not isinstance(name, np.int64) and not isinstance(name, np.int32) and
                 not isinstance(name, torch.Tensor)):
@@ -272,6 +286,7 @@ class ResidueBuilder(object):
         self.next_res = next_res
         self.device = device
         self.is_last_res = is_last_res
+        self.nerf_method = nerf_method
 
         self.bb = []
         self.sc = []
@@ -295,21 +310,25 @@ class ResidueBuilder(object):
                     # Placing N
                     t = self.prev_res.ang[4]  # thetas["ca-c-n"]
                     b = BB_BUILD_INFO["BONDLENS"]["c-n"]
+                    pb = b = BB_BUILD_INFO["BONDLENS"]["ca-c"]
                     dihedral = self.prev_res.ang[1]  # psi of previous residue
                 elif j == 1:
                     # Placing Ca
                     t = self.prev_res.ang[5]  # thetas["c-n-ca"]
                     b = BB_BUILD_INFO["BONDLENS"]["n-ca"]
+                    pb = b = BB_BUILD_INFO["BONDLENS"]["c-n"]
                     dihedral = self.prev_res.ang[2]  # omega of previous residue
                 elif j == 2:
                     # Placing C
                     t = self.ang[3]  # thetas["n-ca-c"]
                     b = BB_BUILD_INFO["BONDLENS"]["ca-c"]
+                    pb = b = BB_BUILD_INFO["BONDLENS"]["n-ca"]
                     dihedral = self.ang[0]  # phi of current residue
                 else:
                     # Placing O (carbonyl)
                     t = torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"])
                     b = BB_BUILD_INFO["BONDLENS"]["c-o"]
+                    pb = BB_BUILD_INFO["BONDLENS"]["ca-c"]
                     if self.is_last_res:
                         # we explicitly measure this angle during dataset creation,
                         # no need to invert it here.
@@ -318,7 +337,8 @@ class ResidueBuilder(object):
                         # the angle for placing oxygen is opposite to psi of current res
                         dihedral = self.ang[1] - np.pi
 
-                next_pt = nerf(pts[-3], pts[-2], pts[-1], b, t, dihedral)
+                next_pt = nerf(pts[-3], pts[-2], pts[-1], b, t, dihedral, pb,
+                               self.nerf_method)
                 pts.append(next_pt)
             self.bb = pts[3:]
 
@@ -335,9 +355,15 @@ class ResidueBuilder(object):
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
         cy = torch.sin(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]['ca-c']
         c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32)
-        o = nerf(n, ca, c, torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"]),
-                 torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"]),
-                 self.ang[1] - np.pi)  # opposite to current residue's psi
+        o = nerf(
+            n,
+            ca,
+            c,
+            torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"]),
+            torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"]),
+            self.ang[1] - np.pi,  # opposite to current residue's psi
+            torch.tensor(BB_BUILD_INFO["BONDLENS"]["ca-c"]),  # Previous bond length
+            self.nerf_method)
         return [n, ca, c, o]
 
     def build_sc(self):
@@ -355,7 +381,7 @@ class ResidueBuilder(object):
             self.pts["C-"] = self.prev_res.bb[2]
 
         last_torsion = None
-        for i, (bond_len, angle, torsion, atom_names) in enumerate(
+        for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
                 _get_residue_build_iter(self.name, SC_BUILD_INFO)):
             # Select appropriate 3 points to build from
             if self.next_res and i == 0:
@@ -371,7 +397,7 @@ class ResidueBuilder(object):
             elif type(torsion) is str and torsion == "i" and last_torsion:
                 torsion = last_torsion - np.pi
 
-            new_pt = nerf(a, b, c, bond_len, angle, torsion)
+            new_pt = nerf(a, b, c, pbond_len, bond_len, angle, torsion)
             self.pts[atom_names[-1]] = new_pt
             self.sc.append(new_pt)
             last_torsion = torsion
@@ -412,13 +438,15 @@ def _get_residue_build_iter(res, build_dictionary):
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
     bond_vals = [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]]
+    pbond_vals = [torch.tensor(BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32)
+                 ] + [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]][:-1]
     angle_vals = [torch.tensor(a, dtype=torch.float32) for a in r["angles-vals"]]
     torsion_vals = [
         torch.tensor(t, dtype=torch.float32) if t not in ["p", "i"] else t
         for t in r["torsion-vals"]
     ]
     return iter(
-        zip(bond_vals, angle_vals, torsion_vals,
+        zip(pbond_vals, bond_vals, angle_vals, torsion_vals,
             [t.split("-") for t in r["torsion-names"]]))
 
 

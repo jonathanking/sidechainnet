@@ -1,3 +1,5 @@
+"""A convenience class for generating multiple protein structures simultaneously."""
+
 import numpy as np
 
 from sidechainnet.dataloaders.collate import pad_for_batch
@@ -7,13 +9,12 @@ import sidechainnet as scn
 
 
 class BatchedStructureBuilder(object):
+    """BatchedStructureBuilder enables users to generate a batch of protein structures."""
 
-    # Assumes sequence of integers
-
-    def __init__(self, seq_batch, ang_batch=None, crd_batch=None, nerf_method="sn_nerf"):
+    def __init__(self, seq_batch, ang_batch=None, crd_batch=None, nerf_method="standard"):
         """Construct a object capable of generating batches of StructureBuilders.
 
-        A BatchedStructreBuilder essentially is a container for multiple StructureBuilder
+        A BatchedStructureBuilder essentially is a container for multiple StructureBuilder
         objects, one for each protein in the given batch. As such, it implements much
         of the same functionality, but simply iterates over multiple proteins.
 
@@ -26,9 +27,10 @@ class BatchedStructureBuilder(object):
                 cartesian coordinates that represent protein structure. Defaults to None.
             return_as_list (bool, optional): Boolean value. If True, returns constructed
                 coordinates Defaults to True.
-            nerf_method (str, optional): Which NeRF implementation to use. "nerf" uses the
-                standard NeRF formulation described in many papers. "sn-nerf" uses an
-                optimized version with less vector normalizations. Defaults to "sn_nerf".
+            nerf_method (str, optional): Which NeRF implementation to use. "standard" uses
+                the standard NeRF formulation described in many papers. "sn_nerf" uses an
+                optimized version with less vector normalizations. Defaults to
+                "standard".
 
         Raises:
             ValueError: May raise ValueError when asked to generate structures from angles
@@ -56,7 +58,8 @@ class BatchedStructureBuilder(object):
         for i, (seq, ang_or_crd) in enumerate(zip(seq_batch, self.ang_or_crd_batch)):
             seq, ang_or_crd = unpad_tensors(seq, ang_or_crd)
             try:
-                self.structure_builders.append(scn.StructureBuilder(seq, ang_or_crd))
+                self.structure_builders.append(
+                    scn.StructureBuilder(seq, ang_or_crd, nerf_method=nerf_method))
             except ValueError as e:
                 if self.uses_coords:
                     raise e
@@ -77,7 +80,7 @@ class BatchedStructureBuilder(object):
 
         Returns:
             List or torch.float32 tensor: Depending on the value of return_as_list,
-            returns either a Python list of constructued coordinates for each protein, or
+            returns either a Python list of constructed coordinates for each protein, or
             a padded tensor containing the coordinates.
         """
         all_coords = []
