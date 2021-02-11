@@ -24,11 +24,11 @@ def angles_to_coords(angles, seq, remove_batch_padding=False):
 
 
 def generate_coords(angles, input_seq, device):
-    """ Returns a protein's coordinates generated from its angles and sequence.
+    """Return a protein's coordinates generated from its angles and sequence.
 
-    Given a tensor of angles (L x NUM_PREDICTED_ANGLES), produces the entire
-    set of cartesian coordinates using the NeRF method, (L x A` x 3),
-    where A` is the number of atoms generated (depends on amino acid sequence).
+    Given a tensor of angles (L x NUM_PREDICTED_ANGLES), produces the entire set
+    of cartesian coordinates using the NeRF method, (L x A` x 3), where A` is
+    the number of atoms generated (depends on amino acid sequence).
     """
     sb = StructureBuilder.StructureBuilder(input_seq, angles, device)
     return sb.build()
@@ -88,9 +88,7 @@ def determine_missing_positions(ang_or_coord_matrix):
 
 
 def deg2rad(angle):
-    """
-    Converts an angle in degrees to radians.
-    """
+    """Convert an angle in degrees to radians."""
     return angle * np.pi / 180.
 
 

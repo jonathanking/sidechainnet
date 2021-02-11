@@ -10,7 +10,30 @@ class BatchedStructureBuilder(object):
 
     # Assumes sequence of integers
 
-    def __init__(self, seq_batch, ang_batch=None, crd_batch=None, return_as_list=True):
+    def __init__(self, seq_batch, ang_batch=None, crd_batch=None, nerf_method="sn_nerf"):
+        """Construct a object capable of generating batches of StructureBuilders.
+
+        A BatchedStructreBuilder essentially is a container for multiple StructureBuilder
+        objects, one for each protein in the given batch. As such, it implements much
+        of the same functionality, but simply iterates over multiple proteins.
+
+        Args:
+            seq_batch (tensor, torch.long): An integer tensor describing the sequences
+                of the proteins in this batch. Shape (Batch x L).
+            ang_batch (torch.float32 tensor, optional): Optional tensor containing angles
+                that represent protein structure. Defaults to None.
+            crd_batch (torch.float32 tensor, optional): Optional tensor containing
+                cartesian coordinates that represent protein structure. Defaults to None.
+            return_as_list (bool, optional): Boolean value. If True, returns constructed
+                coordinates Defaults to True.
+            nerf_method (str, optional): Which NeRF implementation to use. "nerf" uses the
+                standard NeRF formulation described in many papers. "sn-nerf" uses an
+                optimized version with less vector normalizations. Defaults to "sn_nerf".
+
+        Raises:
+            ValueError: May raise ValueError when asked to generate structures from angles
+            for structures that have missing angles.
+        """
         # Validate input data
         if (ang_batch is None and crd_batch is None) or (ang_batch is not None and
                                                          crd_batch is not None):
@@ -27,7 +50,6 @@ class BatchedStructureBuilder(object):
             self.ang_or_crd_batch = crd_batch
             self.uses_coords = True
 
-        self.return_as_list = return_as_list
         self.structure_builders = []
         self.unbuildable_structures = []
         self.max_seq_len = 0
@@ -46,11 +68,22 @@ class BatchedStructureBuilder(object):
             if len(seq) > self.max_seq_len:
                 self.max_seq_len = len(seq)
 
-    def build(self):
+    def build(self, return_as_list=True):
+        """Build and return 3D coordinates for the previously specified protein batch.
+
+        Args:
+            return_as_list (bool, optional): Boolean value. If True, returns constructed
+            coordinates Defaults to True.
+
+        Returns:
+            List or torch.float32 tensor: Depending on the value of return_as_list,
+            returns either a Python list of constructued coordinates for each protein, or
+            a padded tensor containing the coordinates.
+        """
         all_coords = []
         for sb in self.structure_builders:
             all_coords.append(sb.build())
-        if self.return_as_list:
+        if return_as_list:
             return all_coords
         else:
             return pad_for_batch(all_coords, self.max_seq_len, dtype='crd')
@@ -102,7 +135,7 @@ class BatchedStructureBuilder(object):
         return self.structure_builders[idx].to_gltf(path, title)
 
     def _missing_residue_error(self, structure_idx):
-        """Raises a ValueError describing missing residues."""
+        """Raise a ValueError describing missing residues."""
         missing_loc = np.where((self.ang_or_crd_batch[structure_idx] == 0).all(axis=-1))
         raise ValueError(f"Building atomic coordinates from angles is not supported "
                          f"for structures with missing residues. Missing residues = "
@@ -121,7 +154,7 @@ class BatchedStructureBuilder(object):
 
 
 def unpad_tensors(sequence, other):
-    """Unpads both sequence and other tensor based on the batch padding in sequence.
+    """Unpad both sequence and other tensor based on the batch padding in sequence.
 
     This relies on the fact that the sequence tensor ONLY has pad characters to represent
     batch-level padding, not missing residues. This pad character can be used to identify
@@ -130,7 +163,7 @@ def unpad_tensors(sequence, other):
     Args:
         sequence (torch.LongTensor): Sequence represented as integer tensor.
         other (torch.Tensor): Angle or coordinate data as a torch.FloatTensor.
-    
+
     Returns:
         Sequence and other tensors with the batch-level padding removed.
     """

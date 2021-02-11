@@ -39,7 +39,7 @@ class StructureBuilder(object):
         # Perhaps the user mistakenly passed coordinates for the angle arguments
         if ang is not None and crd is None and ang.shape[-1] == 3:
             self.coords = ang
-            self.ang =  None
+            self.ang = None
         elif crd is not None and ang is None:
             self.ang = None
             self.coords = crd
@@ -191,7 +191,7 @@ class StructureBuilder(object):
             if self.data_type == 'numpy':
                 self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords)
             else:
-                self.pdb_creator = PdbBuilder(self.seq_as_str, 
+                self.pdb_creator = PdbBuilder(self.seq_as_str,
                                               self.coords.detach().numpy())
 
     def to_pdb(self, path, title="pred"):
@@ -260,8 +260,8 @@ class ResidueBuilder(object):
             prev_ang : Angle tensor (1 X NUM_PREDICTED_ANGLES) of previous reside, upon
                 which this residue is extending.
         """
-        if (not isinstance(name, np.int64) and not isinstance(name, np.int32)
-                and not isinstance(name, torch.Tensor)):
+        if (not isinstance(name, np.int64) and not isinstance(name, np.int32) and
+                not isinstance(name, torch.Tensor)):
             raise ValueError("Expected integer AA code." + str(name.shape) +
                              str(type(name)))
         if isinstance(angles, np.ndarray):
