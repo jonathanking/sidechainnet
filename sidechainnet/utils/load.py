@@ -99,7 +99,8 @@ def load(casp_version=12,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2,
-         filter_by_resolution=False):
+         filter_by_resolution=False,
+         complete_structures_only=False):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -172,6 +173,9 @@ def load(casp_version=12,
             having a resolution value LESS than or equal this threshold will be included.
             For example, a value of 2.5 will exclude all structures with resolution
             greater than 2.5 Angstrom. Only the training set is filtered.
+        complete_structures_only (bool, optional): If True, yield only structures from the
+            training set that have no missing residues. Filter not applied to other data
+            splits. Default False.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -247,6 +251,8 @@ def load(casp_version=12,
 
     scn_dict = _load_dict(local_path)
     scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
+    if complete_structures_only:
+        scn_dict = filter_dictionary_by_missing_residues(scn_dict)
 
     # By default, the load function returns a dictionary
     if not with_pytorch:
@@ -272,7 +278,7 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
 
     Args:
         raw_data (dict): SidechainNet dictionary.
-        threshold (float, bool): Entries with resolution values greater than this value 
+        threshold (float, bool): Entries with resolution values greater than this value
             are discarded. Test set entries have no measured resolution and are not
             excluded. Default is 3 Angstroms. If False, nothing is filtered.
 
@@ -316,6 +322,51 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
     if n_filtered_entries:
         print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
               " training set entries were excluded based on resolution.")
+    raw_data["train"] = new_data
+    return raw_data
+
+
+def filter_dictionary_by_missing_residues(raw_data):
+    """Return new SidechainNet dictionary that omits training data with missing residues.
+
+    Args:
+        raw_data (dict): SidechainNet dictionary.
+
+    Returns:
+        Filtered dictionary.
+    """
+    new_data = {
+        "seq": [],
+        "ang": [],
+        "ids": [],
+        "evo": [],
+        "msk": [],
+        "crd": [],
+        "sec": [],
+        "res": []
+    }
+    train = raw_data["train"]
+    n_filtered_entries = 0
+    total_entires = 0.
+    for seq, ang, crd, msk, evo, _id, res, sec in zip(train['seq'], train['ang'],
+                                                      train['crd'], train['msk'],
+                                                      train['evo'], train['ids'],
+                                                      train['res'], train['sec']):
+        total_entires += 1
+        if "-" in msk:
+            continue
+        else:
+            new_data["seq"].append(seq)
+            new_data["ang"].append(ang)
+            new_data["ids"].append(_id)
+            new_data["evo"].append(evo)
+            new_data["msk"].append(msk)
+            new_data["crd"].append(crd)
+            new_data["sec"].append(sec)
+            new_data["res"].append(res)
+    if n_filtered_entries:
+        print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
+              " training set entries were excluded based on missing residues.")
     raw_data["train"] = new_data
     return raw_data
 
