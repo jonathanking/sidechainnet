@@ -354,6 +354,7 @@ def filter_dictionary_by_missing_residues(raw_data):
                                                       train['res'], train['sec']):
         total_entires += 1
         if "-" in msk:
+            n_filtered_entries += 1
             continue
         else:
             new_data["seq"].append(seq)
