@@ -14,7 +14,9 @@ from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_a
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
-VALID_SPLITS = [10, 20, 30, 40, 50, 70, 90]
+VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
+VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
+DATA_SPLITS = ['train', 'test'] + VALID_SPLITS
 with open(get_data("astral_data.txt"), "r") as astral_file:
     ASTRAL_ID_MAPPING = parse_astral_summary_file(astral_file.read().splitlines())
 D_AMINO_ACID_CODES = [
@@ -358,7 +360,7 @@ def add_proteinnetID_to_idx_mapping(data):
     Useful if you'd like to quickly extract a certain protein.
     """
     d = {}
-    for subset in ["train", "test"] + [f"valid-{split}" for split in VALID_SPLITS]:
+    for subset in DATA_SPLITS:
         for idx, pnid in enumerate(data[subset]["ids"]):
             d[pnid] = {"subset": subset, "idx": idx}
 
