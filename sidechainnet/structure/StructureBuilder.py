@@ -400,7 +400,7 @@ class ResidueBuilder(object):
             # Select appropriate torsion angle, or infer if part of a planar configuration
             if type(torsion) is str and torsion == "p":
                 torsion = self.ang[SC_ANGLES_START_POS + i]
-            elif type(torsion) is str and torsion == "i" and last_torsion:
+            elif type(torsion) is str and torsion == "i" and last_torsion is not None:
                 torsion = last_torsion - np.pi
 
             new_pt = nerf(a,
