@@ -119,3 +119,38 @@ class OpenMMPDB(object):
 
     def localenergyminimize(self):
         LocalEnergyMinimizer.minimize(self.context, maxIterations=100)
+
+    def minimize_energy(self):
+        """Perform an energy minimization simulation."""
+        modeller = Modeller(self.pdb.topology, self.pdb.positions)
+        forcefield = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+        modeller.addHydrogens(forcefield)
+        system = forcefield.createSystem(modeller.topology, nonbondedMethod=app.NoCutoff,
+                nonbondedCutoff=1*nanometer, constraints=HBonds)
+        integrator = LangevinMiddleIntegrator(300*kelvin, 1/picosecond, 0.004*picoseconds)
+        simulation = Simulation(modeller.topology, system, integrator)
+        simulation.context.setPositions(modeller.positions)
+        simulation.minimizeEnergy()
+        self.state = simulation.context.getState(getVelocities=True,
+                                                 getPositions=True,
+                                                 getParameters=True,
+                                                 getEnergy=True,
+                                                 getForces=True)
+
+    def make_high_and_low_energy_pdbs(self):
+        """Minimize energy and make high/low energy PDB files."""
+        self.to_pdb(f"{self.pdbid}_high")
+        high_e = self.get_potential_energy()
+
+        self.minimize_energy()
+        self.to_pdb(f"{self.pdbid}_low")
+        rmsd = scn.structure.structure.compare_pdb_files(f"{self.pdbid}_high.pdb",
+                                                         f"{self.pdbid}_low.pdb")
+        energy_d = high_e - self.get_potential_energy()
+        print(f"Created files {self.pdbid}_{{high,low}}.pdb.")
+        print(f"RMSD = {rmsd:.2f} A, Energy Delta = {energy_d.format('%.2f')}")
+
+    def to_pdb(self, output_prefix):
+        positions = self.get_position()
+        with open(f'{output_prefix}.pdb', 'w') as f:
+            PDBFile.writeFile(self.modeller.topology, positions, f)
