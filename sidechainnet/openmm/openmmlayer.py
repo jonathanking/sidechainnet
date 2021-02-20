@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import sidechainnet as scn
-from openmmfunction import OpenMMFunction
+from .openmmfunction import OpenMMFunction
 import random
 import numpy as np
 import warnings
@@ -27,15 +27,16 @@ class OpenMMLayer(nn.Module):
         self.coords.grad.data.zero_()
 
 
-def inject_noise(coords):
+def inject_noise(coords, scale=1):
     """
     :param coords: The co-ordinates of sidechainnet. Dimension L x 14 x 3, where L is the number of residues
     :return: The co-ordinates altered with random noise. All zero co-ordinates means missing atoms. Those are not altered.
     """
-    nonzero = np.nonzero(coords)
+    new = np.array(coords)
+    nonzero = np.nonzero(new)
     for i in range(len(nonzero[0])):
-        coords[nonzero[0][i]][nonzero[1][i]] += random.randint(-5, 5)
-    return coords
+        new[nonzero[0][i]][nonzero[1][i]] += random.random() * scale
+    return new
 
 
 if __name__ == '__main__':

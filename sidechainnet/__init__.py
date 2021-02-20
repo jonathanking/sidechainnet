@@ -27,7 +27,6 @@ from ._version import get_versions
 from .structure.StructureBuilder import StructureBuilder
 from .structure.BatchedStructureBuilder import BatchedStructureBuilder
 from .utils.load import load
-
 from .utils.download import VALID_SPLITS, DATA_SPLITS
 
 

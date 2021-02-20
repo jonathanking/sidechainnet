@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch.autograd import Function
 import sidechainnet as scn
-from openmmpdb import OpenMMPDB
+from .openmmpdb import OpenMMPDB
 
 
 class OpenMMFunction(Function):

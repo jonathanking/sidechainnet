@@ -1,5 +1,5 @@
 import sidechainnet as scn
-from openmmlayer import OpenMMLayer
+from .openmmlayer import OpenMMLayer
 import random
 import numpy as np
 import warnings
