@@ -15,14 +15,15 @@ class OpenMMLayer(nn.Module):
         self.seq = sequence
         self.coords = torch.tensor(coords, dtype=torch.float64)
         self.coords = nn.Parameter(self.coords)
-        self.coord_mask = coords
-        self.coord_mask[self.coord_mask > 0.0] = 1.0
+        self.coord_mask = np.zeros_like(coords)
+        self.coord_mask[self.coords > 0.0] = 1.0
 
     def forward(self):
         return OpenMMFunction.apply(self.coords, self.seq)
 
-    def step(self, lr):
-        self.coords.data += lr * self.coords.grad.data
+    def step(self, lr, clip_value=.1):
+        self.coords.grad.data.clamp_(min=-clip_value, max=clip_value)
+        self.coords.data -= lr * self.coords.grad.data
         self.coords.data *= self.coord_mask
         self.coords.grad.data.zero_()
 
