@@ -121,7 +121,11 @@ class OpenMMPDB(object):
         LocalEnergyMinimizer.minimize(self.context, maxIterations=100)
 
     def minimize_energy(self):
-        """Perform an energy minimization simulation."""
+        """Perform an energy minimization simulation.
+
+        Recommended AMBER forcefields from
+        http://docs.openmm.org/latest/userguide/application.html.
+        """
         modeller = Modeller(self.pdb.topology, self.pdb.positions)
         forcefield = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
         modeller.addHydrogens(forcefield)
@@ -154,3 +158,36 @@ class OpenMMPDB(object):
         positions = self.get_position()
         with open(f'{output_prefix}.pdb', 'w') as f:
             PDBFile.writeFile(self.modeller.topology, positions, f)
+
+    def get_coords(self):
+        coords = []
+        for v in self.get_position():
+            coords.append(np.asarray(v.value_in_unit(angstrom)))
+        coords = np.vstack(coords)
+        return coords
+
+    def get_atomnames(self):
+        if self.chain is None:
+            self.chain = next(self.pdb.topology.chains())
+        atom_names = [str(an).split()[2][1:-1] for an in self.chain.atoms()]
+        return atom_names
+
+    def get_resnames(self):
+        if self.chain is None:
+            self.chain = next(self.pdb.topology.chains())
+        resnames = [str(an).split()[-1][1:-2] for an in self.chain.atoms()]
+        return resnames
+
+    def get_resnums(self):
+        if self.chain is None:
+            self.chain = next(self.pdb.topology.chains())
+        resnums = [int(str(an).split()[-2]) for an in self.chain.atoms()]
+        return resnums
+
+    def make_prody_atomgroup(self):
+        ag = pr.AtomGroup()
+        ag.setCoords(self.get_coords())
+        ag.setNames(self.get_atomnames())
+        ag.setResnames(self.get_resnames())
+        ag.setResnums(self.get_resnums())
+        return ag
