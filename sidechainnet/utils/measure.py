@@ -7,6 +7,24 @@ from sidechainnet.structure.build_info import NUM_ANGLES, NUM_BB_OTHER_ANGLES, N
 from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError, NonStandardAminoAcidError, NoneStructureError, SequenceError
 
 GLOBAL_PAD_CHAR = 0
+ALLOWED_NONSTD_RESIDUES = {
+        "ASX": "ASP",
+        "GLX": "GLU",
+        "CSO": "CYS",
+        "HIP": "HIS",
+        "HSD": "HIS",
+        "HSE": "HIS",
+        "HSP": "HIS",
+        "MSE": "MET",
+        "SEC": "CYS",
+        "SEP": "SER",
+        "TPO": "THR",
+        "PTR": "TYR",
+        "XLE": "LEU",
+        "4FB": "PRO",
+        "MLY": "LYS",  # N-dimethyl-lysine
+        "AIB": "ALA",  # alpha-methyl-alanine, not included during generation on 1/23/22
+    }
 
 
 def angle_list_to_sin_cos(angs, reshape=True):
@@ -134,24 +152,7 @@ def replace_nonstdaas(residues):
         for a complete list of non-standard amino acids supported here.
         `XAA` is treated as missing.
     """
-    replacements = {
-        "ASX": "ASP",
-        "GLX": "GLU",
-        "CSO": "CYS",
-        "HIP": "HIS",
-        "HSD": "HIS",
-        "HSE": "HIS",
-        "HSP": "HIS",
-        "MSE": "MET",
-        "SEC": "CYS",
-        "SEP": "SER",
-        "TPO": "THR",
-        "PTR": "TYR",
-        "XLE": "LEU",
-        "4FB": "PRO",
-        "MLY": "LYS",  # N-dimethyl-lysine
-        "AIB": "ALA",  # alpha-methyl-alanine, not included during generation on 1/23/22
-    }
+    replacements = ALLOWED_NONSTD_RESIDUES
 
     for r in residues:
         rname = r.getResname()
