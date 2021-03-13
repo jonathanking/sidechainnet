@@ -162,7 +162,7 @@ def replace_nonstdaas(residues):
     return residues
 
 
-def get_seq_coords_and_angles(chain):
+def get_seq_coords_and_angles(chain, replace_nonstd=True):
     """Extracts protein sequence, coordinates, and angles from a ProDy chain.
 
     Args:
@@ -183,7 +183,7 @@ def get_seq_coords_and_angles(chain):
     dihedrals = []
     observed_sequence = ""
     all_residues = list(chain.iterResidues())
-    if chain.nonstdaa:
+    if chain.nonstdaa and replace_nonstd:
         all_residues = replace_nonstdaas(all_residues)
     prev_res = None
     next_res = all_residues[1]
