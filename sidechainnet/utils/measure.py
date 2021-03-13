@@ -140,7 +140,7 @@ def measure_res_coordinates(_res):
 
 
 def replace_nonstdaas(residues):
-    """Replaces the non-standard Amino Acids in a list with their equivalents.
+    """Replace the non-standard Amino Acids in a list with their equivalents.
 
     Args:
         residues: List of ProDy residues.
@@ -153,13 +153,19 @@ def replace_nonstdaas(residues):
         `XAA` is treated as missing.
     """
     replacements = ALLOWED_NONSTD_RESIDUES
+    is_nonstd = []
+    resnames = []
 
     for r in residues:
         rname = r.getResname()
         if rname in replacements.keys():
             r.setResname(replacements[rname])
+            is_nonstd.append(1)
+        else:
+            is_nonstd.append(0)
+        resnames.append(rname)
 
-    return residues
+    return residues, resnames, np.asarray(is_nonstd)
 
 
 def get_seq_coords_and_angles(chain, replace_nonstd=True):
@@ -183,8 +189,10 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
     dihedrals = []
     observed_sequence = ""
     all_residues = list(chain.iterResidues())
+    unmodified_sequence = [res.getResname() for res in all_residues]
+    is_nonstd = np.asarray([0 for res in all_residues])
     if chain.nonstdaa and replace_nonstd:
-        all_residues = replace_nonstdaas(all_residues)
+        all_residues, unmodified_sequence, is_nonstd = replace_nonstdaas(all_residues)
     prev_res = None
     next_res = all_residues[1]
 
@@ -221,7 +229,7 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
         )
         raise SequenceError
 
-    return dihedrals_np, coords_np, observed_sequence
+    return dihedrals_np, coords_np, observed_sequence, unmodified_sequence, is_nonstd
 
 
 def no_nans_infs_allzeros(matrix):

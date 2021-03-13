@@ -25,6 +25,7 @@ import argparse
 import os
 import re
 from multiprocessing import Pool, cpu_count
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
 import prody as pr
 from tqdm import tqdm
@@ -63,10 +64,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if needs_manual_adjustment(pnid):
         return {}, "needs manual adjustment"
 
-    mask, alignment, ang, crd, dssp, warning = merge(aligner, pn_entry["primary"],
-                                                     sc_entry["seq"], sc_entry["ang"],
-                                                     sc_entry["crd"], sc_entry["sec"],
-                                                     pn_entry["mask"], pnid)
+    mask, alignment, ang, crd, dssp, unmod_seq, warning = merge(aligner, pn_entry, sc_entry, pnid)
     new_entry = {}
 
     if alignment:
@@ -83,6 +81,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["ang"] = expand_data_with_mask(ang, mask)
         new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["sec"] = expand_data_with_mask(dssp, mask)
+        new_entry["ums"] = make_unmodified_seq_entry(new_entry["seq"], unmod_seq, mask)
         new_entry["msk"] = mask
         new_entry["res"] = sc_entry["res"]
 
@@ -104,6 +103,17 @@ def combine_wrapper(pndata_scdata_pnid):
     aligner = init_aligner()
     return combine(pn_data, sc_data, aligner, pnid)
 
+
+def make_unmodified_seq_entry(pn_seq, unmod_seq, mask):
+    """Given observed residues, create the unmodified sequence entry for SidechainNet."""
+    padded_unmod_seq = expand_data_with_mask(unmod_seq, mask)
+    unmod_seq_complete = []
+    for c_pn, c_unmod in zip(pn_seq, padded_unmod_seq):
+        if c_unmod == "---":
+            unmod_seq_complete.append(ONE_TO_THREE_LETTER_MAP[c_pn])
+        else:
+            unmod_seq_complete.append(c_unmod)
+    return " ".join(unmod_seq_complete)
 
 def combine_datasets(proteinnet_out, sc_data, training_set):
     """Adds sidechain information to ProteinNet to create SidechainNet.

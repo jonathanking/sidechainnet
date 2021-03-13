@@ -39,7 +39,8 @@ def create_empty_dictionary():
         "msk": [],
         "crd": [],
         "sec": [],
-        "res": []
+        "res": [],
+        "ums": []
     }
 
     data = {
@@ -126,6 +127,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
             organized_data[realsplit]['evo'].append(scnet_data[pnid]['evo'])
             organized_data[realsplit]['sec'].append(scnet_data[pnid]['sec'])
             organized_data[realsplit]['res'].append(scnet_data[pnid]['res'])
+            organized_data[realsplit]['ums'].append(scnet_data[pnid]['ums'])
             organized_data[realsplit]['ids'].append(pnid)
             n_proteins += 1
 
