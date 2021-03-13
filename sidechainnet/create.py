@@ -90,6 +90,9 @@ def combine(pn_entry, sc_entry, aligner, pnid):
             if k == "crd":
                 if len(v) // NUM_COORDS_PER_RES != length:
                     return {}, "failed"
+            elif k == "ums":
+                if len(v.split(" ")) != length:
+                    return {}, "failed"
             elif k != "res":
                 if len(v) != length:
                     return {}, "failed"
@@ -170,8 +173,8 @@ def create():
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
                                  args.training_set)
-    pnids = pnids[:args.limit]  # Limit the length of the list for debugging
-
+    #pnids = ['20#2FZT_1_A', "70#2E87_1_A"] # pnids[:args.limit]  # Limit the length of the list for debugging
+    pnids = pnids[:args.limit]
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
     sc_only_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
                                                         args.casp_version,
