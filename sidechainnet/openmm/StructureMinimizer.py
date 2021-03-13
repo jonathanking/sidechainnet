@@ -1,20 +1,18 @@
 import sidechainnet as scn
-from .openmmlayer import OpenMMLayer
+import sidechainnet.utils.minimize as minimize
+from sidechainnet.openmm.openmmlayer import OpenMMLayer
 import random
 import numpy as np
 import warnings
 
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
 
 
 class StructureMinimizer(object):
 
-    def __init__(self, sequence, coords):
-        self.optimum_coords = coords
+    def __init__(self, sequence, coords, lr=0.00001):
+        self.optimum_coords = minimize.minimize_entry_coords_only(sequence, coords)
         self.openmmlayer = OpenMMLayer(sequence, coords)
-        self.lr = 0.0001
-
-    def set_learning_rate(self, lr):
         self.lr = lr
 
     def minimize(
@@ -22,11 +20,11 @@ class StructureMinimizer(object):
         max_Iterations=100,
         tolerance=30
     ):  # Tolerance : Number of times it tries to decrease loss once loss stops decreasing
+        np.random.seed(100)
         if max_Iterations == -1:
             tillbest_loss = float("inf")
             counter = 0
             while True:
-                random.seed(10)
                 loss = self.openmmlayer()
                 if loss.item() < tillbest_loss:
                     counter = 0
@@ -43,7 +41,6 @@ class StructureMinimizer(object):
 
         else:
             for i in range(max_Iterations):
-                random.seed(10)
                 loss = self.openmmlayer()
                 loss.backward()
                 self.openmmlayer.step(self.lr)
@@ -60,17 +57,16 @@ def inject_noise(coords):
     """
     nonzero = np.nonzero(coords)
     for i in range(len(nonzero[0])):
-        coords[nonzero[0][i]][nonzero[1][i]] += random.randint(-5, 5)
+        coords[nonzero[0][i]][nonzero[1][i]] += random.rand(-1, 1) * 0.2
     return coords
 
 
 if __name__ == '__main__':
-    data = scn.load(casp_version=12, thinning=30)
-    seq = data['train']['seq'][0]
-    coords = data['train']['crd'][0]
-    coords = inject_noise(coords)
+    data = scn.load("debug")
+    seq = data['train']['seq'][1]
+    coords = data['train']['crd'][1]
     sm = StructureMinimizer(sequence=seq, coords=coords)
     sm.minimize(
-        max_Iterations=-1
-    )  #When set to -1 it finds the local minima irrespective of the number of iterations
+        max_Iterations=100
+    )  # When set to -1 it finds the local minima irrespective of the number of iterations
     print(sm.get_optimum_coords())

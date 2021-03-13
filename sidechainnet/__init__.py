@@ -28,6 +28,8 @@ from .structure.StructureBuilder import StructureBuilder
 from .structure.BatchedStructureBuilder import BatchedStructureBuilder
 from .utils.load import load
 from .utils.download import VALID_SPLITS, DATA_SPLITS
+from . import utils
+from . import openmm
 
 
 versions = get_versions()

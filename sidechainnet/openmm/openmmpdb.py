@@ -5,6 +5,8 @@ from pdbfixer import PDBFixer
 import io
 from simtk.openmm import LocalEnergyMinimizer
 from collections import defaultdict
+import prody as pr
+import numpy as np
 
 import sidechainnet as scn
 
@@ -13,15 +15,18 @@ class OpenMMPDB(object):
     """Operates on a single PDB object in Sidechainnet Calculates energy, force norms,
     force per all atoms, force per atoms present in Sidechainnent."""
 
-    def __init__(self, pdbstr, pdbid):
+    def __init__(self, pdbstr, pdbid='unknown'):
         self.pdbstr = pdbstr
         self.pdbid = pdbid
         self.pdb = PDBFixer(pdbfile=io.StringIO(pdbstr))
         self._pos_atom_map(self.pdb.positions)
         self.pdb.findMissingResidues()
         self.pdb.findMissingAtoms()
+        self.pdb.findNonstandardResidues()
         self.pdb.addMissingAtoms()
         self.pdb.addMissingHydrogens(7.0)
+        # self.pdb.replaceNonstandardResidues()
+        self.chain = None
         self._set_up_env()
 
     def _get_atom_residue(self):

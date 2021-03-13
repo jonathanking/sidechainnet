@@ -260,3 +260,21 @@ def prepare_dataloaders(data,
     dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in VALID_SPLITS})
 
     return dataloaders
+
+
+def get_dataloader_from_dataset_dict(dictionary):
+    collate_fn = get_collate_fn(False, seqs_as_onehot=True)
+
+    train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        num_workers=num_workers,
+        collate_fn=collate_fn,
+        batch_sampler=SimilarLengthBatchSampler(
+            train_dataset,
+            batch_size,
+            dynamic_batch=batch_size *
+            data['settings']['lengths'].mean() if dynamic_batching else None,
+            optimize_batch_for_cpus=optimize_for_cpu_parallelism,
+        ))
