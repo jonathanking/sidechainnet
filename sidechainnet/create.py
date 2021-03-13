@@ -64,7 +64,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if needs_manual_adjustment(pnid):
         return {}, "needs manual adjustment"
 
-    mask, alignment, ang, crd, dssp, unmod_seq, warning = merge(aligner, pn_entry, sc_entry, pnid)
+    mask, alignment, ang, crd, dssp, unmod_seq, is_mod, warning = merge(aligner, pn_entry, sc_entry, pnid)
     new_entry = {}
 
     if alignment:
@@ -82,6 +82,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["sec"] = expand_data_with_mask(dssp, mask)
         new_entry["ums"] = make_unmodified_seq_entry(new_entry["seq"], unmod_seq, mask)
+        new_entry["mod"] = expand_data_with_mask(is_mod, mask)
         new_entry["msk"] = mask
         new_entry["res"] = sc_entry["res"]
 

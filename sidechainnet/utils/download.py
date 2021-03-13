@@ -175,7 +175,7 @@ def process_id(pnid):
         "sec": dssp,
         "res": resolution,
         "ums": unmodified_seq,
-        "nst": is_nonstd
+        "mod": is_nonstd
     }
     if message:
         data["msg"] = message
