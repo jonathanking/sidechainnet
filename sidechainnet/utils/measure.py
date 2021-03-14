@@ -3,28 +3,29 @@
 import numpy as np
 import prody as pr
 
+import sidechainnet as scn
 from sidechainnet.structure.build_info import NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError, NonStandardAminoAcidError, NoneStructureError, SequenceError
 
 GLOBAL_PAD_CHAR = 0
 ALLOWED_NONSTD_RESIDUES = {
-        "ASX": "ASP",
-        "GLX": "GLU",
-        "CSO": "CYS",
-        "HIP": "HIS",
-        "HSD": "HIS",
-        "HSE": "HIS",
-        "HSP": "HIS",
-        "MSE": "MET",
-        "SEC": "CYS",
-        "SEP": "SER",
-        "TPO": "THR",
-        "PTR": "TYR",
-        "XLE": "LEU",
-        "4FB": "PRO",
-        "MLY": "LYS",  # N-dimethyl-lysine
-        "AIB": "ALA",  # alpha-methyl-alanine, not included during generation on 1/23/22
-    }
+    "ASX": "ASP",
+    "GLX": "GLU",
+    "CSO": "CYS",
+    "HIP": "HIS",
+    "HSD": "HIS",
+    "HSE": "HIS",
+    "HSP": "HIS",
+    "MSE": "MET",
+    "SEC": "CYS",
+    "SEP": "SER",
+    "TPO": "THR",
+    "PTR": "TYR",
+    "XLE": "LEU",
+    "4FB": "PRO",
+    "MLY": "LYS",  # N-dimethyl-lysine
+    "AIB": "ALA",  # alpha-methyl-alanine, not included during generation on 1/23/22
+}
 
 
 def angle_list_to_sin_cos(angs, reshape=True):
@@ -196,7 +197,7 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
     prev_res = None
     next_res = all_residues[1]
 
-    for res_id, res in enumerate(all_residues):
+    for res_id, (res, is_modified) in enumerate(zip(all_residues, is_nonstd)):
         if res.getResname() == "XAA":  # Treat unknown amino acid as missing
             continue
         elif not res.stdaa:
@@ -219,6 +220,15 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
         prev_res = res
         observed_sequence += res.getSequence()[0]
 
+    for res_id, (res, is_modified) in enumerate(zip(all_residues, is_nonstd)):
+        # Standardized non-standard amino acids
+        if is_modified:
+            prev_coords = coords[res_id - 1] if res_id > 0 else None
+            next_coords = coords[res_id + 1] if res_id + 1 < len(coords) else None
+            prev_ang = dihedrals[res_id - 1] if res_id > 0 else None
+            res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
+                                      prev_ang)
+
     dihedrals_np = np.asarray(dihedrals)
     coords_np = np.concatenate(coords)
 
@@ -229,7 +239,59 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
         )
         raise SequenceError
 
-    return dihedrals_np, coords_np, observed_sequence, unmodified_sequence, is_nonstd
+    return dihedrals_np, coords_np, observed_sequence, unmodified_sequence, is_nonstd\
+
+
+def standardize_residue(res, ang, prev_coords, next_coords, prev_ang):
+    """Convert non-std residue res to its standard form. Input and output are Prody objs.
+
+    Args:
+        res (prody.Residue): A non-standard residue that has had its extra atoms removed
+            and is currently labeled as its standard form though its coordinates are
+            non-standard.
+        ang (list): List of dihedral angles for this residue. Will be unchanged.
+        prev_coords (list): List of coordinates for previous residue.
+        next_coords (list): List of coordinates for next residue.
+        prev_ang (list): List of dihedral angles for the previous angle.
+
+    Returns:
+        prody.Residue: A residue that has had its bond lengths and angles to more 
+            accurately conform to its standard form.
+    """
+    import torch
+    # Make previous ResidueBuilder
+    if res.getPrev() is None:
+        prev_rb = None
+    else:
+        prev_rb = scn.structure.ResidueBuilder(
+            get_resname_as_int(res.getPrev().getResname()), torch.tensor(np.asarray(prev_ang), dtype=torch.float32), None,
+            None)
+        prev_rb.bb = [torch.tensor(c, dtype=torch.float32) for c in prev_coords[:4]]
+        prev_rb.sc = [torch.tensor(c, dtype=torch.float32) for c in prev_coords[4:]]
+        prev_rb._stack_coords()
+
+    # Make previous ResidueBuilder
+    if res.getNext() is None:
+        next_rb = None
+    else:
+        next_rb = scn.structure.ResidueBuilder(
+            get_resname_as_int(res.getNext().getResname()), torch.tensor(np.asarray([0])), None, None)
+        next_rb.bb = [torch.tensor(c, dtype=torch.float32) for c in next_coords[:4]]
+        next_rb.sc = [torch.tensor(c, dtype=torch.float32) for c in next_coords[4:]]
+        next_rb._stack_coords()
+
+    # Regenerate/standardize current residue
+    rb = scn.structure.ResidueBuilder(
+        get_resname_as_int(res.getResname()), torch.tensor(np.asarray(ang)), prev_rb, next_rb)
+    rb.build()
+    new_res = rb.to_prody(res)
+    return new_res
+
+
+def get_resname_as_int(resname):
+    """Return the integer represenation of a given residue name."""
+    from sidechainnet.utils.sequence import THREE_TO_ONE_LETTER_MAP, VOCAB
+    return VOCAB._char2int[THREE_TO_ONE_LETTER_MAP[resname]]
 
 
 def no_nans_infs_allzeros(matrix):
