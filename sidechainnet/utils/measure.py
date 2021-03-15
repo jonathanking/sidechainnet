@@ -264,8 +264,8 @@ def standardize_residue(res, ang, prev_coords, next_coords, prev_ang):
         prev_rb = None
     else:
         prev_rb = scn.structure.ResidueBuilder(
-            get_resname_as_int(res.getPrev().getResname()), torch.tensor(np.asarray(prev_ang), dtype=torch.float32), None,
-            None)
+            get_resname_as_int(res.getPrev().getResname()),
+            torch.tensor(np.asarray(prev_ang), dtype=torch.float32), None, None)
         prev_rb.bb = [torch.tensor(c, dtype=torch.float32) for c in prev_coords[:4]]
         prev_rb.sc = [torch.tensor(c, dtype=torch.float32) for c in prev_coords[4:]]
         prev_rb._stack_coords()
@@ -275,14 +275,16 @@ def standardize_residue(res, ang, prev_coords, next_coords, prev_ang):
         next_rb = None
     else:
         next_rb = scn.structure.ResidueBuilder(
-            get_resname_as_int(res.getNext().getResname()), torch.tensor(np.asarray([0])), None, None)
+            get_resname_as_int(res.getNext().getResname()),
+            torch.tensor(np.asarray([0.])), None, None)
         next_rb.bb = [torch.tensor(c, dtype=torch.float32) for c in next_coords[:4]]
         next_rb.sc = [torch.tensor(c, dtype=torch.float32) for c in next_coords[4:]]
         next_rb._stack_coords()
 
     # Regenerate/standardize current residue
-    rb = scn.structure.ResidueBuilder(
-        get_resname_as_int(res.getResname()), torch.tensor(np.asarray(ang)), prev_rb, next_rb)
+    rb = scn.structure.ResidueBuilder(get_resname_as_int(res.getResname()),
+                                      torch.tensor(np.asarray(ang), dtype=torch.float32),
+                                      prev_rb, next_rb)
     rb.build()
     new_res = rb.to_prody(res)
     return new_res
