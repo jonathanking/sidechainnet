@@ -1,4 +1,5 @@
 """A class for creating PDB files/strings given a protein's sequence and coordinates."""
+import itertools
 
 import numpy as np
 
@@ -116,10 +117,9 @@ class PdbBuilder(object):
             self.res_nbr += 1
         return self._pdb_body_lines
 
-    @staticmethod
-    def _make_header(title):
+    def _make_header(self, title):
         """Return a string representing the PDB header."""
-        return f"REMARK  {title}"
+        return f"REMARK  {title}" + "\n" + self._make_SEQRES()
 
     @staticmethod
     def _make_footer():
@@ -146,6 +146,20 @@ class PdbBuilder(object):
         self._pdb_str = "\n".join(self._pdb_lines)
         return self._pdb_str
 
+    def _make_SEQRES(self):
+        """Return a SEQRES entry as a multi-line string for this PDB file."""
+        three_letter_seq = [ONE_TO_THREE_LETTER_MAP[c] for c in self.seq]
+        residue_blocks = list(split_every(13, three_letter_seq))
+        lineno = 1
+        nres = len(self.seq)
+        lines = []
+        for block in residue_blocks:
+            res_block_str = " ".join(block)
+            cur_line = f"SEQRES {lineno: >3} A {nres: >4}  {res_block_str: <61}"
+            lines.append(cur_line)
+            lineno += 1
+        return "\n".join(lines)
+
     def save_pdb(self, path, title="UntitledProtein"):
         """Write out the generated PDB file as a string to the specified path."""
         with open(path, "w") as outfile:
@@ -164,6 +178,15 @@ class PdbBuilder(object):
         pymol.cmd.color("oxygen", title)
         pymol.cmd.save(path, quiet=True)
         pymol.cmd.delete("all")
+
+
+def split_every(n, iterable):
+    """Split iterable into chunks. From https://stackoverflow.com/a/1915307/2780645."""
+    i = iter(iterable)
+    piece = list(itertools.islice(i, n))
+    while piece:
+        yield piece
+        piece = list(itertools.islice(i, n))
 
 
 ATOM_MAP_14 = {}

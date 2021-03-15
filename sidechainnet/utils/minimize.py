@@ -62,7 +62,7 @@ def minimize_entry(split, i):
                                                 determine_pnid_type(split['ids'][i]))
             if isinstance(chain, tuple):
                 chain = chain[0]
-            raw_angs, raw_crds, seq = scn.utils.measure.get_seq_coords_and_angles(
+            raw_angs, raw_crds, seq, ums, isnonstd = scn.utils.measure.get_seq_coords_and_angles(
                 chain, replace_nonstd=False)
             sb = scn.StructureBuilder(seq, raw_crds)
             sb._initialize_coordinates_and_PdbCreator()
@@ -72,7 +72,8 @@ def minimize_entry(split, i):
     pdb_obj.minimize_energy()
 
     atomgroup = pdb_obj.make_prody_atomgroup()
-    angs, crds, seq = scn.utils.measure.get_seq_coords_and_angles(atomgroup)
+    angs, crds, seq, ums, isnonstd = scn.utils.measure.get_seq_coords_and_angles(
+        atomgroup)
     angs = expand_data_with_mask(angs, split['msk'][i])
     crds = expand_data_with_mask(crds, split['msk'][i])
 
@@ -120,7 +121,7 @@ def minimize_entry_parallel(seq, ang, crd, _id, msk, sec, evo, res):
     print("done.")
 
     atomgroup = pdb_obj.make_prody_atomgroup()
-    angs, crds, _seq = scn.utils.measure.get_seq_coords_and_angles(atomgroup)
+    angs, crds, _seq, _, _ = scn.utils.measure.get_seq_coords_and_angles(atomgroup)
     angs = expand_data_with_mask(angs, msk)
     crds = expand_data_with_mask(crds, msk)
 

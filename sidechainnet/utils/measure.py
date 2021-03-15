@@ -239,7 +239,7 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
         )
         raise SequenceError
 
-    return dihedrals_np, coords_np, observed_sequence, unmodified_sequence, is_nonstd\
+    return dihedrals_np, coords_np, observed_sequence, unmodified_sequence, is_nonstd
 
 
 def standardize_residue(res, ang, prev_coords, next_coords, prev_ang):
