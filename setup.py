@@ -33,6 +33,11 @@ setup(
     # Customize MANIFEST.in if the general case does not suit your needs
     # Comment out this line to prevent the files from being packaged with your software
     include_package_data=True,
+    package_data={
+        "astral_data": "resources/astral_data.txt",
+        "full_protein_dssp": "resources/full_protein_dssp_annotations.json",
+        "single_domain_dssp": "resources/single_domain_dssp_annotations.json"
+        }
 
     # Allows `setup.py test` to work correctly with pytest
     setup_requires=[] + pytest_runner,

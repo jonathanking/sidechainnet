@@ -2,6 +2,7 @@
 
 import multiprocessing
 import os
+import pkg_resources
 from glob import glob
 import requests
 
@@ -17,14 +18,17 @@ MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
 VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
 DATA_SPLITS = ['train', 'test'] + VALID_SPLITS
-with open(get_data("astral_data.txt"), "r") as astral_file:
+with open(pkg_resources.resource_filename("astral_data"), "r") as astral_file:
     ASTRAL_ID_MAPPING = parse_astral_summary_file(astral_file.read().splitlines())
 D_AMINO_ACID_CODES = [
     "DAL", "DSN", "DTH", "DCY", "DVA", "DLE", "DIL", "MED", "DPR", "DPN", "DTY", "DTR",
     "DSP", "DGL", "DSG", "DGN", "DHI", "DLY", "DAR"
 ]
-PROTEIN_DSSP_DATA = parse_dssp_file(get_data("full_protein_dssp_annotations.json"))
-PROTEIN_DSSP_DATA.update(parse_dssp_file(get_data("single_domain_dssp_annotations.json")))
+PROTEIN_DSSP_DATA = parse_dssp_file(
+    pkg_resources.resource_filename("full_protein_dssp"))
+PROTEIN_DSSP_DATA.update(
+    parse_dssp_file(
+        pkg_resources.resource_filename("single_domain_dssp")))
 
 
 def download_sidechain_data(pnids,
@@ -259,7 +263,7 @@ def get_chain_from_trainid(pnid):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
         struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(pdbid,
-                                                                            chain=chid)
+                                                                              chain=chid)
         if struct and chnum > 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
