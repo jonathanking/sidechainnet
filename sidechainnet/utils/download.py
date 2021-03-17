@@ -30,10 +30,10 @@ def _init_dssp_data():
     global PROTEIN_DSSP_DATA
     global ASTRAL_ID_MAPPING
     PROTEIN_DSSP_DATA = parse_dssp_file(
-        pkg_resources.resource_filename(__name__, "full_protein_dssp"))
+        pkg_resources.resource_filename(__package__, "full_protein_dssp"))
     PROTEIN_DSSP_DATA.update(
-        parse_dssp_file(pkg_resources.resource_filename(__name__, "single_domain_dssp")))
-    with open(pkg_resources.resource_filename(__name__, "astral_data"), "r") as astral_file:
+        parse_dssp_file(pkg_resources.resource_filename(__package__, "single_domain_dssp")))
+    with open(pkg_resources.resource_filename(__package__, "astral_data"), "r") as astral_file:
         ASTRAL_ID_MAPPING = parse_astral_summary_file(astral_file.read().splitlines())
 
 
