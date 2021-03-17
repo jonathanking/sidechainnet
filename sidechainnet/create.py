@@ -275,6 +275,10 @@ def main(args_tuple):
                          " i.e. 'casp12'.")
     args_tuple = args_tuple._replace(casp_version=match.group(1))
 
+    # Initialize DSSP data
+    from sidechainnet.utils.download import _init_dssp_data
+    _init_dssp_data()
+
     if args_tuple.training_set == 'all':
         _create_all(args_tuple)
     else:

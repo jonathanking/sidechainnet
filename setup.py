@@ -34,9 +34,9 @@ setup(
     # Comment out this line to prevent the files from being packaged with your software
     include_package_data=True,
     package_data={
-        "astral_data": "resources/astral_data.txt",
-        "full_protein_dssp": "resources/full_protein_dssp_annotations.json",
-        "single_domain_dssp": "resources/single_domain_dssp_annotations.json"
+        "astral_data": ["resources/astral_data.txt"],
+        "full_protein_dssp": ["resources/full_protein_dssp_annotations.json"],
+        "single_domain_dssp": ["resources/single_domain_dssp_annotations.json"]
         }
 
     # Allows `setup.py test` to work correctly with pytest
@@ -46,7 +46,7 @@ setup(
     url='https://github.com/jonathanking/sidechainnet',  # Website
     install_requires=[
         'ProDy>=2.0', 'numpy', 'scipy', 'torch>=1.7', 'biopython', 'tqdm', 'py3Dmol',
-        'requests'
+        'requests', 'setuptools'
     ],  # Required packages, pulls from pip if needed; do not use for Conda deployment
     tests_require=['pytest'],
     # platforms=['Linux',
