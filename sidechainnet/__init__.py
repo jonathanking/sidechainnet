@@ -20,6 +20,7 @@ def get_data(path):
     """
     return os.path.join(_ROOT, 'resources', path)
 
+
 # Handle versioneer
 from ._version import get_versions
 
@@ -35,3 +36,10 @@ versions = get_versions()
 __version__ = versions['version']
 __git_revision__ = versions['full-revisionid']
 del get_versions, versions
+
+__author__ = "Jonathan King"
+__credits__ = (
+    "Carnegie Mellon University–"
+    "University of Pittsburgh Joint PhD Program in Computational Biology\n"
+    "David Koes, PhD, Advisor."
+)

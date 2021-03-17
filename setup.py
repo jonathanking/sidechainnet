@@ -1,7 +1,4 @@
-"""
-SideChainNet
-A protein structure prediction data set that includes side chain information. A direct extension of ProteinNet by Mohammed AlQuraishi.
-"""
+"""Tools and data for all-atom protein structure prediction via machine learning."""
 import sys
 from setuptools import setup, find_packages
 import versioneer
@@ -12,11 +9,8 @@ short_description = __doc__.split("\n")
 needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if needs_pytest else []
 
-try:
-    with open("README.md", "r") as handle:
-        long_description = handle.read()
-except:
-    long_description = "\n".join(short_description[2:])
+with open("README.md", "r") as handle:
+    long_description = handle.read()
 
 setup(
     # Self-descriptive entries which should always be present
@@ -44,14 +38,26 @@ setup(
     setup_requires=[] + pytest_runner,
 
     # Additional entries you may want simply uncomment the lines you want and fill in the data
-    # url='http://www.my_package.com',  # Website
-    # install_requires=[],              # Required packages, pulls from pip if needed; do not use for Conda deployment
+    url='https://github.com/jonathanking/sidechainnet',  # Website
+    install_requires=[
+        'ProDy>=2.0', 'numpy', 'scipy', 'torch>=1.7', 'biopython', 'tqdm', 'py3Dmol',
+        'requests'
+    ],  # Required packages, pulls from pip if needed; do not use for Conda deployment
+    tests_require=['pytest'],
     # platforms=['Linux',
     #            'Mac OS-X',
     #            'Unix',
     #            'Windows'],            # Valid platforms your code works on, adjust to your flavor
-    # python_requires=">=3.5",          # Python version restrictions
+    python_requires=">=3.5",  # Python version restrictions
 
     # Manual control if final package is compressible or not, set False to prevent the .egg from being made
     # zip_safe=False,
-)
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: BSD License',
+        'Programming Language :: Python :: 3',
+        'Operating System :: POSIX :: Linux',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        'Topic :: Scientific/Engineering :: Bio-Informatics'
+    ])
