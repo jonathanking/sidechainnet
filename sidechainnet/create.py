@@ -22,6 +22,7 @@ Date:   10/28/2020
 """
 
 import argparse
+from collections import namedtuple
 import os
 import re
 from multiprocessing import Pool, cpu_count
@@ -42,6 +43,10 @@ from sidechainnet.utils.parse import parse_raw_proteinnet
 
 pr.confProDy(verbosity="none")
 pr.confProDy(auto_secondary=False)
+
+ArgsTuple = namedtuple(
+    "Args", "training_set casp_version proteinnet_in proteinnet_out "
+    "sidechainnet_out regenerate_scdata limit")
 
 
 def combine(pn_entry, sc_entry, aligner, pnid):
@@ -155,7 +160,45 @@ def format_sidechainnet_path(casp_version, training_split):
     return f"sidechainnet_casp{casp_version}_{training_split}.pkl"
 
 
-def create():
+def create(casp_version=12,
+           training_set=30,
+           proteinnet_in=None,
+           proteinnet_out="data/proteinnet/",
+           sidechainnet_out="data/sidechainnet/",
+           regenerate_scdata=False,
+           limit=None):
+    """Generate the requested SidechainNet dataset and save pickled result files.
+
+    This function replicates CLI behavior of calling `python sidechainnet/create.py`.
+
+    Args:
+        casp_version (int, optional): CASP dataset version (7-12). Defaults to 12.
+        training_set (int, optional): Training set thinning (30, 50, 70, 90, 95, 100
+            where 100 means 100% of the training set is kept). Defaults to 30.
+        proteinnet_in ([type], optional): Path to ProteinNet raw text files, previously
+            downloaded by the user. Defaults to None.
+        proteinnet_out (str, optional): Path for saving processed ProteinNet records.
+            Defaults to "data/proteinnet/".
+        sidechainnet_out (str, optional): Path for saving processed SidechainNet records.
+            Defaults to "data/sidechainnet/".
+        regenerate_scdata (bool, optional): If true, regenerate raw sidechain-applicable
+            data instead of searching for data that has already been preprocessed.
+            Defaults to False.
+        limit ([type], optional): The upper limit on number of proteins to process,
+            useful when debugging. Defaults to None.
+
+    Raises:
+        ValueError: when ProteinNet data paths are non-existant or not as expected.
+    """
+    if proteinnet_in is None:
+        raise ValueError("Please provide a value for proteinnet_in that "
+                         "points to the directory where raw ProteinNet files are stored.")
+    args = ArgsTuple(training_set, casp_version, proteinnet_in, proteinnet_out,
+                     sidechainnet_out, regenerate_scdata, limit)
+    main(args)
+
+
+def _create(args):
     """Generates SidechainNet for a single CASP thinning."""
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
@@ -182,7 +225,7 @@ def create():
     print(f"SidechainNet for CASP {args.casp_version} written to {sidechainnet_outfile}.")
 
 
-def create_all():
+def _create_all(args):
     """Generates all thinnings of a particular CASP dataset, starting with the largest."""
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, 100)
@@ -217,6 +260,25 @@ def create_all():
         save_data(sidechainnet, sc_outfile)
         print(f"SidechainNet for CASP {args.casp_version} "
               f"({training_set}% thinning) written to {sc_outfile}.")
+
+
+def main(args_tuple):
+    """Run _create or _create_all using the arguments provided by the namedtuple."""
+    if args_tuple.training_set != 'all':
+        args_tuple = args_tuple._replace(training_set=int(args_tuple.training_set))
+
+    match = re.search(r"casp(\d+)", args_tuple.proteinnet_in, re.IGNORECASE)
+    if not match:
+        raise ValueError("The input_dir does not contain 'caspX'. "
+                         "Please ensure the raw files are enclosed "
+                         "in a path that contains the CASP version"
+                         " i.e. 'casp12'.")
+    args_tuple = args_tuple._replace(casp_version=match.group(1))
+
+    if args_tuple.training_set == 'all':
+        _create_all(args_tuple)
+    else:
+        _create(args_tuple)
 
 
 if __name__ == "__main__":
@@ -254,18 +316,7 @@ if __name__ == "__main__":
         help=('If True, then regenerate the sidechain-only data even if it already exists'
               ' locally.'))
     args = parser.parse_args()
-    if args.training_set != 'all':
-        args.training_set = int(args.training_set)
-
-    match = re.search(r"casp(\d+)", args.proteinnet_in, re.IGNORECASE)
-    if not match:
-        raise parser.error("The input_dir does not contain 'caspX'. "
-                           "Please ensure the raw files are enclosed "
-                           "in a path that contains the CASP version"
-                           " i.e. 'casp12'.")
-    args.casp_version = match.group(1)
-
-    if args.training_set == 'all':
-        create_all()
-    else:
-        create()
+    args_tuple = ArgsTuple(args.training_set, args.casp_version, args.proteinnet_in,
+                           args.proteinnet_out, args.sidechainnet_out,
+                           args.regenerate_scdata, args.limit)
+    main(args_tuple)
