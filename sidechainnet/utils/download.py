@@ -9,7 +9,6 @@ import requests
 import prody as pr
 import tqdm
 
-from sidechainnet import get_data
 import sidechainnet.utils.errors as errors
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
