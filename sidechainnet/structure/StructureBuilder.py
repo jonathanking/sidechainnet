@@ -310,19 +310,19 @@ class ResidueBuilder(object):
                     # Placing N
                     t = self.prev_res.ang[4]  # thetas["ca-c-n"]
                     b = BB_BUILD_INFO["BONDLENS"]["c-n"]
-                    pb = b = BB_BUILD_INFO["BONDLENS"]["ca-c"]  # pb is previous bond len
+                    pb = BB_BUILD_INFO["BONDLENS"]["ca-c"]  # pb is previous bond len
                     dihedral = self.prev_res.ang[1]  # psi of previous residue
                 elif j == 1:
                     # Placing Ca
                     t = self.prev_res.ang[5]  # thetas["c-n-ca"]
                     b = BB_BUILD_INFO["BONDLENS"]["n-ca"]
-                    pb = b = BB_BUILD_INFO["BONDLENS"]["c-n"]
+                    pb = BB_BUILD_INFO["BONDLENS"]["c-n"]
                     dihedral = self.prev_res.ang[2]  # omega of previous residue
                 elif j == 2:
                     # Placing C
                     t = self.ang[3]  # thetas["n-ca-c"]
                     b = BB_BUILD_INFO["BONDLENS"]["ca-c"]
-                    pb = b = BB_BUILD_INFO["BONDLENS"]["n-ca"]
+                    pb = BB_BUILD_INFO["BONDLENS"]["n-ca"]
                     dihedral = self.ang[0]  # phi of current residue
                 else:
                     # Placing O (carbonyl)
