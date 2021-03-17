@@ -235,16 +235,16 @@ def get_chain_from_trainid(pnid):
     try:
         chain = pr.parsePDB(pdbid, chain=chid, model=chnum)
         if not chain:
-            chain = pr.parseCIF(pdbid, chain=chid, model=chnum)
+            chain = pr.parseMMCIF(pdbid, chain=chid, model=chnum)
             use_pdb = False
     # If the file is too large, then we can download the CIF instead
     except OSError:
         try:
-            chain = pr.parseCIF(pdbid, chain=chid, model=chnum)
+            chain = pr.parseMMCIF(pdbid, chain=chid, model=chnum)
             use_pdb = False
         except IndexError:
             try:
-                chain = pr.parseCIF(pdbid, chain=chid, model=1)
+                chain = pr.parseMMCIF(pdbid, chain=chid, model=1)
                 use_pdb = False
                 modified_model_number = True
             except Exception as e:
@@ -258,7 +258,7 @@ def get_chain_from_trainid(pnid):
     except (pr.proteins.pdbfile.PDBParseError, IndexError):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
-        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseCIF(pdbid,
+        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(pdbid,
                                                                             chain=chid)
         if struct and chnum > 1:
             try:
