@@ -2,13 +2,13 @@
 
 import multiprocessing
 import os
+import pkg_resources
 from glob import glob
 import requests
 
 import prody as pr
 import tqdm
 
-from sidechainnet import get_data
 import sidechainnet.utils.errors as errors
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
@@ -17,14 +17,28 @@ MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
 VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
 DATA_SPLITS = ['train', 'test'] + VALID_SPLITS
-with open(get_data("astral_data.txt"), "r") as astral_file:
-    ASTRAL_ID_MAPPING = parse_astral_summary_file(astral_file.read().splitlines())
 D_AMINO_ACID_CODES = [
     "DAL", "DSN", "DTH", "DCY", "DVA", "DLE", "DIL", "MED", "DPR", "DPN", "DTY", "DTR",
     "DSP", "DGL", "DSG", "DGN", "DHI", "DLY", "DAR"
 ]
-PROTEIN_DSSP_DATA = parse_dssp_file(get_data("full_protein_dssp_annotations.json"))
-PROTEIN_DSSP_DATA.update(parse_dssp_file(get_data("single_domain_dssp_annotations.json")))
+ASTRAL_ID_MAPPING = None
+PROTEIN_DSSP_DATA = None
+
+
+def _init_dssp_data():
+    global PROTEIN_DSSP_DATA
+    global ASTRAL_ID_MAPPING
+    PROTEIN_DSSP_DATA = parse_dssp_file(
+        pkg_resources.resource_filename("sidechainnet",
+                                        "resources/full_protein_dssp_annotations.json"))
+    PROTEIN_DSSP_DATA.update(
+        parse_dssp_file(
+            pkg_resources.resource_filename(
+                "sidechainnet", "resources/single_domain_dssp_annotations.json")))
+    with open(
+            pkg_resources.resource_filename("sidechainnet", "resources/astral_data.txt"),
+            "r") as astral_file:
+        ASTRAL_ID_MAPPING = parse_astral_summary_file(astral_file.read().splitlines())
 
 
 def download_sidechain_data(pnids,
@@ -160,6 +174,7 @@ def process_id(pnid):
 
     # If we've made it this far, we can unpack the data and return it
     dihedrals, coords, sequence = dihedrals_coords_sequence
+
     if "#" not in pnid:
         try:
             dssp = PROTEIN_DSSP_DATA[pnid]
@@ -259,7 +274,7 @@ def get_chain_from_trainid(pnid):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
         struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(pdbid,
-                                                                            chain=chid)
+                                                                              chain=chid)
         if struct and chnum > 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
