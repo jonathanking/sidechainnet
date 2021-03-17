@@ -36,8 +36,10 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 <sup>**\*</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
-## Installation
-To run this code, it's recommended to first clone the repo into an appropriate source directory with `git clone <CLONE_URL>`. Then, perform a developmental install of the package with pip in your current environment with `pip install -e .`. This will install the `sidechainnet` package in your environment.
+## Installation *(Now via `pip`!)*
+`pip install sidechainnet`
+
+This should also install the prerequisite packages listed below.
 
 ## Usage Examples
 
