@@ -45,7 +45,7 @@ pr.confProDy(verbosity="none")
 pr.confProDy(auto_secondary=False)
 
 ArgsTuple = namedtuple(
-    "Args", "training_set casp_version proteinnet_in proteinnet_out "
+    "ArgsTuple", "casp_version training_set proteinnet_in proteinnet_out "
     "sidechainnet_out regenerate_scdata limit")
 
 
@@ -184,7 +184,7 @@ def create(casp_version=12,
         regenerate_scdata (bool, optional): If true, regenerate raw sidechain-applicable
             data instead of searching for data that has already been preprocessed.
             Defaults to False.
-        limit ([type], optional): The upper limit on number of proteins to process,
+        limit (bool, optional): The upper limit on number of proteins to process,
             useful when debugging. Defaults to None.
 
     Raises:
@@ -193,7 +193,7 @@ def create(casp_version=12,
     if proteinnet_in is None:
         raise ValueError("Please provide a value for proteinnet_in that "
                          "points to the directory where raw ProteinNet files are stored.")
-    args = ArgsTuple(training_set, casp_version, proteinnet_in, proteinnet_out,
+    args = ArgsTuple(casp_version, training_set, proteinnet_in, proteinnet_out,
                      sidechainnet_out, regenerate_scdata, limit)
     main(args)
 
@@ -316,7 +316,7 @@ if __name__ == "__main__":
         help=('If True, then regenerate the sidechain-only data even if it already exists'
               ' locally.'))
     args = parser.parse_args()
-    args_tuple = ArgsTuple(args.training_set, args.casp_version, args.proteinnet_in,
+    args_tuple = ArgsTuple(args.casp_version, args.training_set, args.proteinnet_in,
                            args.proteinnet_out, args.sidechainnet_out,
                            args.regenerate_scdata, args.limit)
     main(args_tuple)
