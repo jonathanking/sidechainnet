@@ -24,38 +24,79 @@ def angles_to_coords(angles, seq, remove_batch_padding=False):
 
 
 def generate_coords(angles, input_seq, device):
-    """ Returns a protein's coordinates generated from its angles and sequence.
+    """Return a protein's coordinates generated from its angles and sequence.
 
-    Given a tensor of angles (L x NUM_PREDICTED_ANGLES), produces the entire
-    set of cartesian coordinates using the NeRF method, (L x A` x 3),
-    where A` is the number of atoms generated (depends on amino acid sequence).
+    Given a tensor of angles (L x NUM_PREDICTED_ANGLES), produces the entire set
+    of cartesian coordinates using the NeRF method, (L x A` x 3), where A` is
+    the number of atoms generated (depends on amino acid sequence).
     """
     sb = StructureBuilder.StructureBuilder(input_seq, angles, device)
     return sb.build()
 
 
-def nerf(a, b, c, l, theta, chi):
-    """
-    Natural extension reference frame method for placing the 4th atom given
-    atoms 1-3 and the relevant angle inforamation. This code was originally
-    written by Rohit Bhattacharya (rohit.bhattachar@gmail.com,
-    https://github.com/rbhatta8/protein-design/blob/master/nerf.py) and I
-    have extended it to work with PyTorch. His original documentation is
-    below:
+def nerf(a, b, c, l, theta, chi, l_bc=None, nerf_method="standard"):
+    """Compute the position of point d given 3 previous points and several parameters.
 
-    Nerf method of finding 4th coord (d) in cartesian space
-        Params:
-            a, b, c : coords of 3 points
-            l : bond length between c and d
-            theta : bond angle between b, c, d (in degrees)
-            chi : dihedral using a, b, c, d (in degrees)
-        Returns:
-            d: tuple of (x, y, z) in cartesian space
+    This function uses either sn_nerf or standard_nerf depending on the presence of l_bc.
+    Both sn_nerf and standard_nerf follow the formulations in the paper by Jerod Parsons
+    et al. https://doi.org/10.1002/jcc.20237 titled "Practical conversion from torsion
+    space to Cartesian space for in silico protein synthesis."
+
+    Args:
+        a (torch.float32 tensor): (3 x 1) tensor describing point a.
+        b (torch.float32 tensor): (3 x 1) tensor describing point b.
+        c (torch.float32 tensor): (3 x 1) tensor describing point c.
+        l_cd (torch.float32 tensor): (1) tensor describing the length between points
+            c & d.
+        theta (torch.float32 tensor): (1) tensor describing angle between points b, c,
+            and d.
+        chi (torch.float32 tensor): (1) tensor describing dihedral angle between points
+            a, b, c, and d.
+        l_bc (torch.float32 tensor, optional): (1) tensor describing length between points
+            b and c.
+        nerf_method (str, optional): Which NeRF implementation to use. "standard" uses
+            the standard NeRF formulation described in many papers. "sn_nerf" uses an
+            optimized version with less vector normalizations. Defaults to
+            "standard".
     """
-    # calculate unit vectors AB and BC
+    if nerf_method == "standard" or l_bc is None:
+        return standard_nerf(a, b, c, l, theta, chi)
+    elif nerf_method == "sn_nerf" and l_bc is not None:
+        return sn_nerf(a, b, c, l, theta, chi, l_bc)
+    else:
+        raise ValueError("l_bc must be provided for sn_nerf.")
+
+
+def standard_nerf(a, b, c, l, theta, chi):
+    """Compute the position of point d given 3 previous points and angle information.
+
+    This implementation is based on the one originally written by Rohit Bhattacharya
+    (rohit.bhattachar@gmail.com,
+    https://github.com/rbhatta8/protein-design/blob/master/nerf.py). I have extended it to
+    work with PyTorch. Original equation from https://doi.org/10.1002/jcc.20237.
+
+    Args:
+        a (torch.float32 tensor): (3 x 1) tensor describing point a.
+        b (torch.float32 tensor): (3 x 1) tensor describing point b.
+        c (torch.float32 tensor): (3 x 1) tensor describing point c.
+        l_cd (torch.float32 tensor): (1) tensor describing the length between points
+            c & d.
+        theta (torch.float32 tensor): (1) tensor describing angle between points b, c,
+            and d.
+        chi (torch.float32 tensor): (1) tensor describing dihedral angle between points
+            a, b, c, and d.
+
+    Raises:
+        ValueError: Raises ValueError when value of theta is not in [-pi, pi].
+
+    Returns:
+        torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
+        placement using points a, b, c, and several parameters.
+    """
     if not (-np.pi <= theta <= np.pi):
         raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
 
+    # calculate unit vectors AB and BC
     W_hat = torch.nn.functional.normalize(b - a, dim=0)
     x_hat = torch.nn.functional.normalize(c - b, dim=0)
 
@@ -76,10 +117,55 @@ def nerf(a, b, c, l, theta, chi):
     ])
 
     # calculate with rotation as our final output
-    # TODO: is the squeezing necessary?
     d = d.unsqueeze(1).to(torch.float32)
     res = c + torch.mm(M, d).squeeze()
     return res.squeeze()
+
+
+def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
+    """Return coordinates for point d given previous points & parameters. Optimized NeRF.
+
+    This function has been optimized from the original nerf to be about 20% faster. It
+    contains fewer normalization steps and total calculations than the original
+    formulation. See https://doi.org/10.1002/jcc.20237 for details.
+
+    Args:
+        a (torch.float32 tensor): (3 x 1) tensor describing point a.
+        b (torch.float32 tensor): (3 x 1) tensor describing point b.
+        c (torch.float32 tensor): (3 x 1) tensor describing point c.
+        l_cd (torch.float32 tensor): (1) tensor describing the length between points
+            c & d.
+        theta (torch.float32 tensor): (1) tensor describing angle between points b, c,
+            and d.
+        chi (torch.float32 tensor): (1) tensor describing dihedral angle between points
+            a, b, c, and d.
+        l_bc (torch.float32 tensor): (1) tensor describing length between points b and c.
+
+    Raises:
+        ValueError: Raises ValueError when value of theta is not in [-pi, pi].
+
+    Returns:
+        torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
+        placement using points a, b, c, and several parameters.
+    """
+    if not (-np.pi <= theta <= np.pi):
+        raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
+    AB = b - a
+    BC = c - b
+    bc = BC / l_bc
+    n = torch.nn.functional.normalize(torch.cross(AB, bc), dim=0)
+    n_x_bc = torch.cross(n, bc)
+
+    M = torch.stack([bc, n_x_bc, n], dim=1)
+
+    D2 = torch.stack([
+        -l_cd * torch.cos(theta), l_cd * torch.sin(theta) * torch.cos(chi),
+        l_cd * torch.sin(theta) * torch.sin(chi)
+    ]).to(torch.float32).unsqueeze(1)
+
+    D = torch.mm(M, D2).squeeze()
+
+    return D + c
 
 
 def determine_missing_positions(ang_or_coord_matrix):
@@ -88,9 +174,7 @@ def determine_missing_positions(ang_or_coord_matrix):
 
 
 def deg2rad(angle):
-    """
-    Converts an angle in degrees to radians.
-    """
+    """Convert an angle in degrees to radians."""
     return angle * np.pi / 180.
 
 

@@ -1,5 +1,5 @@
-"""
-SideChainNet
+"""SidechainNet.
+
 A protein structure prediction data set that includes sidechain information. Directly
 extends ProteinNet by Mohammed AlQuraishi.
 """
@@ -27,6 +27,9 @@ from ._version import get_versions
 from .structure.StructureBuilder import StructureBuilder
 from .structure.BatchedStructureBuilder import BatchedStructureBuilder
 from .utils.load import load
+
+from .utils.download import VALID_SPLITS, DATA_SPLITS
+
 
 versions = get_versions()
 __version__ = versions['version']

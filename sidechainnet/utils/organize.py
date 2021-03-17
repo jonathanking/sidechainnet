@@ -7,7 +7,7 @@ import pickle
 
 import numpy as np
 
-from sidechainnet.utils.download import VALID_SPLITS
+from sidechainnet.utils.download import DATA_SPLITS, VALID_SPLITS
 
 
 def validate_data_dict(data):
@@ -21,11 +21,11 @@ def validate_data_dict(data):
             l == num_items for l in map(len, [data[subset][k] for k in items_recorded])
         ]), f"{subset} lengths don't match."
 
-    for split in VALID_SPLITS:
-        valid_len = len(data[f"valid-{split}"]["seq"])
+    for vsplit in VALID_SPLITS:
+        valid_len = len(data[vsplit]["seq"])
         assert all([
             l == valid_len
-            for l in map(len, [data[f"valid-{split}"][k] for k in ["ang", "ids", "crd"]])
+            for l in map(len, [data[vsplit][k] for k in ["ang", "ids", "crd"]])
         ]), "Valid lengths don't match."
 
 
@@ -51,7 +51,7 @@ def create_empty_dictionary():
     }
 
     validation_subdict = {
-        f"valid-{split}": copy.deepcopy(basic_data_entries) for split in VALID_SPLITS
+        vsplit: copy.deepcopy(basic_data_entries) for vsplit in VALID_SPLITS
     }
     data.update(validation_subdict)
 
@@ -130,7 +130,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
             n_proteins += 1
 
     # Sort each split of data by length, ascending
-    for split in ["train", "test"] + [f"valid-{vs}" for vs in VALID_SPLITS]:
+    for split in DATA_SPLITS:
         organized_data[split] = sort_datasplit(organized_data[split])
 
     # Add settings

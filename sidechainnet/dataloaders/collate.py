@@ -9,7 +9,7 @@ from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatc
 from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
 from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
-from sidechainnet.utils.download import VALID_SPLITS, MAX_SEQ_LEN
+from sidechainnet.utils.download import MAX_SEQ_LEN, VALID_SPLITS
 
 
 Batch = collections.namedtuple("Batch",
@@ -237,13 +237,13 @@ def prepare_dataloaders(data,
             downsample=train_eval_downsample))
 
     valid_loaders = {}
-    for split in VALID_SPLITS:
+    for vsplit in VALID_SPLITS:
         valid_loader = torch.utils.data.DataLoader(ProteinDataset(
-            data[f'valid-{split}'], f'valid-{split}', data['settings'], data['date']),
+            data[vsplit], vsplit, data['settings'], data['date']),
                                                    num_workers=num_workers,
                                                    batch_size=batch_size,
                                                    collate_fn=collate_fn)
-        valid_loaders[split] = valid_loader
+        valid_loaders[vsplit] = valid_loader
 
     test_loader = torch.utils.data.DataLoader(ProteinDataset(data['test'], 'test',
                                                              data['settings'],
@@ -257,6 +257,6 @@ def prepare_dataloaders(data,
         'train-eval': train_eval_loader,
         'test': test_loader
     }
-    dataloaders.update({f'valid-{split}': valid_loaders[split] for split in VALID_SPLITS})
+    dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in VALID_SPLITS})
 
     return dataloaders
