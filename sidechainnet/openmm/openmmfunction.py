@@ -46,7 +46,7 @@ class OpenMMFunction(Function):
         for i in range(force_arr.shape[0]):
             if coord_sum[i] != 0:
                 force = forces.pop(0)
-                force_arr[i] = force / np.linalg.norm(force)
+                force_arr[i] = -force / np.linalg.norm(force)
         return torch.tensor(force_arr, dtype=torch.float64), None
 
 

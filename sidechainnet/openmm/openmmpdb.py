@@ -4,7 +4,7 @@ from simtk.unit import *
 from pdbfixer import PDBFixer
 import io
 from simtk.openmm import LocalEnergyMinimizer
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import prody as pr
 import numpy as np
 
@@ -38,7 +38,7 @@ class OpenMMPDB(object):
                 yield spltline[2], spltline[3]
 
     def _pos_atom_map(self, init_positions):
-        self.pos_atom_map = defaultdict(lambda: defaultdict(dict))
+        self.pos_atom_map = OrderedDict()
         for pos, atomres in zip(init_positions, self._get_atom_residue()):
             _pos = ''.join(["%.4f" % item for item in pos.value_in_unit(nanometer)])
             self.pos_atom_map[_pos] = atomres
@@ -87,7 +87,7 @@ class OpenMMPDB(object):
         forces = self.state.getForces()
         for pos, force in zip(positions, forces):
             _pos = ''.join(["%.4f" % item for item in pos.value_in_unit(nanometer)])
-            if self.pos_atom_map.get(_pos) is not None:
+            if _pos in self.pos_atom_map:
                 self.pos_force_map[_pos] = force
         return self.pos_force_map
 
