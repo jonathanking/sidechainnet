@@ -53,9 +53,8 @@ def minimize_entry(split, i):
     """Return an OpenMM-minimized version of a SidechainNet data entry."""
     new_entry = {k: None for k in split.keys()}
     sb = scn.StructureBuilder(split['seq'][i], split['crd'][i])
-    sb._initialize_coordinates_and_PdbCreator()
     try:
-        pdb_obj = openmmpdb.OpenMMPDB(sb.pdb_creator.get_pdb_string(), split['ids'][i])
+        pdb_obj = openmmpdb.OpenMMPDB(sb.to_pdbstr(), split['ids'][i])
     except ValueError as e:
         if "No template found" in str(e):
             chain = get_chain_from_proteinnetid(split['ids'][i],
@@ -66,8 +65,7 @@ def minimize_entry(split, i):
                 chain, replace_nonstd=False)
             sb = scn.StructureBuilder(seq, raw_crds)
             sb._initialize_coordinates_and_PdbCreator()
-            pdb_obj = openmmpdb.OpenMMPDB(sb.pdb_creator.get_pdb_string(),
-                                          split['ids'][i])
+            pdb_obj = openmmpdb.OpenMMPDB(sb.to_pdbstr(), split['ids'][i])
 
     pdb_obj.minimize_energy()
 
@@ -106,9 +104,8 @@ def minimize_entry_parallel(seq, ang, crd, _id, msk, sec, evo, res):
         'crd': None
     }
     sb = scn.StructureBuilder(seq, crd)
-    sb._initialize_coordinates_and_PdbCreator()
     try:
-        pdb_obj = openmmpdb.OpenMMPDB(sb.pdb_creator.get_pdb_string(), _id)
+        pdb_obj = openmmpdb.OpenMMPDB(sb.to_pdbstr(), _id)
     except ValueError as e:
         if "No template found" in str(e):
             # TODO reparse directly from a PDB file to observe non-std AAs previously ignored
@@ -116,7 +113,7 @@ def minimize_entry_parallel(seq, ang, crd, _id, msk, sec, evo, res):
             new_entry['seq'] = seq
             new_entry['res'] = -1
             return new_entry
-    # pdb_obj = openmmpdb.OpenMMPDB(sb.pdb_creator.get_pdb_string(), _id)
+    # pdb_obj = openmmpdb.OpenMMPDB(sb.to_pdbstr(), _id)
     pdb_obj.minimize_energy()
     print("done.")
 
@@ -137,7 +134,7 @@ def minimize_entry_coords_only(seq, coords):
     """Return an OpenMM-minimized version of SidechainNet structure (coordinates only)."""
     sb = scn.StructureBuilder(seq, coords)
     sb._initialize_coordinates_and_PdbCreator()
-    pdb_obj = openmmpdb.OpenMMPDB(sb.pdb_creator.get_pdb_string())
+    pdb_obj = openmmpdb.OpenMMPDB(sb.to_pdbstr())
     pdb_obj.minimize_energy()
 
     atomgroup = pdb_obj.make_prody_atomgroup()

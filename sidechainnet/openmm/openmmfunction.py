@@ -18,8 +18,7 @@ class OpenMMFunction(Function):
     def forward(ctx, coord, seq):
         # Take coordinates and build a PDB file
         sb = scn.StructureBuilder(seq, crd=coord)
-        sb._initialize_coordinates_and_PdbCreator()
-        pdbstr = sb.pdb_creator.get_pdb_string()
+        pdbstr = sb.to_pdbstr()
 
         # Make OpenMMPDB object to compute P.E.
         pdb_mm = OpenMMPDB(pdbstr)

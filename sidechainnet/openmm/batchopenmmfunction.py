@@ -22,8 +22,7 @@ class OpenMMBatchFunction(Function):
             ]).replace('_', '')
             coord = coords[protein_index][:len(seq) * 14]
             sb = scn.StructureBuilder(seq, crd=coord)
-            sb._initialize_coordinates_and_PdbCreator()
-            pdbstr = sb.pdb_creator.get_pdb_string()
+            pdbstr = sb.to_pdbstr()
             pdb_mm = OpenMMPDB(pdbstr)
             pdb_mmlist.append(pdb_mm)
         ctx.pdb_mmlist = pdb_mmlist
