@@ -192,6 +192,15 @@ class StructureBuilder(object):
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_pdb(path, title)
 
+    def to_pdbstr(self, title="pred"):
+        """Return protein structure as a PDB string.
+
+        Args:
+            title (str, optional): Title of structure for PDB file. Defaults to "pred".
+        """
+        self._initialize_coordinates_and_PdbCreator()
+        return self.pdb_creator.get_pdb_string()
+
     def to_gltf(self, path, title="pred"):
         """Save protein structure as a GLTF (3D-object) file to given path.
 
