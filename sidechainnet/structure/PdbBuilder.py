@@ -50,7 +50,7 @@ class PdbBuilder(object):
                            "{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}")
         self.defaults = {
             "alt_loc": "",
-            "chain_id": "",
+            "chain_id": "A",
             "insertion_code": "",
             "occupancy": 1,
             "temp_factor": 0,
@@ -155,7 +155,7 @@ class PdbBuilder(object):
         lines = []
         for block in residue_blocks:
             res_block_str = " ".join(block)
-            cur_line = f"SEQRES {lineno: >3} A {nres: >4}  {res_block_str: <61}"
+            cur_line = f"SEQRES {lineno: >3} {self.defaults['chain_id']} {nres: >4}  {res_block_str: <61}"
             lines.append(cur_line)
             lineno += 1
         return "\n".join(lines)

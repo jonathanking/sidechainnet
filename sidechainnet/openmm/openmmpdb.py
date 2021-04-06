@@ -15,7 +15,7 @@ class OpenMMPDB(object):
     """Operates on a single PDB object in Sidechainnet Calculates energy, force norms,
     force per all atoms, force per atoms present in Sidechainnent."""
 
-    def __init__(self, pdbstr, pdbid='unknown'):
+    def __init__(self, pdbstr, mask=None, pdbid='unknown'):
         self.pdbstr = pdbstr
         self.pdbid = pdbid
         self.pdb = PDBFixer(pdbfile=io.StringIO(pdbstr))
@@ -28,6 +28,7 @@ class OpenMMPDB(object):
         # self.pdb.replaceNonstandardResidues()
         self.chain = None
         self._set_up_env()
+        self.mask = mask
 
     def _get_atom_residue(self):
         """Get Atom Name and Residue Name for Each Atom present in Sidechainnent
@@ -125,7 +126,7 @@ class OpenMMPDB(object):
     def localenergyminimize(self):
         LocalEnergyMinimizer.minimize(self.context, maxIterations=100)
 
-    def minimize_energy(self):
+    def minimize_energy(self, pin_gap_boundaries=True):
         """Perform an energy minimization simulation.
 
         Recommended AMBER forcefields from
@@ -136,6 +137,8 @@ class OpenMMPDB(object):
         modeller.addHydrogens(forcefield)
         system = forcefield.createSystem(modeller.topology, nonbondedMethod=app.NoCutoff,
                 nonbondedCutoff=1*nanometer, constraints=HBonds)
+        if pin_gap_boundaries:
+            system = self.pin_gap_boundaries(system)
         integrator = LangevinMiddleIntegrator(300*kelvin, 1/picosecond, 0.004*picoseconds)
         simulation = Simulation(modeller.topology, system, integrator)
         simulation.context.setPositions(modeller.positions)
@@ -145,6 +148,23 @@ class OpenMMPDB(object):
                                                  getParameters=True,
                                                  getEnergy=True,
                                                  getForces=True)
+
+    def pin_gap_boundaries(self, system):
+        """Pin residues on either side of internal gaps by setting masses to 0.
+
+        Args:
+            system (OpenMM System): System containing information about particles & mass.
+
+        Returns:
+            OpenMM System: A modified system with the residues immediately to the
+            left/right of each gap immobilized.
+        """
+        boundaries = get_zeroindexed_gap_positions(self.mask)
+        if not boundaries:
+            return system
+        new_system = set_residue_masses_to_zero(boundaries, self.pdb.topology, system)
+        return new_system
+
 
     def make_high_and_low_energy_pdbs(self):
         """Minimize energy and make high/low energy PDB files."""
@@ -196,3 +216,80 @@ class OpenMMPDB(object):
         ag.setResnames(self.get_resnames())
         ag.setResnums(self.get_resnums())
         return ag
+
+
+def get_zeroindexed_gap_positions(mask):
+    """Return [start-1, end+1] position of every gap in mask, zero-indexed.
+
+    Args:
+        mask (str): A SidechainNet mask (sequence of '+' and '-') marking sequence gaps.
+
+    Returns:
+        list: A list of indices describing the residues immediately preceding and
+        following each internal gap in the mask. The numbers are indexed counting only
+        the present residues. If there are not internal gaps, returns an empty list.
+
+    Examples:
+        >>> get_zeroindexed_gap_positions("+++--+")
+        [2, 3]
+        >>> get_zeroindexed_gap_positions("+++-------+")
+        [2, 3]
+        >>> get_zeroindexed_gap_positions("---++++++---")
+        []
+    """
+    gap_locs = []
+    cur_pos = 0
+    in_gap = False
+    for m in mask:
+        if cur_pos == 0 and m == "-":
+            in_gap = True
+        elif m == "+" and not in_gap:
+            cur_pos += 1
+        elif m == "-" and not in_gap:
+            gap_locs.append(cur_pos - 1)
+            in_gap = True
+        elif m == "-" and in_gap:
+            continue
+        elif m == "+" and in_gap and cur_pos != 0:
+            in_gap = False
+            gap_locs.append(cur_pos)
+            cur_pos += 1
+        elif m == "+" and in_gap and cur_pos == 0:
+            in_gap = False
+            cur_pos += 1
+    if in_gap:
+        gap_locs.pop()
+
+    return gap_locs
+
+
+def set_residue_masses_to_zero(res_indices, topo, sys):
+    """Set the masses for the specified residues in a system and topology to zero.
+
+    Args:
+        res_indices (list): List of integers of residues that will be immobilized.
+        topo (OpenMM Topology): Topology of PDB structure (PDBStructure.topology).
+        sys (OpenMM System): System containing atomic masses.
+
+    Returns:
+        OpenMM System: Modified system with the masses for all atoms in specified residues
+            set to zero.
+    """
+    residues = list(topo.residues())
+    for i in res_indices:
+        res = residues[i]
+        atom_indices = [a.index for a in res.atoms()]
+        for ai in atom_indices:
+            sys.setParticleMass(ai, 0)
+    return sys
+
+
+if __name__ == "__main__":
+
+    d = scn.load("debug", "/home/jok120/sidechainnet/data/sidechainnet/")
+    sb = scn.StructureBuilder(d['valid-70']['seq'][13], d['valid-70']['crd'][13])
+
+    fixer = PDBFixer(pdbfile=io.StringIO(sb.to_pdbstr()))
+    fixer.findMissingResidues()
+    fixer.findMissingAtoms()
+    fixer.findNonstandardResidues()
