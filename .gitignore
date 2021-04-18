@@ -118,6 +118,3 @@ errors/
 *ignored/
 *.dssp
 *.stride
-sidechainnet/examples/snNerf Performance Evaluation.ipynb
-sidechainnet/examples/test imports.ipynb
-sidechainnet/examples/test_complete_structures_only.ipynb

@@ -16,7 +16,6 @@ from .utils.load import load
 from .utils.download import VALID_SPLITS, DATA_SPLITS
 from .create import create
 from . import utils
-from . import openmm
 
 versions = get_versions()
 __version__ = versions['version']
