@@ -71,10 +71,9 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences, 1-letter codes
                   "evo": [evo1, evo2, ...],  # PSSMs and Information Content
                   "sec": [sec1, sec2, ...],  # Secondary structure labels (DSSP)
                   "res": [res1, res2, ...],  # X-ray crystallographic resolution
-                  "ids": [id1, id2,   ...],   # Corresponding ProteinNet IDs
-                  "mod": [mod1, mod2,   ...]   # Modified residue annotations
-                  },
-                  "ums": [mod1, mod2,   ...]   # Sequences before modification, 3-letter codes
+                  "ids": [id1, id2,   ...],  # Corresponding ProteinNet IDs
+                  "mod": [mod1, mod2, ...],  # Modified residue annotations
+                  "ums": [mod1, mod2, ...]   # Unmodified sequences, 3-letter codes
                   },
         "valid-10": {...},
             ...
