@@ -30,13 +30,15 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X | 
 | Structure resolution | *1* | `res` | | X |
 | Primary sequence (3-letter codes) before SidechainNet standardization (a.k.a. **U**n**M**odified **S**equence)<sup>§</sup> | *L*  | `ums` | | X |
-| Modified residue bit-vector | *L x 1*  | `mod` | | X |
+| Modified residue bit-vector<sup>†</sup> | *L x 1*  | `mod` | | X |
 
 **L* reperesents the length of any given protein in the dataset.
 
 <sup>*\*</sup>Secondary structure is acquired from ProteinNet for training sets only. (Added January 2021)
 
 <sup>**\*</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
+
+<sup>†</sup>Includes a `1` for each residue that has been modified to its standard form according to the mapping in `sidechainnet.utils.measure.ALLOWED_NONSTD_RESIDUES`.
 
 <sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
 
