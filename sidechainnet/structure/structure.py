@@ -1,6 +1,7 @@
 """Contains high-level functionality for protein structure building tools, i.e. NeRF."""
 
 import numpy as np
+import prody as pr
 import torch
 from sidechainnet.structure import StructureBuilder
 from sidechainnet.structure.build_info import NUM_ANGLES
@@ -219,6 +220,23 @@ def trig_transform(t):
         raise ValueError("trig_transform function is only defined for "
                          "(batch x L x num_angle) tensors.")
     return new_t
+
+
+def compare_pdb_files(file1, file2):
+    """Returns the RMSD between two PDB files of the same protein.
+
+    Args:
+        file1 (str): Path to first PDB file.
+        file2 (str): Path to second PDB file. Must be the same protein as in file1.
+
+    Returns:
+        float: Root Mean Squared Deviation (RMSD) between the two structures.
+    """
+    s1 = pr.parsePDB(file1)
+    s2 = pr.parsePDB(file2)
+    transformation = pr.calcTransformation(s1, s2)
+    s1_aligned = transformation.apply(s1)
+    return pr.calcRMSD(s1_aligned, s2)
 
 
 def debug_example():

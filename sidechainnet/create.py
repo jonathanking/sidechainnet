@@ -26,6 +26,7 @@ from collections import namedtuple
 import os
 import re
 from multiprocessing import Pool, cpu_count
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
 import prody as pr
 from tqdm import tqdm
@@ -68,10 +69,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if needs_manual_adjustment(pnid):
         return {}, "needs manual adjustment"
 
-    mask, alignment, ang, crd, dssp, warning = merge(aligner, pn_entry["primary"],
-                                                     sc_entry["seq"], sc_entry["ang"],
-                                                     sc_entry["crd"], sc_entry["sec"],
-                                                     pn_entry["mask"], pnid)
+    mask, alignment, ang, crd, dssp, unmod_seq, is_mod, warning = merge(aligner, pn_entry, sc_entry, pnid)
     new_entry = {}
 
     if alignment:
@@ -88,6 +86,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["ang"] = expand_data_with_mask(ang, mask)
         new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["sec"] = expand_data_with_mask(dssp, mask)
+        new_entry["ums"] = make_unmodified_seq_entry(new_entry["seq"], unmod_seq, mask)
+        new_entry["mod"] = expand_data_with_mask(is_mod, mask)
         new_entry["msk"] = mask
         new_entry["res"] = sc_entry["res"]
 
@@ -95,6 +95,9 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         for k, v in new_entry.items():
             if k == "crd":
                 if len(v) // NUM_COORDS_PER_RES != length:
+                    return {}, "failed"
+            elif k == "ums":
+                if len(v.split(" ")) != length:
                     return {}, "failed"
             elif k != "res":
                 if len(v) != length:
@@ -109,6 +112,17 @@ def combine_wrapper(pndata_scdata_pnid):
     aligner = init_aligner()
     return combine(pn_data, sc_data, aligner, pnid)
 
+
+def make_unmodified_seq_entry(pn_seq, unmod_seq, mask):
+    """Given observed residues, create the unmodified sequence entry for SidechainNet."""
+    padded_unmod_seq = expand_data_with_mask(unmod_seq, mask)
+    unmod_seq_complete = []
+    for c_pn, c_unmod in zip(pn_seq, padded_unmod_seq):
+        if c_unmod == "---":
+            unmod_seq_complete.append(ONE_TO_THREE_LETTER_MAP[c_pn])
+        else:
+            unmod_seq_complete.append(c_unmod)
+    return " ".join(unmod_seq_complete)
 
 def combine_datasets(proteinnet_out, sc_data, training_set):
     """Adds sidechain information to ProteinNet to create SidechainNet.
@@ -203,8 +217,7 @@ def _create(args):
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out,
                                  args.training_set)
-    pnids = pnids[:args.limit]  # Limit the length of the list for debugging
-
+    pnids = pnids[:args.limit]
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
     sc_only_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
                                                         args.casp_version,
