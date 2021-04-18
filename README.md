@@ -65,13 +65,16 @@ In its most basic form, SidechainNet is stored as a Python dictionary organized 
  
  Within each train/validation/test split in SidechainNet is another dictionary mapping data entry types (`seq`, `ang`, etc.) to a list containing this data type for every protein. In the example below, `seq{i}`, `ang{i}`, ... all refer to the `i`<sup>th</sup> protein in the dataset.
 ```python
-data = {"train": {"seq": [seq1, seq2, ...],  # Sequences
+data = {"train": {"seq": [seq1, seq2, ...],  # Sequences, 1-letter codes
                   "ang": [ang1, ang2, ...],  # Angles
                   "crd": [crd1, crd2, ...],  # Coordinates
                   "evo": [evo1, evo2, ...],  # PSSMs and Information Content
                   "sec": [sec1, sec2, ...],  # Secondary structure labels (DSSP)
                   "res": [res1, res2, ...],  # X-ray crystallographic resolution
-                  "ids": [id1, id2,   ...]   # Corresponding ProteinNet IDs
+                  "ids": [id1, id2,   ...],   # Corresponding ProteinNet IDs
+                  "mod": [mod1, mod2,   ...]   # Modified residue annotations
+                  },
+                  "ums": [mod1, mod2,   ...]   # Sequences before modification, 3-letter codes
                   },
         "valid-10": {...},
             ...
@@ -181,6 +184,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | :---: | :--- |
  | `batch.pids` | Tuple of ProteinNet/SidechainNet IDs for proteins in this batch |
  | `batch.seqs` | Tensor of sequences, either as integers or as one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
+  | `batch.int_seqs` | Tensor of sequences in integer sequence format |
 | `batch.msks` | Tensor of missing residue masks, (redundant with padding in data) |
 | `batch.evos` | Tensor of Position Specific Scoring Matrix + Information Content |
 | `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
