@@ -199,7 +199,7 @@ class StructureBuilder(object):
             title (str, optional): Title of structure for PDB file. Defaults to "pred".
         """
         self._initialize_coordinates_and_PdbCreator()
-        return self.pdb_creator.get_pdb_string()
+        return self.pdb_creator.get_pdb_string(title)
 
     def to_gltf(self, path, title="pred"):
         """Save protein structure as a GLTF (3D-object) file to given path.
@@ -225,10 +225,9 @@ class StructureBuilder(object):
         import py3Dmol
         if not style:
             style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
-        self._initialize_coordinates_and_PdbCreator()
 
         view = py3Dmol.view(**kwargs)
-        view.addModel(self.pdb_creator.get_pdb_string(), 'pdb')
+        view.addModel(self.to_pdbstr(), 'pdb')
         if style:
             view.setStyle(style)
         view.zoomTo()
