@@ -173,7 +173,7 @@ def process_id(pnid):
         return pnid, errors.ERRORS["NONE_STRUCTURE_ERRORS"]
 
     # If we've made it this far, we can unpack the data and return it
-    dihedrals, coords, sequence = dihedrals_coords_sequence
+    dihedrals, coords, sequence, unmodified_seq, is_nonstd = dihedrals_coords_sequence
 
     if "#" not in pnid:
         try:
@@ -188,7 +188,9 @@ def process_id(pnid):
         "crd": coords,
         "seq": sequence,
         "sec": dssp,
-        "res": resolution
+        "res": resolution,
+        "ums": unmodified_seq,
+        "mod": is_nonstd
     }
     if message:
         data["msg"] = message
