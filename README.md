@@ -29,15 +29,6 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |  | X | 
 | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X |
 
-
-### Other potentially useful data features include
-
-| Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
-| :---: | :---: |  :---: | :---: | :---: |
-| Structure resolution | *1* | `res` | | X |
-| Primary sequence (3-letter codes) before SidechainNet standardization (a.k.a. **U**n**M**odified **S**equence)<sup>§</sup> | *L*  | `ums` | | X |
-| Modified residue bit-vector<sup>†</sup> | *L x 1*  | `mod` | | X |
-
 **L* reperesents the length of any given protein in the dataset.
 
 <sup>*\*</sup>Secondary structure is acquired from ProteinNet for training sets only. (Added January 2021)
@@ -46,9 +37,20 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 <sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
 
+### Other included data
+
+| Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
+| :---: | :---: |  :---: | :---: | :---: |
+| Structure resolution | *1* | `res` | | X |
+| Primary sequence (3-letter codes) before SidechainNet standardization (a.k.a. **U**n**M**odified **S**equence)<sup>§</sup> | *L*  | `ums` | | X |
+| Modified residue bit-vector<sup>†</sup> | *L x 1*  | `mod` | | X |
+
+<sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
+
+
 <sup>†</sup>Includes a `1` for each residue that has been modified to a standard residue according to the mapping in `sidechainnet.utils.measure.ALLOWED_NONSTD_RESIDUES` (e.g., selenomethionine -> methionine).
 
-## Installation *(Now via `pip`!)*
+## Installation
 `pip install sidechainnet`
 
 This should also install the prerequisite packages listed below.
