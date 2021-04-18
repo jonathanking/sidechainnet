@@ -19,22 +19,26 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
  
 | Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
 | :---: | :---: |  :---: | :---: | :---: | 
-| Primary sequence | *L x 1* | `seq` | X | X | 
-| Secondary structure ([DSSP](https://swift.cmbi.umcn.nl/gv/dssp/DSSP_2.html))<sup>\*\*</sup> | *L x 1* | `sec` | X | X |
+| Primary sequence<sup>§</sup> | *L* | `seq` | X | X | 
+| [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/DSSP_2.html) Secondary structure<sup>\*\*,§</sup> | *L* | `sec` | X | X |
 | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` | X | X | 
-| Missing residue mask | *L x 1* |  `msk` | X | X | 
+| Missing residue mask<sup>§</sup> | *L* |  `msk` | X | X | 
 | Backbone coordinates | *L x 4<sup>\*\*\*</sup> x 3* |  `crd`, subset `[0:4]` | X | X | 
 | Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` |  | X | 
 | Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` |  | X | 
 | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |  | X | 
 | Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X | 
 | Structure resolution | *1* | `res` | | X |
+| Primary sequence (3-letter codes) before SidechainNet standardization (a.k.a. **U**n**M**odified **S**equence)<sup>§</sup> | *L*  | `ums` | | X |
+| Modified residue bit-vector | *L x 1*  | `mod` | | X |
 
 **L* reperesents the length of any given protein in the dataset.
 
 <sup>*\*</sup>Secondary structure is acquired from ProteinNet for training sets only. (Added January 2021)
 
 <sup>**\*</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
+
+<sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
 
 ## Installation *(Now via `pip`!)*
 `pip install sidechainnet`
@@ -176,6 +180,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | `batch.crds` | Tensor of coordinates |
 | `batch.ress` | Tuple of X-ray crystallographic resolutions, when available. |
 | `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
+| `batch.is_modified` | Tensor of modified residue bit-vectors. Each entry is a bit-vector where a 1 signifies that the residue at that position has been modified to match a standard residue supported by SidechainNet (e.g., selenomethionine -> methionine). |
 
 
 ## Reproducing SidechainNet
