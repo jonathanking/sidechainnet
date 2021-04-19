@@ -297,15 +297,16 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
         "msk": [],
         "crd": [],
         "sec": [],
-        "res": []
+        "res": [],
+        "ums": [],
+        "mod": []
     }
     train = raw_data["train"]
     n_filtered_entries = 0
     total_entires = 0.
-    for seq, ang, crd, msk, evo, _id, res, sec in zip(train['seq'], train['ang'],
-                                                      train['crd'], train['msk'],
-                                                      train['evo'], train['ids'],
-                                                      train['res'], train['sec']):
+    for seq, ang, crd, msk, evo, _id, res, sec, ums, mod in zip(
+            train['seq'], train['ang'], train['crd'], train['msk'], train['evo'],
+            train['ids'], train['res'], train['sec'], train['ums'], train['mod']):
         total_entires += 1
         if not res or res > threshold:
             n_filtered_entries += 1
@@ -319,6 +320,8 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
             new_data["crd"].append(crd)
             new_data["sec"].append(sec)
             new_data["res"].append(res)
+            new_data["ums"].append(ums)
+            new_data["mod"].append(mod)
     if n_filtered_entries:
         print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
               " training set entries were excluded based on resolution.")
@@ -343,15 +346,16 @@ def filter_dictionary_by_missing_residues(raw_data):
         "msk": [],
         "crd": [],
         "sec": [],
-        "res": []
+        "res": [],
+        "ums": [],
+        "mod": []
     }
     train = raw_data["train"]
     n_filtered_entries = 0
     total_entires = 0.
-    for seq, ang, crd, msk, evo, _id, res, sec in zip(train['seq'], train['ang'],
-                                                      train['crd'], train['msk'],
-                                                      train['evo'], train['ids'],
-                                                      train['res'], train['sec']):
+    for seq, ang, crd, msk, evo, _id, res, sec, ums, mod in zip(
+            train['seq'], train['ang'], train['crd'], train['msk'], train['evo'],
+            train['ids'], train['res'], train['sec'], train['ums'], train['mod']):
         total_entires += 1
         if "-" in msk:
             n_filtered_entries += 1
@@ -365,6 +369,9 @@ def filter_dictionary_by_missing_residues(raw_data):
             new_data["crd"].append(crd)
             new_data["sec"].append(sec)
             new_data["res"].append(res)
+            new_data["ums"].append(ums)
+            new_data["mod"].append(mod)
+
     if n_filtered_entries:
         print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
               " training set entries were excluded based on missing residues.")
