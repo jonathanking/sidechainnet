@@ -53,8 +53,6 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 ## Installation
 `pip install sidechainnet`
 
-This should also install the prerequisite packages listed below.
-
 ## Usage Examples
 
 ### Loading SidechainNet as a Python dictionary
@@ -75,7 +73,7 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences, 1-letter codes
                   "res": [res1, res2, ...],  # X-ray crystallographic resolution
                   "ids": [id1, id2,   ...],  # Corresponding ProteinNet IDs
                   "mod": [mod1, mod2, ...],  # Modified residue annotations
-                  "ums": [mod1, mod2, ...]   # Unmodified sequences, 3-letter codes
+                  "ums": [ums1, ums2, ...]   # Unmodified sequences, 3-letter codes
                   },
         "valid-10": {...},
             ...
