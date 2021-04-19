@@ -191,7 +191,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
 | `batch.angs` | Tensor of angles |
 | `batch.crds` | Tensor of coordinates |
-| `batch.ress` | Tuple of X-ray crystallographic resolutions, when available. |
+| `batch.resolutions` | Tuple of X-ray crystallographic resolutions, when available. |
 | `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
 | `batch.is_modified` | Tensor of modified residue bit-vectors. Each entry is a bit-vector where a 1 signifies that the residue at that position has been modified to match a standard residue supported by SidechainNet (e.g., selenomethionine -> methionine). |
 

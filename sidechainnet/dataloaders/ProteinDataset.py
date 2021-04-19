@@ -26,7 +26,7 @@ class ProteinDataset(torch.utils.data.Dataset):
         ]
         self.evos = scn_data_split['evo']
         self.ids = scn_data_split['ids']
-        self.ress = scn_data_split['res']
+        self.resolution = scn_data_split['res']
         dssp_vocab = DSSPVocabulary()
         self.secs = [dssp_vocab.str2ints(s, add_sos_eos) for s in scn_data_split['sec']]
         self.mods = scn_data_split['mod']  # Arrays with 1 where non-std residues were standardized
@@ -55,7 +55,7 @@ class ProteinDataset(torch.utils.data.Dataset):
         self.msks = [self.msks[i] for i in sorted_len_indices]
         self.evos = [self.evos[i] for i in sorted_len_indices]
         self.ids = [self.ids[i] for i in sorted_len_indices]
-        self.ress = [self.ress[i] for i in sorted_len_indices]
+        self.resolution = [self.resolution[i] for i in sorted_len_indices]
         self.secs = [self.secs[i] for i in sorted_len_indices]
         self.mods = [self.mods[i] for i in sorted_len_indices]
 
@@ -64,7 +64,7 @@ class ProteinDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         return (self.ids[idx], self.seqs[idx], self.msks[idx], self.evos[idx],
-                self.secs[idx], self.angs[idx], self.crds[idx], self.ress[idx],
+                self.secs[idx], self.angs[idx], self.crds[idx], self.resolution[idx],
                 self.mods[idx])
 
     def __str__(self):
