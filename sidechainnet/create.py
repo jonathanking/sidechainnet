@@ -26,6 +26,7 @@ from collections import namedtuple
 import os
 import re
 from multiprocessing import Pool, cpu_count
+import pkg_resources
 
 import prody as pr
 from tqdm import tqdm
@@ -40,6 +41,8 @@ from sidechainnet.utils.manual_adjustment import (manually_adjust_data,
 from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 from sidechainnet.utils.organize import load_data, organize_data, save_data
 from sidechainnet.utils.parse import parse_raw_proteinnet
+
+PNID_CSV_FILE = None
 
 pr.confProDy(verbosity="none")
 pr.confProDy(auto_secondary=False)
@@ -260,6 +263,42 @@ def _create_all(args):
         save_data(sidechainnet, sc_outfile)
         print(f"SidechainNet for CASP {args.casp_version} "
               f"({training_set}% thinning) written to {sc_outfile}.")
+
+
+def get_proteinnet_ids(casp_version, split, thinning):
+    """Return a list of ProteinNet IDs for a given CASP version, split, and thinning.
+
+    Args:
+        casp_version (int): CASP version (7, 8, 9, 10, 11, 12).
+        split (string): Dataset split ('train', 'valid', 'test').
+        thinning (int): Dataset thinning (30, 50, 70, 90, 95, 100).
+
+    Returns:
+        List: Python list of strings representing the ProteinNet IDs in the requested
+            split.
+    """
+    # Load ProteinNet CSV
+    import pandas
+    global PNID_CSV_FILE
+    if PNID_CSV_FILE is None:
+        PNID_CSV_FILE = pandas.read_csv(
+            pkg_resources.resource_filename(
+                "sidechainnet",
+                "resources/all_proteinnet_ids.csv")).set_index('pnid').astype(bool)
+
+    # Fix input
+    if split == "valid":
+        split = "validation"
+    elif split == "train":
+        split = "training"
+    elif split == "test":
+        split = "testing"
+
+    # Pick out the pnids that match the requested splits
+    colname = f"casp{casp_version}_{split}"
+    if split == 'training':
+        colname += f"_{thinning}"
+    return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
 
 
 def main(args_tuple):
