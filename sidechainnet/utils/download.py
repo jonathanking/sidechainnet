@@ -204,7 +204,8 @@ def determine_pnid_type(pnid):
     Returns:
         The 'type' of ProteinNet ID as a string.
     """
-    if "TBM#" in pnid or "FM#" in pnid or "TBM-hard" in pnid or "FM-hard" in pnid:
+    if ("TBM#" in pnid or "FM#" in pnid or "TBM-hard" in pnid or "FM-hard" in pnid or
+            "Unclassified" in pnid):
         return "test"
 
     if pnid.count("_") == 1:
