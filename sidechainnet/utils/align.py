@@ -113,7 +113,16 @@ def shorten_ends(s1, s2, s1_ang, s1_crd, s1_dssp):
     return s1, s1_ang, s1_crd, s1_dssp
 
 
-def merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid, attempt_number=0):
+def merge(aligner,
+          pn_seq,
+          my_seq,
+          ang,
+          crd,
+          dssp,
+          pn_mask,
+          pnid,
+          attempt_number=0,
+          ignore_pnmask=False):
     """Returns True iff when pn_seq and my_seq are aligned, the resultant mask is the same
     as reported by ProteinNet.
 
@@ -198,7 +207,7 @@ def merge(aligner, pn_seq, my_seq, ang, crd, dssp, pn_mask, pnid, attempt_number
             if computed_mask.count("X") + computed_mask.count(".") > 5:
                 warning = "too many wrong AAs"
             computed_mask = computed_mask.replace("X", "+").replace(".", "+")
-        if not masks_match(pn_mask, computed_mask):
+        if not masks_match(pn_mask, computed_mask) and not ignore_pnmask:
             if "astral" in determine_pnid_type(pnid):
                 pdbid, chain = ASTRAL_ID_MAPPING[pnid.split("_")[1].replace("-", "_")]
                 if "A" not in chain:

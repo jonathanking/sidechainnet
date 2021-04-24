@@ -28,18 +28,19 @@ import re
 from multiprocessing import Pool, cpu_count
 import pkg_resources
 
+import numpy as np
 import prody as pr
 from tqdm import tqdm
 
 from sidechainnet.utils.align import (assert_mask_gaps_are_correct, expand_data_with_mask,
                                       init_aligner, merge)
-from sidechainnet.utils.download import download_sidechain_data, VALID_SPLITS
+from sidechainnet.utils.download import PN_VALID_SPLITS, _reinit_global_valid_splits, download_sidechain_data, get_sequence_from_pnid
 from sidechainnet.utils.errors import write_errors_to_files
 from sidechainnet.utils.manual_adjustment import (manually_adjust_data,
                                                   manually_correct_mask,
                                                   needs_manual_adjustment)
 from sidechainnet.utils.measure import NUM_COORDS_PER_RES
-from sidechainnet.utils.organize import load_data, organize_data, save_data
+from sidechainnet.utils.organize import get_validation_split_identifiers_from_pnid_list, load_data, organize_data, save_data
 from sidechainnet.utils.parse import parse_raw_proteinnet
 
 PNID_CSV_FILE = None
@@ -71,10 +72,31 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     if needs_manual_adjustment(pnid):
         return {}, "needs manual adjustment"
 
-    mask, alignment, ang, crd, dssp, warning = merge(aligner, pn_entry["primary"],
-                                                     sc_entry["seq"], sc_entry["ang"],
-                                                     sc_entry["crd"], sc_entry["sec"],
-                                                     pn_entry["mask"], pnid)
+    # If there is no corresponding ProteinNet entry, we create a template entry
+    if pn_entry is None:
+        seq = get_sequence_from_pnid(pnid)
+        pn_entry = {
+            "primary": seq,
+            "evolutionary": np.zeros((len(seq), 21)),
+            "mask": "?" * len(seq)
+        }
+        alignment = True
+        crd = sc_entry['crd']
+        ang = sc_entry['ang']
+        dssp = sc_entry['sec']
+        ignore_pnmask = True
+    else:
+        ignore_pnmask = False
+
+    mask, alignment, ang, crd, dssp, warning = merge(aligner,
+                                                     pn_entry["primary"],
+                                                     sc_entry["seq"],
+                                                     sc_entry["ang"],
+                                                     sc_entry["crd"],
+                                                     sc_entry["sec"],
+                                                     pn_entry["mask"],
+                                                     pnid,
+                                                     ignore_pnmask=ignore_pnmask)
     new_entry = {}
 
     if alignment:
@@ -153,7 +175,11 @@ def combine_datasets(proteinnet_out, sc_data, training_set):
 
 
 def get_tuple(pndata, scdata, pnid):
-    return pndata[pnid], scdata[pnid], pnid
+    """Extract relevant SidechainNet and ProteinNet data from their respective dicts."""
+    try:
+        return pndata[pnid], scdata[pnid], pnid
+    except KeyError:
+        return None, scdata[pnid], pnid
 
 
 def format_sidechainnet_path(casp_version, training_split):
@@ -265,7 +291,82 @@ def _create_all(args):
               f"({training_set}% thinning) written to {sc_outfile}.")
 
 
-def get_proteinnet_ids(casp_version, split, thinning):
+def create_custom(pnids,
+                  output_filename,
+                  proteinnet_in,
+                  proteinnet_out="data/proteinnet/",
+                  sidechainnet_out="data/sidechainnet/",
+                  short_description="Custom SidechainNet dataset.",
+                  regenerate_scdata=False):
+    """[summary]
+
+    Args:
+        pnids (List): List of ProteinNet-formatted protein identifiers (i.e., formmated
+            according to <class>#<pdb_id>_<chain_number>_<chain_id>. ASTRAL identifiers
+            are also supported, <class>#<pdb_id>_<ASTRAL_id>.)
+        output_filename (str): Path to save custom dataset (a pickled Python
+            dictionary). ".pkl" extension is recommended.
+        proteinnet_in (str): Path to customizable ProteinNet directory
+            (contains validation_all, testing_all, and training_100 (CASP12) raw data.)
+        proteinnet_out (str, optional): Path to save processed ProteinNet data.
+            Defaults to "data/proteinnet/".
+        sidechainnet_out (str, optional): Path to save processed SidechainNet data.
+            Defaults to "data/sidechainnet/".
+        short_description (str, optional): A short description provided by the user to
+            describe the dataset. Defaults to "Custom SidechainNet dataset.".
+        regenerate_scdata (bool, optional): If true, regenerate raw sidechain-applicable
+            data instead of searching for data that has already been preprocessed.
+            Defaults to False.
+
+    Returns:
+        dict: Saves and returns the requested custom SidechainNet dictionary.
+    """
+    # ""Generate a SidechainNet dataset according to user specifications.
+
+    # Initialize DSSP data
+    from sidechainnet.utils.download import _init_dssp_data
+    _init_dssp_data()
+    new_splits = get_validation_split_identifiers_from_pnid_list(pnids)
+    _reinit_global_valid_splits(new_splits)
+
+    # First, parse and load raw proteinnet files into Python dictionaries for convenience
+    print("Loading ProteinNet for CASP12 (100% thinning).")
+    _ = parse_raw_proteinnet(proteinnet_in, proteinnet_out, training_set=100)
+
+    # Download and return requested pnids
+    print("Preparing to download requested proteins via their ProteinNet IDs.")
+    dirs, tail = os.path.split(output_filename)
+    intermediate_filename = os.path.join(dirs, "sidechain-only_" + tail)
+    sc_only_data, sc_filename = download_sidechain_data(
+        pnids,
+        sidechainnet_out,
+        casp_version=None,
+        training_set=None,
+        limit=None,
+        proteinnet_in=proteinnet_in,
+        regenerate_scdata=regenerate_scdata,
+        output_name=intermediate_filename)
+
+    # Finally, unify the sidechain data with ProteinNet
+    sidechainnet_raw = combine_datasets(proteinnet_out, sc_only_data, training_set=100)
+
+    sidechainnet_outfile = os.path.join(sidechainnet_out, output_filename)
+    sidechainnet_dict = organize_data(sidechainnet_raw,
+                                      proteinnet_out,
+                                      casp_version="User-specified",
+                                      thinning="User-specified",
+                                      description=short_description,
+                                      custom_ids=pnids)
+    save_data(sidechainnet_dict, sidechainnet_outfile)
+    print(
+        f"User-specified SidechainNet written to {sidechainnet_outfile}.\n"
+        "To load the data in a different format, use sidechainnet.load with the desired\n"
+        f"options and set 'local_scn_path={sidechainnet_outfile}'.")
+
+    return sidechainnet_dict
+
+
+def get_proteinnet_ids(casp_version, split, thinning=None):
     """Return a list of ProteinNet IDs for a given CASP version, split, and thinning.
 
     Args:
@@ -276,7 +377,8 @@ def get_proteinnet_ids(casp_version, split, thinning):
             validation set splits will be returned. If split == 'all', the training,
             validation, and testing set splits for the specified CASP and training set
             thinning are all returned.
-        thinning (int): Training dataset split thinning (30, 50, 70, 90, 95, 100).
+        thinning (int): Training dataset split thinning (30, 50, 70, 90, 95, 100). Default
+            None.
 
     Returns:
         List: Python list of strings representing the ProteinNet IDs in the requested
@@ -294,9 +396,9 @@ def get_proteinnet_ids(casp_version, split, thinning):
     # Fix input, select correct column name for the CSV
     validsplitnum = None
     if "valid" in split:
-        if split not in VALID_SPLITS + ['valid']:
+        if split not in PN_VALID_SPLITS + ['valid']:
             raise ValueError(f"{split} is not a valid ProteinNet validation set split. "
-                             "Use one of {VALID_SPLITS + ['valid']}.")
+                             f"Use one of {PN_VALID_SPLITS + ['valid']}.")
         if split != "valid":
             _, validsplitnum = split.split("-")
         split = "validation"
@@ -304,6 +406,8 @@ def get_proteinnet_ids(casp_version, split, thinning):
         split = "training"
     elif split == "test":
         split = "testing"
+    if split in ["all", "training"] and thinning is None:
+        raise ValueError("Training set thinning must not be None.")
 
     def make_colname(cur_split):
         """Return column name for a given CASP dataset split and thinning."""

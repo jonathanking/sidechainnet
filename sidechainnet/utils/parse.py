@@ -190,11 +190,12 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
         f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]"))
         if not os.path.isdir(f)
     ]
-    assert len(input_files) == 8, (
-        f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
-        "could not find all 8.\n Please download from Mohammed "
-        "AlQuraishi's repository: "
-        "https://github.com/aqlaboratory/proteinnet")
+    if training_set != 100:
+        assert len(input_files) == 8, (
+            f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
+            "could not find all 8.\n Please download from Mohammed "
+            "AlQuraishi's repository: "
+            "https://github.com/aqlaboratory/proteinnet")
 
     # Process each ProteinNet file by turning them into PyTorch saved dictionaries
     print("Preprocessing raw ProteinNet files...")

@@ -9,11 +9,10 @@ from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatc
 from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
 from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
-from sidechainnet.utils.download import MAX_SEQ_LEN, VALID_SPLITS
+from sidechainnet.utils.download import MAX_SEQ_LEN
 
-
-Batch = collections.namedtuple("Batch",
-                               "pids seqs msks evos secs angs crds int_seqs seq_evo_sec ress")
+Batch = collections.namedtuple(
+    "Batch", "pids seqs msks evos secs angs crds int_seqs seq_evo_sec ress")
 
 
 def get_collate_fn(aggregate_input, seqs_as_onehot=None):
@@ -208,6 +207,7 @@ def prepare_dataloaders(data,
             its components (sequence, mask pssm).
         batch_size: Batch size to use when yielding batches from a DataLoader.
     """
+    from sidechainnet.utils.download import VALID_SPLITS
     if collate_fn is None:
         collate_fn = get_collate_fn(aggregate_model_input, seqs_as_onehot=seq_as_onehot)
 

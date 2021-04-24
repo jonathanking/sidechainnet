@@ -14,9 +14,15 @@ from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_a
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
+
 VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
 VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
 DATA_SPLITS = ['train', 'test'] + VALID_SPLITS
+
+PN_VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
+PN_VALID_SPLITS = [f'valid-{s}' for s in PN_VALID_SPLITS_INTS]
+PN_DATA_SPLITS = ['train', 'test'] + PN_VALID_SPLITS
+
 D_AMINO_ACID_CODES = [
     "DAL", "DSN", "DTH", "DCY", "DVA", "DLE", "DIL", "MED", "DPR", "DPN", "DTY", "DTR",
     "DSP", "DGL", "DSG", "DGN", "DHI", "DLY", "DAR"
@@ -25,7 +31,19 @@ ASTRAL_ID_MAPPING = None
 PROTEIN_DSSP_DATA = None
 
 
+def _reinit_global_valid_splits(new_splits):
+    """Reinitialize global validation split variables when customizing dataset splits."""
+    global VALID_SPLITS
+    global VALID_SPLITS_INTS
+    global DATA_SPLITS
+    print(f"Re-initializing validation set splits ({new_splits}).")
+    VALID_SPLITS_INTS = new_splits
+    VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
+    DATA_SPLITS = ['train', 'test'] + VALID_SPLITS
+
+
 def _init_dssp_data():
+    """Initialize global variables for secondary structure and ASTRAL database info."""
     global PROTEIN_DSSP_DATA
     global ASTRAL_ID_MAPPING
     PROTEIN_DSSP_DATA = parse_dssp_file(
@@ -47,7 +65,8 @@ def download_sidechain_data(pnids,
                             training_set,
                             limit,
                             proteinnet_in,
-                            regenerate_scdata=False):
+                            regenerate_scdata=False,
+                            output_name=None):
     """Download the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
@@ -59,6 +78,8 @@ def download_sidechain_data(pnids,
         proteinnet_in: A string representing the path to processed proteinnet.
         regenerate_scdata: Boolean, if True then recreate the sidechain-only data even if
             it already exists.
+        output_name: A string describing the filename. Defaults to
+            "sidechain-only_{casp_version}_{training_set}.pkl".
 
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
@@ -68,7 +89,8 @@ def download_sidechain_data(pnids,
     # Initialize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
-    output_name = f"sidechain-only_{casp_version}_{training_set}.pkl"
+    if output_name is None:
+        output_name = f"sidechain-only_{casp_version}_{training_set}.pkl"
     output_path = os.path.join(sidechainnet_out_dir, output_name)
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
@@ -82,6 +104,8 @@ def download_sidechain_data(pnids,
     if os.path.exists("errors"):
         for file in glob('errors/*.txt'):
             os.remove(file)
+    else:
+        os.makedirs("errors")
 
     # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
@@ -195,7 +219,7 @@ def process_id(pnid):
     return pnid, data
 
 
-def determine_pnid_type(pnid):
+def determine_pnid_type(pnid, label_astral=False):
     """Return the 'type' of a ProteinNet ID (i.e. train, valid, test, ASTRAL).
 
     Args:
@@ -208,7 +232,7 @@ def determine_pnid_type(pnid):
             "Unclassified" in pnid):
         return "test"
 
-    if pnid.count("_") == 1:
+    if label_astral and pnid.count("_") == 1:
         is_astral = "_astral"
     else:
         is_astral = ""

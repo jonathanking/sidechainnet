@@ -100,7 +100,8 @@ def load(casp_version=12,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2,
          filter_by_resolution=False,
-         complete_structures_only=False):
+         complete_structures_only=False,
+         local_scn_path=None):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -176,6 +177,8 @@ def load(casp_version=12,
         complete_structures_only (bool, optional): If True, yield only structures from the
             training set that have no missing residues. Filter not applied to other data
             splits. Default False.
+        local_scn_path (str, optional): The path for a locally saved SidechainNet file.
+            This is especially useful for loading custom SidechainNet datasets.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -242,9 +245,12 @@ def load(casp_version=12,
                 ....    prediction = model(sequence, pssm)
                 ....    ...
     """
-    local_path = _get_local_sidechainnet_path(casp_version, thinning, scn_dir)
-    if not local_path:
-        print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
+    if local_scn_path:
+        local_path = local_scn_path
+    else:
+        local_path = _get_local_sidechainnet_path(casp_version, thinning, scn_dir)
+        if not local_path:
+            print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
     if not local_path or force_download:
         # Download SidechainNet if it does not exist locally, or if requested
         local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
