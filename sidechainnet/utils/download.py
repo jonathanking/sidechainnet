@@ -416,12 +416,53 @@ def get_resolution_from_pdbid(pdbid):
     return res
 
 
-def get_pdbid_from_pnid(pnid):
+def get_sequence_from_pdbid(pdbid, chain):
+    """Use RSCB PDB's API to download the sequence for a PDB ID and chain.
+
+    Args:
+        pdbid (str): 4-letter PDB ID.
+        chain (str): Chain name.
+
+    Returns:
+        str: 1-letter code primary sequence for the specified protein chain.
+    """
+    entity = 1
+    query_string = (f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdbid}/{entity}")
+    r = requests.get(query_string)
+    if r.status_code != 200:
+        res = None
+    while True:
+        query_string = (
+            f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdbid}/{entity}")
+        r = requests.get(query_string)
+        entity_poly = r.json()['entity_poly']
+        if chain.upper() not in entity_poly['pdbx_strand_id'].split(","):
+            entity += 1
+            continue
+        else:
+            break
+    sequence = entity_poly['pdbx_seq_one_letter_code_can']
+
+    return sequence
+
+
+def get_sequence_from_pnid(pnid):
+    """Return the ProteinNet ID's sequence as acquired from RCSB PDB."""
+    pdbid, chid = get_pdbid_from_pnid(pnid, return_chain=True)
+    return get_sequence_from_pdbid(pdbid, chid)
+
+
+def get_pdbid_from_pnid(pnid, return_chain=False):
     """Return RCSB PDB ID associated with a given ProteinNet ID.
 
     Args:
         pnid (string): A ProteinNet entry identifier.
+        return_chain (bool): If True, also return the chain specified by the pnid.
+
+    Returns:
+        str: The PDB ID (and chain, optional) specified by the provided ProteinNet ID.
     """
+    chid = None
     # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
     try:
         pdbid, chnum, chid = pnid.split("_")
@@ -438,7 +479,8 @@ def get_pdbid_from_pnid(pnid):
             print(e)
             print(pnid)
             exit(1)
-
+    if return_chain:
+        return pdbid, chid
     return pdbid
 
 
