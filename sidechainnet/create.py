@@ -33,7 +33,7 @@ from tqdm import tqdm
 
 from sidechainnet.utils.align import (assert_mask_gaps_are_correct, expand_data_with_mask,
                                       init_aligner, merge)
-from sidechainnet.utils.download import download_sidechain_data
+from sidechainnet.utils.download import download_sidechain_data, VALID_SPLITS
 from sidechainnet.utils.errors import write_errors_to_files
 from sidechainnet.utils.manual_adjustment import (manually_adjust_data,
                                                   manually_correct_mask,
@@ -270,8 +270,11 @@ def get_proteinnet_ids(casp_version, split, thinning):
 
     Args:
         casp_version (int): CASP version (7, 8, 9, 10, 11, 12).
-        split (string): Dataset split ('train', 'valid', 'test').
-        thinning (int): Dataset thinning (30, 50, 70, 90, 95, 100).
+        split (string): Dataset split ('train', 'valid', 'test'). Validation sets may
+            also be specified, ('valid-10', 'valid-20, 'valid-30', 'valid-40', 
+            'valid-50', 'valid-70', 'valid-90'). If no valid split is specified, all
+            validation set splits will be returned.
+        thinning (int): Training dataset split thinning (30, 50, 70, 90, 95, 100).
 
     Returns:
         List: Python list of strings representing the ProteinNet IDs in the requested
@@ -286,8 +289,14 @@ def get_proteinnet_ids(casp_version, split, thinning):
                 "sidechainnet",
                 "resources/all_proteinnet_ids.csv")).set_index('pnid').astype(bool)
 
-    # Fix input
-    if split == "valid":
+    # Fix input, select correct column name for the CSV
+    validsplitnum = None
+    if "valid" in split:
+        if split not in VALID_SPLITS + ['valid']:
+            raise ValueError(f"{split} is not a valid ProteinNet validation set split. "
+                             "Use one of {VALID_SPLITS + ['valid']}.")
+        if split != "valid":
+            _, validsplitnum = split.split("-")
         split = "validation"
     elif split == "train":
         split = "training"
@@ -298,6 +307,10 @@ def get_proteinnet_ids(casp_version, split, thinning):
     colname = f"casp{casp_version}_{split}"
     if split == 'training':
         colname += f"_{thinning}"
+    if split == "validation" and validsplitnum is not None:
+        return list(
+            filter(lambda x: x.startswith(f"{validsplitnum}#"),
+                   PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values))
     return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
 
 
