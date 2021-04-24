@@ -150,7 +150,8 @@ def merge(aligner,
                      dssp,
                      pn_mask,
                      pnid,
-                     attempt_number=1)
+                     attempt_number=1,
+                     ignore_pnmask=ignore_pnmask)
 
     if n_alignments == 0 and attempt_number == 1:
         # If there appear to be no alignments, it may be the case that there
@@ -166,7 +167,8 @@ def merge(aligner,
                      dssp,
                      pn_mask,
                      pnid,
-                     attempt_number=2)
+                     attempt_number=2,
+                     ignore_pnmask=ignore_pnmask)
 
     if n_alignments == 0 and attempt_number == 2:
         # Try making very few assumptions about gaps before allowing mismatches/gaps in
@@ -180,7 +182,8 @@ def merge(aligner,
                      dssp,
                      pn_mask,
                      pnid,
-                     attempt_number=3)
+                     attempt_number=3,
+                     ignore_pnmask=ignore_pnmask)
 
     elif n_alignments == 0 and attempt_number == 3:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
@@ -192,7 +195,8 @@ def merge(aligner,
                                                   dssp,
                                                   pn_mask,
                                                   pnid,
-                                                  attempt_number=4)
+                                                  attempt_number=4,
+                                                  ignore_pnmask=ignore_pnmask)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return mask, a0, ang, crd, dssp, warning
 
