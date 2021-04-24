@@ -34,7 +34,7 @@ from tqdm import tqdm
 
 from sidechainnet.utils.align import (assert_mask_gaps_are_correct, expand_data_with_mask,
                                       init_aligner, merge)
-from sidechainnet.utils.download import PN_VALID_SPLITS, _reinit_global_valid_splits, download_sidechain_data, get_sequence_from_pnid
+from sidechainnet.utils.download import PN_VALID_SPLITS, _reinit_global_valid_splits, download_complete_proteinnet, download_sidechain_data, get_sequence_from_pnid
 from sidechainnet.utils.errors import write_errors_to_files
 from sidechainnet.utils.manual_adjustment import (manually_adjust_data,
                                                   manually_correct_mask,
@@ -255,7 +255,7 @@ def _create(args):
 
 
 def _create_all(args):
-    """Generates all thinnings of a particular CASP dataset, starting with the largest."""
+    """Generate all thinnings of a particular CASP dataset, starting with the largest."""
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = parse_raw_proteinnet(args.proteinnet_in, args.proteinnet_out, 100)
     pnids = pnids[:args.limit]  # Limit the length of the list for debugging
@@ -293,12 +293,11 @@ def _create_all(args):
 
 def create_custom(pnids,
                   output_filename,
-                  proteinnet_in,
                   proteinnet_out="data/proteinnet/",
                   sidechainnet_out="data/sidechainnet/",
                   short_description="Custom SidechainNet dataset.",
                   regenerate_scdata=False):
-    """[summary]
+    """Generate a custom SidechainNet dataset from user-specified ProteinNet IDs.
 
     Args:
         pnids (List): List of ProteinNet-formatted protein identifiers (i.e., formmated
@@ -306,8 +305,6 @@ def create_custom(pnids,
             are also supported, <class>#<pdb_id>_<ASTRAL_id>.)
         output_filename (str): Path to save custom dataset (a pickled Python
             dictionary). ".pkl" extension is recommended.
-        proteinnet_in (str): Path to customizable ProteinNet directory
-            (contains validation_all, testing_all, and training_100 (CASP12) raw data.)
         proteinnet_out (str, optional): Path to save processed ProteinNet data.
             Defaults to "data/proteinnet/".
         sidechainnet_out (str, optional): Path to save processed SidechainNet data.
@@ -321,7 +318,8 @@ def create_custom(pnids,
     Returns:
         dict: Saves and returns the requested custom SidechainNet dictionary.
     """
-    # ""Generate a SidechainNet dataset according to user specifications.
+    # Download ProteinNet custom-helper package (concatenated ProteinNet datasets)
+    proteinnet_in = download_complete_proteinnet()
 
     # Initialize DSSP data
     from sidechainnet.utils.download import _init_dssp_data
@@ -330,7 +328,7 @@ def create_custom(pnids,
     _reinit_global_valid_splits(new_splits)
 
     # First, parse and load raw proteinnet files into Python dictionaries for convenience
-    print("Loading ProteinNet for CASP12 (100% thinning).")
+    print(f"Loading complete ProteinNet data (100% thinning) from {proteinnet_in}.")
     _ = parse_raw_proteinnet(proteinnet_in, proteinnet_out, training_set=100)
 
     # Download and return requested pnids
