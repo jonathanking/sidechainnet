@@ -4,6 +4,7 @@ import multiprocessing
 import os
 import pkg_resources
 from glob import glob
+import re
 import requests
 
 import prody as pr
@@ -472,11 +473,42 @@ def get_sequence_from_pdbid(pdbid, chain):
 
 def get_sequence_from_pnid(pnid):
     """Return the ProteinNet ID's sequence as acquired from RCSB PDB."""
-    pdbid, chid = get_pdbid_from_pnid(pnid, return_chain=True)
-    return get_sequence_from_pdbid(pdbid, chid)
+    check_for_presence_of_astral_sequence_file()
+
+    pdbid, chid_or_astral_id, is_astral = get_pdbid_from_pnid(pnid, return_chain=True, include_is_astral=True)
+    if is_astral:
+        return get_sequence_from_astralid(chid_or_astral_id)
+    return get_sequence_from_pdbid(pdbid, chid_or_astral_id)
 
 
-def get_pdbid_from_pnid(pnid, return_chain=False):
+def check_for_presence_of_astral_sequence_file():
+    """Download the ASTRAL/SCOPe sequence database file from the web if not present."""
+    if not os.path.exists(
+            pkg_resources.resource_filename(
+                "sidechainnet",
+                "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa")):
+        r = requests.get(
+            "http://scop.berkeley.edu/downloads/scopeseq-2.07/astral-scopedom-seqres-gd-all-2.07-stable.fa",
+            allow_redirects=True)
+        with open(
+                pkg_resources.resource_filename(
+                    "sidechainnet",
+                    "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa"), "wb") as f:
+            f.write(r.content)
+
+
+def get_sequence_from_astralid(astral_id):
+    """Read the protein sequence from the local ASTRAL/SCOPe database for an ASTRAL ID."""
+    with open(pkg_resources.resource_filename(
+                    "sidechainnet",
+                    "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa"), "r") as f:
+        data = f.read()
+    pattern = ">" + astral_id + r".+((\n\w+)+)"
+    sequence = re.search(pattern, data, re.MULTILINE).group(1).replace("\n", "").upper()
+    return sequence
+
+
+def get_pdbid_from_pnid(pnid, return_chain=False, include_is_astral=False):
     """Return RCSB PDB ID associated with a given ProteinNet ID.
 
     Args:
@@ -487,6 +519,7 @@ def get_pdbid_from_pnid(pnid, return_chain=False):
         str: The PDB ID (and chain, optional) specified by the provided ProteinNet ID.
     """
     chid = None
+    is_astral = False
     # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
     try:
         pdbid, chnum, chid = pnid.split("_")
@@ -497,15 +530,24 @@ def get_pdbid_from_pnid(pnid, return_chain=False):
     except ValueError:
         try:
             pdbid, astral_id = pnid.split("_")
+            is_astral = True
+            astral_id = astral_id.replace("-", "_")
             if "#" in pdbid:
                 val_split, pdbid = pdbid.split("#")
         except Exception as e:
             print(e)
             print(pnid)
             exit(1)
-    if return_chain:
+    if not include_is_astral and return_chain:
         return pdbid, chid
-    return pdbid
+    elif not include_is_astral:
+        return pdbid
+    elif include_is_astral and return_chain and not is_astral:
+        return pdbid, chid, False
+    elif include_is_astral and is_astral:
+        return pdbid, astral_id, True
+    else:
+        return pdbid
 
 
 def get_resolution_from_pnid(pnid):
