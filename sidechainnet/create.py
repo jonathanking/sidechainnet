@@ -273,7 +273,9 @@ def get_proteinnet_ids(casp_version, split, thinning):
         split (string): Dataset split ('train', 'valid', 'test'). Validation sets may
             also be specified, ('valid-10', 'valid-20, 'valid-30', 'valid-40', 
             'valid-50', 'valid-70', 'valid-90'). If no valid split is specified, all
-            validation set splits will be returned.
+            validation set splits will be returned. If split == 'all', the training,
+            validation, and testing set splits for the specified CASP and training set
+            thinning are all returned.
         thinning (int): Training dataset split thinning (30, 50, 70, 90, 95, 100).
 
     Returns:
@@ -303,15 +305,28 @@ def get_proteinnet_ids(casp_version, split, thinning):
     elif split == "test":
         split = "testing"
 
+    def make_colname(cur_split):
+        """Return column name for a given CASP dataset split and thinning."""
+        colname = f"casp{casp_version}_{cur_split}"
+        if cur_split == 'training':
+            colname += f"_{thinning}"
+        return colname
+
     # Pick out the pnids that match the requested splits
-    colname = f"casp{casp_version}_{split}"
-    if split == 'training':
-        colname += f"_{thinning}"
-    if split == "validation" and validsplitnum is not None:
-        return list(
-            filter(lambda x: x.startswith(f"{validsplitnum}#"),
-                   PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values))
-    return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
+    if split == "all":
+        all_ids = []
+        for s in ["training", "validation", "testing"]:
+            colname = make_colname(s)
+            all_ids.extend(list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values))
+        return all_ids
+
+    else:
+        colname = make_colname(split)
+        if split == "validation" and validsplitnum is not None:
+            return list(
+                filter(lambda x: x.startswith(f"{validsplitnum}#"),
+                       PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values))
+        return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
 
 
 def main(args_tuple):
