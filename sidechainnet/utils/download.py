@@ -570,7 +570,7 @@ def download_complete_proteinnet(user_dir=None):
         dir_path = user_dir
         zip_file_path = os.path.join(user_dir, "custom.zip")
     else:
-        dir_path = pkg_resources.resource_filename("sidechainnet", "resources")
+        dir_path = pkg_resources.resource_filename("sidechainnet", "resources/custom")
         zip_file_path = pkg_resources.resource_filename("sidechainnet", "resources/custom.zip")
 
     if not os.path.isdir(os.path.join(dir_path, "targets")):
