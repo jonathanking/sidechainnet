@@ -580,5 +580,7 @@ def download_complete_proteinnet(user_dir=None):
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(dir_path)
         os.remove(zip_file_path)
+    
+    dir_path = os.path.join(dir_path, "custom")
 
     return dir_path
