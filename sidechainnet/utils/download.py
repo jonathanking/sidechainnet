@@ -568,16 +568,17 @@ def download_complete_proteinnet(user_dir=None):
     from sidechainnet.utils.load import _download
     if user_dir is not None:
         dir_path = user_dir
-        file_path = os.path.join(user_dir, "custom.zip")
+        zip_file_path = os.path.join(user_dir, "custom.zip")
     else:
-        dir_path = pkg_resources.resource_filename("sidechainnet", "resources/")
-        file_path = pkg_resources.resource_filename("sidechainnet", "resources/custom.zip")
+        dir_path = pkg_resources.resource_filename("sidechainnet", "resources")
+        zip_file_path = pkg_resources.resource_filename("sidechainnet", "resources/custom.zip")
 
-    if not os.path.isfile(file_path):
+    if not os.path.isdir(os.path.join(dir_path, "targets")):
         print("Downloading the complete ProteinNet dataset from Box.")
-        _download("https://pitt.box.com/shared/static/maqicq9hbdrh9u940ewahj1admwmeh26.zip", file_path)
+        _download("https://pitt.box.com/shared/static/maqicq9hbdrh9u940ewahj1admwmeh26.zip", zip_file_path)
 
-        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(dir_path)
+        os.remove(zip_file_path)
 
     return dir_path
