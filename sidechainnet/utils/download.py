@@ -570,10 +570,10 @@ def download_complete_proteinnet(user_dir=None):
         dir_path = user_dir
         zip_file_path = os.path.join(user_dir, "custom.zip")
     else:
-        dir_path = pkg_resources.resource_filename("sidechainnet", "resources/custom")
+        dir_path = pkg_resources.resource_filename("sidechainnet", "resources/")
         zip_file_path = pkg_resources.resource_filename("sidechainnet", "resources/custom.zip")
 
-    if not os.path.isdir(os.path.join(dir_path, "targets")):
+    if not os.path.isdir(os.path.join(dir_path, "custom", "targets")):
         print("Downloading the complete ProteinNet dataset from Box.")
         _download("https://pitt.box.com/shared/static/maqicq9hbdrh9u940ewahj1admwmeh26.zip", zip_file_path)
 
