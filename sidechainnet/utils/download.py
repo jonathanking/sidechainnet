@@ -14,7 +14,6 @@ import tqdm
 import sidechainnet.utils.errors as errors
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
-from sidechainnet.utils.load import _download
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 
@@ -485,6 +484,7 @@ def get_sequence_from_pnid(pnid):
 
 def check_for_presence_of_astral_sequence_file():
     """Download the ASTRAL/SCOPe sequence database file from the web if not present."""
+    from sidechainnet.utils.load import _download
     local_path = pkg_resources.resource_filename(
                 "sidechainnet",
                 "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa")
@@ -565,6 +565,7 @@ def download_complete_proteinnet(user_dir=None):
     Returns:
         dir_path (str): Path to directory where custom ProteinNet data was downloaded to.
     """
+    from sidechainnet.utils.load import _download
     if user_dir is not None:
         dir_path = user_dir
         file_path = os.path.join(user_dir, "custom.zip")
