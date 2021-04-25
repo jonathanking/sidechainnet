@@ -147,7 +147,10 @@ def process_file(input_filename_out_dir, return_ids=False):
         return (input_filename, all_ids)
 
 
-def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
+def parse_raw_proteinnet(proteinnet_in_dir,
+                         proteinnet_out_dir,
+                         training_set,
+                         remove_raw_proteinnet=False):
     """Extract and saves information for a single ProteinNet dataset.
 
     Preprocesses raw ProteinNet records by reading them and transforming them
@@ -158,6 +161,7 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
         proteinnet_in_dir: Directory where all raw ProteinNet files are kept
         proteinnet_out_dir: Directory to save processed data
         training_set: Which thinning of ProteinNet is requested
+        remove_raw_proteinnet: If True, delete the raw ProteinNet files after processing.
 
     Returns:
         relevant_ids: A list of ProteinNet IDs from corresponding training_set
@@ -202,6 +206,10 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
         p.map(process_file, zip(input_files, itertools.repeat(proteinnet_out_dir)))
     print(f"Done. Processed ProteinNet files saved to {proteinnet_out_dir}.")
+
+    if remove_raw_proteinnet:
+        for f in input_files:
+            os.remove(f)
 
     # Return the ProteinNet IDs associated with the target dataset
     relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,

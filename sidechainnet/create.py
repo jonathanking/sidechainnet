@@ -336,7 +336,10 @@ def create_custom(pnids,
 
     # First, parse and load raw proteinnet files into Python dictionaries for convenience
     print(f"Loading complete ProteinNet data (100% thinning) from {proteinnet_in}.")
-    _ = parse_raw_proteinnet(proteinnet_in, proteinnet_out, training_set=100)
+    _ = parse_raw_proteinnet(proteinnet_in,
+                             proteinnet_out,
+                             training_set=100,
+                             remove_raw_proteinnet=True)
 
     # Download and return requested pnids
     print("Preparing to download requested proteins via their ProteinNet IDs.")
