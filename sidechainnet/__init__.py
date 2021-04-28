@@ -15,6 +15,7 @@ from .structure.BatchedStructureBuilder import BatchedStructureBuilder
 from .utils.load import load
 from .utils.download import VALID_SPLITS, DATA_SPLITS
 from .create import create, create_custom, get_proteinnet_ids
+from .utils.measure import GLOBAL_PAD_CHAR
 
 versions = get_versions()
 __version__ = versions['version']
