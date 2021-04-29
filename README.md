@@ -195,8 +195,8 @@ scn.create(casp_version=12, training_set=30)
  # Include a protein released in April 2021 (not included in SidechainNet)
  custom_ids += ['7C3K_1_A'] 
 scn.create_custom(pnids=custom_ids,
-                  output_filename="custom.pkl",
-                  short_description="Custom SidechainNet.")
+                   output_filename="custom.pkl",
+                   short_description="Custom SidechainNet.")
  ```
 
 
