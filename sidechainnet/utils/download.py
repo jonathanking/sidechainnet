@@ -102,6 +102,8 @@ def download_sidechain_data(pnids,
         print(f"Sidechain information already preprocessed ({output_path}).")
         return load_data(output_path), output_path
 
+    print("Downloading SidechainNet specific data from RSCB PDB.")
+
     # Clean up any error logs that have been left-over from previous runs.
     if os.path.exists("errors"):
         for file in glob('errors/*.txt'):
@@ -585,7 +587,7 @@ def download_complete_proteinnet(user_dir=None):
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(dir_path)
         os.remove(zip_file_path)
-    
+
     else:
         print("Pre-parsed ProteinNet already downloaded.")
 
