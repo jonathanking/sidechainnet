@@ -64,7 +64,7 @@ def _init_dssp_data():
 def download_sidechain_data(pnids,
                             sidechainnet_out_dir,
                             casp_version,
-                            training_set,
+                            thinning,
                             limit,
                             proteinnet_in,
                             regenerate_scdata=False,
@@ -75,13 +75,13 @@ def download_sidechain_data(pnids,
         pnids: List of ProteinNet IDs to download sidechain data for
         sidechainnet_out_dir: Path to directory for saving sidechain data
         casp_version: A string that describes the CASP version i.e. 'casp7'
-        training_set: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
+        thinning: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
         limit: An integer describing maximum number of proteins to process
         proteinnet_in: A string representing the path to processed proteinnet.
         regenerate_scdata: Boolean, if True then recreate the sidechain-only data even if
             it already exists.
         output_name: A string describing the filename. Defaults to
-            "sidechain-only_{casp_version}_{training_set}.pkl".
+            "sidechain-only_{casp_version}_{thinning}.pkl".
 
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
@@ -92,7 +92,7 @@ def download_sidechain_data(pnids,
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
     if output_name is None:
-        output_name = f"sidechain-only_{casp_version}_{training_set}.pkl"
+        output_name = f"sidechain-only_{casp_version}_{thinning}.pkl"
     output_path = os.path.join(sidechainnet_out_dir, output_name)
     if not os.path.exists(sidechainnet_out_dir):
         os.mkdir(sidechainnet_out_dir)
