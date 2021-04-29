@@ -191,7 +191,7 @@ def format_sidechainnet_path(casp_version, training_split):
 
 def create(casp_version=12,
            thinning=30,
-           sidechainnet_out="data/sidechainnet/",
+           sidechainnet_out="./sidechainnet_data",
            regenerate_scdata=False,
            limit=None):
     """Generate the requested SidechainNet dataset and save pickled result files.
@@ -291,8 +291,7 @@ def _create_all(args):
 
 def create_custom(pnids,
                   output_filename,
-                  proteinnet_out="data/proteinnet/",
-                  sidechainnet_out="data/sidechainnet/",
+                  sidechainnet_out="./sidechainnet_data",
                   short_description="Custom SidechainNet dataset.",
                   regenerate_scdata=False):
     """Generate a custom SidechainNet dataset from user-specified ProteinNet IDs.
@@ -310,8 +309,6 @@ def create_custom(pnids,
             are also supported, <class>#<pdb_id>_<ASTRAL_id>.)
         output_filename (str): Path to save custom dataset (a pickled Python
             dictionary). ".pkl" extension is recommended.
-        proteinnet_out (str, optional): Path to save processed ProteinNet data.
-            Defaults to "data/proteinnet/".
         sidechainnet_out (str, optional): Path to save processed SidechainNet data.
             Defaults to "data/sidechainnet/".
         short_description (str, optional): A short description provided by the user to
@@ -324,7 +321,7 @@ def create_custom(pnids,
         dict: Saves and returns the requested custom SidechainNet dictionary.
     """
     # Download ProteinNet custom-helper package (concatenated ProteinNet datasets)
-    proteinnet_in = download_complete_proteinnet()
+    proteinnet_in = proteinnet_out = download_complete_proteinnet()
 
     # Initialize DSSP data
     from sidechainnet.utils.download import _init_dssp_data
