@@ -13,6 +13,7 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 1. SidechainNet datasets stored as pickled Python dictionaries.
 2. Methods for loading and batching SidechainNet data efficiently in PyTorch. 
 3. Methods for generating protein structure visualizations (`.pdb`, [`3Dmol`](http://3dmol.csb.pitt.edu), `.gltf`) from model predictions.
+4. Methods for augmenting SidechainNet to include new proteins and specify dataset organization.
 
  
 ## Summary of SidechainNet data
@@ -178,9 +179,25 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
 
 
-## Reproducing SidechainNet
+## Reproducing or Extending SidechainNet
 
-If you would like to reproduce our work or make modifications to the dataset, you may follow [these directions](how_to_reproduce.md) to generate SidechainNet from scratch.
+If you would like to reproduce our work or make modifications/additions to the dataset, please see 
+the example we provide in our **[Colab Walkthrough](https://colab.research.google.com/drive/11ZZyqwfu7ZTyUKdqt9uy59AqqYccRVcU?usp=sharing)**. In simple terms, you will need to call `scn.create`
+with the desired CASP/ProteinNet information or provide a list of ProteinNet-formatted IDs to
+ `scn.create_custom`. Please note that since some data is acquired from ProteinNet directly (e.g., Position Specific Scoring Matrices), protein entries will exclude this data if it was not previously available in ProteinNet.
+
+ ```python
+ # Reproduce SidechainNet
+scn.create(casp_version=12, training_set=30)
+
+# Create a custom version of SidechainNet
+ custom_ids = scn.get_proteinnet_ids(casp_version=12, split="train", thinning=30)
+ # Include a protein released in April 2021 (not included in SidechainNet)
+ custom_ids += ['7C3K_1_A'] 
+scn.create_custom(pnids=custom_ids,
+                  output_filename="custom.pkl",
+                  short_description="Custom SidechainNet.")
+ ```
 
 
 ## Package Requirements
