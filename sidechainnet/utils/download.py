@@ -95,7 +95,7 @@ def download_sidechain_data(pnids,
         output_name = f"sidechain-only_{casp_version}_{thinning}.pkl"
     output_path = os.path.join(sidechainnet_out_dir, output_name)
     if not os.path.exists(sidechainnet_out_dir):
-        os.mkdir(sidechainnet_out_dir)
+        os.makedirs(sidechainnet_out_dir)
 
     # Simply load sidechain data if it has already been processed.
     if os.path.exists(output_path) and not regenerate_scdata:
@@ -562,7 +562,7 @@ def download_complete_proteinnet(user_dir=None):
 
     Args:
         user_dir (str, optional): If provided, download the ProteinNet data here.
-            Otherwise, download it to sidechainnet/resources/parsed_proteinnet.
+            Otherwise, download it to sidechainnet/resources/proteinnet_parsed.
 
     Returns:
         dir_path (str): Path to directory where custom ProteinNet data was downloaded to.
@@ -570,13 +570,13 @@ def download_complete_proteinnet(user_dir=None):
     from sidechainnet.utils.load import _download
     if user_dir is not None:
         dir_path = user_dir
-        zip_file_path = os.path.join(user_dir, "parsed_proteinnet.zip")
+        zip_file_path = os.path.join(user_dir, "proteinnet_parsed.zip")
     else:
         dir_path = pkg_resources.resource_filename("sidechainnet", "resources/")
         zip_file_path = pkg_resources.resource_filename(
-            "sidechainnet", "resources/parsed_proteinnet.zip")
+            "sidechainnet", "resources/proteinnet_parsed.zip")
 
-    if not os.path.isdir(os.path.join(dir_path, "parsed_proteinnet", "targets")):
+    if not os.path.isdir(os.path.join(dir_path, "proteinnet_parsed", "targets")):
         print("Downloading pre-parsed ProteinNet data from Box (~3.5 GB compressed).")
         _download(
             "https://pitt.box.com/shared/static/nzsglfxdetnrpd4d6lomqh5102upa65a.zip",
@@ -585,7 +585,10 @@ def download_complete_proteinnet(user_dir=None):
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(dir_path)
         os.remove(zip_file_path)
+    
+    else:
+        print("Pre-parsed ProteinNet already downloaded.")
 
-    dir_path = os.path.join(dir_path, "parsed_proteinnet")
+    dir_path = os.path.join(dir_path, "proteinnet_parsed")
 
     return dir_path

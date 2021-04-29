@@ -191,7 +191,6 @@ def format_sidechainnet_path(casp_version, training_split):
 
 def create(casp_version=12,
            thinning=30,
-           proteinnet_out="data/proteinnet/",
            sidechainnet_out="data/sidechainnet/",
            regenerate_scdata=False,
            limit=None):
@@ -204,8 +203,6 @@ def create(casp_version=12,
         thinning (int, optional): Training set thinning (30, 50, 70, 90, 95, 100
             where 100 means 100% of the training set is kept). If 'all', generate all
             training set thinnings. Defaults to 30.
-        proteinnet_out (str, optional): Path for saving processed ProteinNet records.
-            Defaults to "data/proteinnet/".
         sidechainnet_out (str, optional): Path for saving processed SidechainNet records.
             Defaults to "data/sidechainnet/".
         regenerate_scdata (bool, optional): If true, regenerate raw sidechain-applicable
@@ -219,6 +216,7 @@ def create(casp_version=12,
     """
     # Download ProteinNet custom-helper package (concatenated ProteinNet datasets)
     proteinnet_in = download_complete_proteinnet()
+    proteinnet_out = proteinnet_in
 
     args = ArgsTuple(casp_version, thinning, proteinnet_in, proteinnet_out,
                      sidechainnet_out, regenerate_scdata, limit)
