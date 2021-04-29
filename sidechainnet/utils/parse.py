@@ -128,7 +128,7 @@ def process_file(input_filename_out_dir, return_ids=False):
     input_file = open(input_filename, "r")
     meta_dict = {}
     while True:
-        next_protein = read_protein_from_file(input_file, include_tertiary=True)
+        next_protein = read_protein_from_file(input_file, include_tertiary=False)
         if next_protein is None:
             break
         id_ = next_protein["id"]
