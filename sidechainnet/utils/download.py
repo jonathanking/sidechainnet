@@ -476,7 +476,9 @@ def get_sequence_from_pnid(pnid):
     """Return the ProteinNet ID's sequence as acquired from RCSB PDB."""
     check_for_presence_of_astral_sequence_file()
 
-    pdbid, chid_or_astral_id, is_astral = get_pdbid_from_pnid(pnid, return_chain=True, include_is_astral=True)
+    pdbid, chid_or_astral_id, is_astral = get_pdbid_from_pnid(pnid,
+                                                              return_chain=True,
+                                                              include_is_astral=True)
     if is_astral:
         return get_sequence_from_astralid(chid_or_astral_id)
     return get_sequence_from_pdbid(pdbid, chid_or_astral_id)
@@ -486,8 +488,7 @@ def check_for_presence_of_astral_sequence_file():
     """Download the ASTRAL/SCOPe sequence database file from the web if not present."""
     from sidechainnet.utils.load import _download
     local_path = pkg_resources.resource_filename(
-                "sidechainnet",
-                "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa")
+        "sidechainnet", "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa")
     if not os.path.exists(local_path):
         print("Local ASTRAL sequence database not found. Downloading to", local_path)
         _download(
@@ -497,9 +498,10 @@ def check_for_presence_of_astral_sequence_file():
 
 def get_sequence_from_astralid(astral_id):
     """Read the protein sequence from the local ASTRAL/SCOPe database for an ASTRAL ID."""
-    with open(pkg_resources.resource_filename(
-                    "sidechainnet",
-                    "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa"), "r") as f:
+    with open(
+            pkg_resources.resource_filename(
+                "sidechainnet", "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa"),
+            "r") as f:
         data = f.read()
     pattern = ">" + astral_id + r".+((\n\w+)+)"
     sequence = re.search(pattern, data, re.MULTILINE).group(1).replace("\n", "").upper()
@@ -560,7 +562,7 @@ def download_complete_proteinnet(user_dir=None):
 
     Args:
         user_dir (str, optional): If provided, download the ProteinNet data here.
-            Otherwise, download it to sidechainnet/resources/custom.
+            Otherwise, download it to sidechainnet/resources/parsed_proteinnet.
 
     Returns:
         dir_path (str): Path to directory where custom ProteinNet data was downloaded to.
@@ -568,19 +570,22 @@ def download_complete_proteinnet(user_dir=None):
     from sidechainnet.utils.load import _download
     if user_dir is not None:
         dir_path = user_dir
-        zip_file_path = os.path.join(user_dir, "custom.zip")
+        zip_file_path = os.path.join(user_dir, "parsed_proteinnet.zip")
     else:
         dir_path = pkg_resources.resource_filename("sidechainnet", "resources/")
-        zip_file_path = pkg_resources.resource_filename("sidechainnet", "resources/custom.zip")
+        zip_file_path = pkg_resources.resource_filename(
+            "sidechainnet", "resources/parsed_proteinnet.zip")
 
-    if not os.path.isdir(os.path.join(dir_path, "custom", "targets")):
+    if not os.path.isdir(os.path.join(dir_path, "parsed_proteinnet", "targets")):
         print("Downloading the complete ProteinNet dataset from Box.")
-        _download("https://pitt.box.com/shared/static/maqicq9hbdrh9u940ewahj1admwmeh26.zip", zip_file_path)
+        _download(
+            "https://pitt.box.com/shared/static/maqicq9hbdrh9u940ewahj1admwmeh26.zip",
+            zip_file_path)
 
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(dir_path)
         os.remove(zip_file_path)
-    
-    dir_path = os.path.join(dir_path, "custom")
+
+    dir_path = os.path.join(dir_path, "parsed_proteinnet")
 
     return dir_path
