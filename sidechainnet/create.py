@@ -27,6 +27,7 @@ import os
 import re
 from multiprocessing import Pool, cpu_count
 import pkg_resources
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
 import numpy as np
 import prody as pr
@@ -88,15 +89,17 @@ def combine(pn_entry, sc_entry, aligner, pnid):
     else:
         ignore_pnmask = False
 
-    mask, alignment, ang, crd, dssp, warning = merge(aligner,
-                                                     pn_entry["primary"],
-                                                     sc_entry["seq"],
-                                                     sc_entry["ang"],
-                                                     sc_entry["crd"],
-                                                     sc_entry["sec"],
-                                                     pn_entry["mask"],
-                                                     pnid,
-                                                     ignore_pnmask=ignore_pnmask)
+    mask, alignment, ang, crd, dssp, unmod_seq, is_mod, warning = merge(
+        aligner,
+        pn_entry["primary"],
+        sc_entry["seq"],
+        sc_entry["ang"],
+        sc_entry["crd"],
+        sc_entry["sec"],
+        pn_entry["mask"],
+        pnid,
+        ignore_pnmask=ignore_pnmask)
+
     new_entry = {}
 
     if alignment:
@@ -113,6 +116,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         new_entry["ang"] = expand_data_with_mask(ang, mask)
         new_entry["crd"] = expand_data_with_mask(crd, mask)
         new_entry["sec"] = expand_data_with_mask(dssp, mask)
+        new_entry["ums"] = make_unmodified_seq_entry(new_entry["seq"], unmod_seq, mask)
+        new_entry["mod"] = expand_data_with_mask(is_mod, mask)
         new_entry["msk"] = mask
         new_entry["res"] = sc_entry["res"]
 
@@ -120,6 +125,9 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         for k, v in new_entry.items():
             if k == "crd":
                 if len(v) // NUM_COORDS_PER_RES != length:
+                    return {}, "failed"
+            elif k == "ums":
+                if len(v.split(" ")) != length:
                     return {}, "failed"
             elif k != "res":
                 if len(v) != length:
@@ -133,6 +141,18 @@ def combine_wrapper(pndata_scdata_pnid):
     pn_data, sc_data, pnid = pndata_scdata_pnid
     aligner = init_aligner()
     return combine(pn_data, sc_data, aligner, pnid)
+
+
+def make_unmodified_seq_entry(pn_seq, unmod_seq, mask):
+    """Given observed residues, create the unmodified sequence entry for SidechainNet."""
+    padded_unmod_seq = expand_data_with_mask(unmod_seq, mask)
+    unmod_seq_complete = []
+    for c_pn, c_unmod in zip(pn_seq, padded_unmod_seq):
+        if c_unmod == "---":
+            unmod_seq_complete.append(ONE_TO_THREE_LETTER_MAP[c_pn])
+        else:
+            unmod_seq_complete.append(c_unmod)
+    return " ".join(unmod_seq_complete)
 
 
 def combine_datasets(proteinnet_out, sc_data, thinning=100):
@@ -226,23 +246,22 @@ def create(casp_version=12,
 def _create(args):
     """Generates SidechainNet for a single CASP thinning."""
     # First, parse raw proteinnet files into Python dictionaries for convenience
-    pnids = get_proteinnet_ids(casp_version=args.casp_version, split="all",
+    pnids = get_proteinnet_ids(casp_version=args.casp_version,
+                               split="all",
                                thinning=args.thinning)
     pnids = pnids[:args.limit]  # Limit the length of the list for debugging
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
     sc_only_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
-                                                        args.casp_version,
-                                                        args.thinning, args.limit,
-                                                        args.proteinnet_in,
+                                                        args.casp_version, args.thinning,
+                                                        args.limit, args.proteinnet_in,
                                                         args.regenerate_scdata)
 
     # Finally, unify the sidechain data with ProteinNet
     sidechainnet_raw = combine_datasets(args.proteinnet_out, sc_only_data)
 
     sidechainnet_outfile = os.path.join(
-        args.sidechainnet_out,
-        format_sidechainnet_path(args.casp_version, args.thinning))
+        args.sidechainnet_out, format_sidechainnet_path(args.casp_version, args.thinning))
     sidechainnet = organize_data(sidechainnet_raw, args.casp_version, args.thinning)
     save_data(sidechainnet, sidechainnet_outfile)
     print(f"SidechainNet for CASP {args.casp_version} written to {sidechainnet_outfile}.")
@@ -251,9 +270,7 @@ def _create(args):
 def _create_all(args):
     """Generate all thinnings of a particular CASP dataset, starting with the largest."""
     # First, parse raw proteinnet files into Python dictionaries for convenience
-    pnids = get_proteinnet_ids(casp_version=args.casp_version,
-                               split="all",
-                               thinning=100)
+    pnids = get_proteinnet_ids(casp_version=args.casp_version, split="all", thinning=100)
     pnids = pnids[:args.limit]  # Limit the length of the list for debugging
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
@@ -277,9 +294,8 @@ def _create_all(args):
 
     # Generate the rest of the training sets
     for thinning in [100, 95, 90, 70, 50, 30]:
-        sc_outfile = os.path.join(
-            args.sidechainnet_out,
-            format_sidechainnet_path(args.casp_version, thinning))
+        sc_outfile = os.path.join(args.sidechainnet_out,
+                                  format_sidechainnet_path(args.casp_version, thinning))
         sidechainnet = organize_data(sidechainnet_raw_100, args.casp_version, thinning)
         save_data(sidechainnet, sc_outfile)
         print(f"SidechainNet for CASP {args.casp_version} "

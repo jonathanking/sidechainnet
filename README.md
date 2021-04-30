@@ -20,16 +20,15 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
  
 | Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
 | :---: | :---: |  :---: | :---: | :---: | 
-| Primary sequence | *L x 1* | `seq` | X | X | 
-| Secondary structure ([DSSP](https://swift.cmbi.umcn.nl/gv/dssp/DSSP_2.html))<sup>\*\*</sup> | *L x 1* | `sec` | X | X |
+| Primary sequence<sup>§</sup> | *L* | `seq` | X | X | 
+| [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/DSSP_2.html) Secondary structure<sup>\*\*,§</sup> | *L* | `sec` | X | X |
 | [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` | X | X | 
-| Missing residue mask | *L x 1* |  `msk` | X | X | 
+| Missing residue mask<sup>§</sup> | *L* |  `msk` | X | X | 
 | Backbone coordinates | *L x 4<sup>\*\*\*</sup> x 3* |  `crd`, subset `[0:4]` | X | X | 
 | Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` |  | X | 
 | Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` |  | X | 
 | Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |  | X | 
-| Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X | 
-| Structure resolution | *1* | `res` | | X |
+| Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X |
 
 **L* reperesents the length of any given protein in the dataset.
 
@@ -37,10 +36,23 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 <sup>**\*</sup>SidechainNet explicitly includes oxygen atoms as part of the backbone coordinate data in contrast to ProteinNet, which only includes the primary `N, C_alpha, C` atoms.
 
-## Installation *(Now via `pip`!)*
-`pip install sidechainnet`
+<sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
 
-This should also install the prerequisite packages listed below.
+### Other included data
+
+| Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
+| :---: | :---: |  :---: | :---: | :---: |
+| Structure resolution | *1* | `res` | | X |
+| Primary sequence (3-letter codes) before SidechainNet standardization (a.k.a. **U**n**M**odified **S**equence)<sup>§</sup> | *L*  | `ums` | | X |
+| Modified residue bit-vector<sup>†</sup> | *L x 1*  | `mod` | | X |
+
+<sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
+
+
+<sup>†</sup>Includes a `1` for each residue that has been modified to a standard residue according to the mapping in `sidechainnet.utils.measure.ALLOWED_NONSTD_RESIDUES` (e.g., selenomethionine -> methionine).
+
+## Installation
+`pip install sidechainnet`
 
 ## Usage Examples
 
@@ -54,13 +66,15 @@ In its most basic form, SidechainNet is stored as a Python dictionary organized 
  
  Within each train/validation/test split in SidechainNet is another dictionary mapping data entry types (`seq`, `ang`, etc.) to a list containing this data type for every protein. In the example below, `seq{i}`, `ang{i}`, ... all refer to the `i`<sup>th</sup> protein in the dataset.
 ```python
-data = {"train": {"seq": [seq1, seq2, ...],  # Sequences
+data = {"train": {"seq": [seq1, seq2, ...],  # Sequences, 1-letter codes
                   "ang": [ang1, ang2, ...],  # Angles
                   "crd": [crd1, crd2, ...],  # Coordinates
                   "evo": [evo1, evo2, ...],  # PSSMs and Information Content
                   "sec": [sec1, sec2, ...],  # Secondary structure labels (DSSP)
                   "res": [res1, res2, ...],  # X-ray crystallographic resolution
-                  "ids": [id1, id2,   ...]   # Corresponding ProteinNet IDs
+                  "ids": [id1, id2,   ...],  # Corresponding ProteinNet IDs
+                  "mod": [mod1, mod2, ...],  # Modified residue annotations
+                  "ums": [ums1, ums2, ...]   # Unmodified sequences, 3-letter codes
                   },
         "valid-10": {...},
             ...
@@ -170,13 +184,15 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | :---: | :--- |
  | `batch.pids` | Tuple of ProteinNet/SidechainNet IDs for proteins in this batch |
  | `batch.seqs` | Tensor of sequences, either as integers or as one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
+  | `batch.int_seqs` | Tensor of sequences in integer sequence format |
 | `batch.msks` | Tensor of missing residue masks, (redundant with padding in data) |
 | `batch.evos` | Tensor of Position Specific Scoring Matrix + Information Content |
 | `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
 | `batch.angs` | Tensor of angles |
 | `batch.crds` | Tensor of coordinates |
-| `batch.ress` | Tuple of X-ray crystallographic resolutions, when available. |
+| `batch.resolutions` | Tuple of X-ray crystallographic resolutions, when available. |
 | `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
+| `batch.is_modified` | Tensor of modified residue bit-vectors. Each entry is a bit-vector where a 1 signifies that the residue at that position has been modified to match a standard residue supported by SidechainNet (e.g., selenomethionine -> methionine). |
 
 
 ## Reproducing or Extending SidechainNet
