@@ -166,9 +166,9 @@ def report_errors(pnids_errorcodes, total_pnids):
         with open("errors/MODIFIED_MODEL_WARNING.txt", "r") as f:
             model_number_errors = len(f.readlines())
             print(f"Be aware that {model_number_errors} files may be using a "
-                  f"different model number than the one specified by "
+                  f"different model number than the one\nspecified by "
                   f"ProteinNet. See errors/MODIFIED_MODEL_WARNING.txt for "
-                  f"a list of these proteins.")
+                  f"a list of\nthese proteins.")
 
 
 def write_errors_to_files(results_warnings, pnids):

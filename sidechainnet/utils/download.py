@@ -4,7 +4,9 @@ import multiprocessing
 import os
 import pkg_resources
 from glob import glob
+import re
 import requests
+import zipfile
 
 import prody as pr
 import tqdm
@@ -14,9 +16,15 @@ from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_a
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
 
 MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
+
 VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
 VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
 DATA_SPLITS = ['train', 'test'] + VALID_SPLITS
+
+PN_VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
+PN_VALID_SPLITS = [f'valid-{s}' for s in PN_VALID_SPLITS_INTS]
+PN_DATA_SPLITS = ['train', 'test'] + PN_VALID_SPLITS
+
 D_AMINO_ACID_CODES = [
     "DAL", "DSN", "DTH", "DCY", "DVA", "DLE", "DIL", "MED", "DPR", "DPN", "DTY", "DTR",
     "DSP", "DGL", "DSG", "DGN", "DHI", "DLY", "DAR"
@@ -25,7 +33,19 @@ ASTRAL_ID_MAPPING = None
 PROTEIN_DSSP_DATA = None
 
 
+def _reinit_global_valid_splits(new_splits):
+    """Reinitialize global validation split variables when customizing dataset splits."""
+    global VALID_SPLITS
+    global VALID_SPLITS_INTS
+    global DATA_SPLITS
+    print(f"Re-initializing validation set splits ({new_splits}).")
+    VALID_SPLITS_INTS = new_splits
+    VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
+    DATA_SPLITS = ['train', 'test'] + VALID_SPLITS
+
+
 def _init_dssp_data():
+    """Initialize global variables for secondary structure and ASTRAL database info."""
     global PROTEIN_DSSP_DATA
     global ASTRAL_ID_MAPPING
     PROTEIN_DSSP_DATA = parse_dssp_file(
@@ -44,21 +64,24 @@ def _init_dssp_data():
 def download_sidechain_data(pnids,
                             sidechainnet_out_dir,
                             casp_version,
-                            training_set,
+                            thinning,
                             limit,
                             proteinnet_in,
-                            regenerate_scdata=False):
+                            regenerate_scdata=False,
+                            output_name=None):
     """Download the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
         pnids: List of ProteinNet IDs to download sidechain data for
         sidechainnet_out_dir: Path to directory for saving sidechain data
         casp_version: A string that describes the CASP version i.e. 'casp7'
-        training_set: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
+        thinning: Which thinning of ProteinNet to extract (30, 50, 90, etc.)
         limit: An integer describing maximum number of proteins to process
         proteinnet_in: A string representing the path to processed proteinnet.
         regenerate_scdata: Boolean, if True then recreate the sidechain-only data even if
             it already exists.
+        output_name: A string describing the filename. Defaults to
+            "sidechain-only_{casp_version}_{thinning}.pkl".
 
     Returns:
         sc_data: Python dictionary `{pnid: {...}, ...}`
@@ -68,20 +91,25 @@ def download_sidechain_data(pnids,
     # Initialize directories.
     global PROTEINNET_IN_DIR
     PROTEINNET_IN_DIR = proteinnet_in
-    output_name = f"sidechain-only_{casp_version}_{training_set}.pkl"
+    if output_name is None:
+        output_name = f"sidechain-only_{casp_version}_{thinning}.pkl"
     output_path = os.path.join(sidechainnet_out_dir, output_name)
     if not os.path.exists(sidechainnet_out_dir):
-        os.mkdir(sidechainnet_out_dir)
+        os.makedirs(sidechainnet_out_dir)
 
     # Simply load sidechain data if it has already been processed.
     if os.path.exists(output_path) and not regenerate_scdata:
         print(f"Sidechain information already preprocessed ({output_path}).")
         return load_data(output_path), output_path
 
+    print("Downloading SidechainNet specific data from RSCB PDB.")
+
     # Clean up any error logs that have been left-over from previous runs.
     if os.path.exists("errors"):
         for file in glob('errors/*.txt'):
             os.remove(file)
+    else:
+        os.makedirs("errors")
 
     # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(pnids, limit)
@@ -173,7 +201,7 @@ def process_id(pnid):
         return pnid, errors.ERRORS["NONE_STRUCTURE_ERRORS"]
 
     # If we've made it this far, we can unpack the data and return it
-    dihedrals, coords, sequence = dihedrals_coords_sequence
+    dihedrals, coords, sequence, unmodified_seq, is_nonstd = dihedrals_coords_sequence
 
     if "#" not in pnid:
         try:
@@ -188,14 +216,16 @@ def process_id(pnid):
         "crd": coords,
         "seq": sequence,
         "sec": dssp,
-        "res": resolution
+        "res": resolution,
+        "ums": unmodified_seq,
+        "mod": is_nonstd
     }
     if message:
         data["msg"] = message
     return pnid, data
 
 
-def determine_pnid_type(pnid):
+def determine_pnid_type(pnid, label_astral=False):
     """Return the 'type' of a ProteinNet ID (i.e. train, valid, test, ASTRAL).
 
     Args:
@@ -204,10 +234,11 @@ def determine_pnid_type(pnid):
     Returns:
         The 'type' of ProteinNet ID as a string.
     """
-    if "TBM#" in pnid or "FM#" in pnid or "TBM-hard" in pnid or "FM-hard" in pnid:
+    if ("TBM#" in pnid or "FM#" in pnid or "TBM-hard" in pnid or "FM-hard" in pnid or
+            "Unclassified" in pnid):
         return "test"
 
-    if pnid.count("_") == 1:
+    if label_astral and pnid.count("_") == 1:
         is_astral = "_astral"
     else:
         is_astral = ""
@@ -415,12 +446,84 @@ def get_resolution_from_pdbid(pdbid):
     return res
 
 
-def get_pdbid_from_pnid(pnid):
+def get_sequence_from_pdbid(pdbid, chain):
+    """Use RSCB PDB's API to download the sequence for a PDB ID and chain.
+
+    Args:
+        pdbid (str): 4-letter PDB ID.
+        chain (str): Chain name.
+
+    Returns:
+        str: 1-letter code primary sequence for the specified protein chain.
+    """
+    entity = 1
+    query_string = (f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdbid}/{entity}")
+    r = requests.get(query_string)
+    if r.status_code != 200:
+        res = None
+    while True:
+        query_string = (
+            f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdbid}/{entity}")
+        r = requests.get(query_string)
+        entity_poly = r.json()['entity_poly']
+        if chain.upper() not in entity_poly['pdbx_strand_id'].split(","):
+            entity += 1
+            continue
+        else:
+            break
+    sequence = entity_poly['pdbx_seq_one_letter_code_can']
+
+    return sequence
+
+
+def get_sequence_from_pnid(pnid):
+    """Return the ProteinNet ID's sequence as acquired from RCSB PDB."""
+    check_for_presence_of_astral_sequence_file()
+
+    pdbid, chid_or_astral_id, is_astral = get_pdbid_from_pnid(pnid,
+                                                              return_chain=True,
+                                                              include_is_astral=True)
+    if is_astral:
+        return get_sequence_from_astralid(chid_or_astral_id)
+    return get_sequence_from_pdbid(pdbid, chid_or_astral_id)
+
+
+def check_for_presence_of_astral_sequence_file():
+    """Download the ASTRAL/SCOPe sequence database file from the web if not present."""
+    from sidechainnet.utils.load import _download
+    local_path = pkg_resources.resource_filename(
+        "sidechainnet", "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa")
+    if not os.path.exists(local_path):
+        print("Local ASTRAL sequence database not found. Downloading to", local_path)
+        _download(
+            "http://scop.berkeley.edu/downloads/scopeseq-2.07/astral-scopedom-seqres-gd-all-2.07-stable.fa",
+            local_path)
+
+
+def get_sequence_from_astralid(astral_id):
+    """Read the protein sequence from the local ASTRAL/SCOPe database for an ASTRAL ID."""
+    with open(
+            pkg_resources.resource_filename(
+                "sidechainnet", "resources/astral-scopedom-seqres-gd-all-2.07-stable.fa"),
+            "r") as f:
+        data = f.read()
+    pattern = ">" + astral_id + r".+((\n\w+)+)"
+    sequence = re.search(pattern, data, re.MULTILINE).group(1).replace("\n", "").upper()
+    return sequence
+
+
+def get_pdbid_from_pnid(pnid, return_chain=False, include_is_astral=False):
     """Return RCSB PDB ID associated with a given ProteinNet ID.
 
     Args:
         pnid (string): A ProteinNet entry identifier.
+        return_chain (bool): If True, also return the chain specified by the pnid.
+
+    Returns:
+        str: The PDB ID (and chain, optional) specified by the provided ProteinNet ID.
     """
+    chid = None
+    is_astral = False
     # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
     try:
         pdbid, chnum, chid = pnid.split("_")
@@ -431,14 +534,24 @@ def get_pdbid_from_pnid(pnid):
     except ValueError:
         try:
             pdbid, astral_id = pnid.split("_")
+            is_astral = True
+            astral_id = astral_id.replace("-", "_")
             if "#" in pdbid:
                 val_split, pdbid = pdbid.split("#")
         except Exception as e:
             print(e)
             print(pnid)
             exit(1)
-
-    return pdbid
+    if not include_is_astral and return_chain:
+        return pdbid, chid
+    elif not include_is_astral:
+        return pdbid
+    elif include_is_astral and return_chain and not is_astral:
+        return pdbid, chid, False
+    elif include_is_astral and is_astral:
+        return pdbid, astral_id, True
+    else:
+        return pdbid
 
 
 def get_resolution_from_pnid(pnid):
@@ -446,3 +559,40 @@ def get_resolution_from_pnid(pnid):
     if determine_pnid_type(pnid) == "test":
         return None
     return get_resolution_from_pdbid(get_pdbid_from_pnid(pnid))
+
+
+def download_complete_proteinnet(user_dir=None):
+    """Download and return path to complete ProteinNet (all CASPs).
+
+    Args:
+        user_dir (str, optional): If provided, download the ProteinNet data here.
+            Otherwise, download it to sidechainnet/resources/proteinnet_parsed.
+
+    Returns:
+        dir_path (str): Path to directory where custom ProteinNet data was downloaded to.
+    """
+    from sidechainnet.utils.load import _download
+    if user_dir is not None:
+        dir_path = user_dir
+        zip_file_path = os.path.join(user_dir, "proteinnet_parsed.zip")
+    else:
+        dir_path = pkg_resources.resource_filename("sidechainnet", "resources/")
+        zip_file_path = pkg_resources.resource_filename(
+            "sidechainnet", "resources/proteinnet_parsed.zip")
+
+    if not os.path.isdir(os.path.join(dir_path, "proteinnet_parsed", "targets")):
+        print("Downloading pre-parsed ProteinNet data from Box (~3.5 GB compressed).")
+        _download(
+            "https://pitt.box.com/shared/static/nzsglfxdetnrpd4d6lomqh5102upa65a.zip",
+            zip_file_path)
+
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            zip_ref.extractall(dir_path)
+        os.remove(zip_file_path)
+
+    else:
+        print("Pre-parsed ProteinNet already downloaded.")
+
+    dir_path = os.path.join(dir_path, "proteinnet_parsed")
+
+    return dir_path

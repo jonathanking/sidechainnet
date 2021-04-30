@@ -4,7 +4,7 @@ from io import UnsupportedOperation
 import numpy as np
 import torch
 
-from sidechainnet.utils.sequence import VOCAB
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
 from sidechainnet.structure.structure import nerf
 
@@ -65,7 +65,7 @@ class StructureBuilder(object):
             raise ValueError("You must provide exactly one of either coordinates (crd) "
                              "or angles (ang).")
 
-        self.seq_as_str = seq if type(seq) == str else self._convert_seq_to_str(seq)
+        self.seq_as_str = seq if type(seq) == str else _convert_seq_to_str(seq)
         self.seq_as_ints = np.asarray([VOCAB._char2int[s] for s in self.seq_as_str])
         self.device = device
 
@@ -100,27 +100,6 @@ class StructureBuilder(object):
         self.next_bb = None
         self.pdb_creator = None
         self.nerf_method = nerf_method
-
-    @staticmethod
-    def _convert_seq_to_str(seq):
-        """Assuming seq is an int list or int tensor, returns its str representation."""
-        seq_as_str = ""
-        if isinstance(seq, torch.Tensor):
-            seq = seq.numpy()
-        seq = seq.flatten()
-        if len(seq.shape) == 1:
-            # The seq is represented as an integer sequence
-            if len(seq.shape) == 1:
-                seq_as_str = VOCAB.ints2str(seq)
-            elif len(seq.shape) == 2:
-                if seq.shape[0] != 1:
-                    raise ValueError(f"Seq shape {seq.shape} is not supported.")
-                else:
-                    seq_as_str = VOCAB.ints2str(seq[0])
-        else:
-            raise UnsupportedOperation(f"Seq shape {seq.shape} is not supported.")
-
-        return seq_as_str
 
     def __len__(self):
         """Return length of the protein sequence.
@@ -213,6 +192,15 @@ class StructureBuilder(object):
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_pdb(path, title)
 
+    def to_pdbstr(self, title="pred"):
+        """Return protein structure as a PDB string.
+
+        Args:
+            title (str, optional): Title of structure for PDB file. Defaults to "pred".
+        """
+        self._initialize_coordinates_and_PdbCreator()
+        return self.pdb_creator.get_pdb_string(title)
+
     def to_gltf(self, path, title="pred"):
         """Save protein structure as a GLTF (3D-object) file to given path.
 
@@ -237,10 +225,9 @@ class StructureBuilder(object):
         import py3Dmol
         if not style:
             style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
-        self._initialize_coordinates_and_PdbCreator()
 
         view = py3Dmol.view(**kwargs)
-        view.addModel(self.pdb_creator.get_pdb_string(), 'pdb')
+        view.addModel(self.to_pdbstr(), 'pdb')
         if style:
             view.setStyle(style)
         view.zoomTo()
@@ -275,7 +262,7 @@ class ResidueBuilder(object):
                 "standard".
         """
         if (not isinstance(name, np.int64) and not isinstance(name, np.int32) and
-                not isinstance(name, torch.Tensor)):
+                not isinstance(name, int) and not isinstance(name, torch.Tensor)):
             raise ValueError("Expected integer AA code." + str(name.shape) +
                              str(type(name)))
         if isinstance(angles, np.ndarray):
@@ -380,6 +367,7 @@ class ResidueBuilder(object):
         neighboring (previous or next) residue.
         """
         assert len(self.bb) > 0, "Backbone must be built first."
+        self.atom_names = ["N", "CA", "C", "O"]
         self.pts = {"N": self.bb[0], "CA": self.bb[1], "C": self.bb[2]}
         if self.next_res:
             self.pts["N+"] = self.next_res.bb[0]
@@ -414,6 +402,7 @@ class ResidueBuilder(object):
             self.pts[atom_names[-1]] = new_pt
             self.sc.append(new_pt)
             last_torsion = torsion
+            self.atom_names.append(atom_names[-1])
 
         return self.sc
 
@@ -421,6 +410,16 @@ class ResidueBuilder(object):
         self.coords = self.bb + self.sc + (NUM_COORDS_PER_RES - len(self.bb) -
                                            len(self.sc)) * [self.coordinate_padding]
         return self.coords
+
+    def to_prody(self, res):
+        import prody as pr
+        ag = pr.AtomGroup()
+        ag.setCoords(torch.stack(self.bb + self.sc).numpy())
+        ag.setNames(self.atom_names)
+        ag.setResnames([ONE_TO_THREE_LETTER_MAP[VOCAB._int2char[self.name]]] *
+                       len(self.atom_names))
+        ag.setResnums([res.getResnum()] * len(self.atom_names))
+        return pr.Residue(ag, [0] * len(self.atom_names), None)
 
     def __repr__(self):
         """Return a string describing the name of the residue used for this object."""
@@ -461,6 +460,27 @@ def _get_residue_build_iter(res, build_dictionary):
     return iter(
         zip(pbond_vals, bond_vals, angle_vals, torsion_vals,
             [t.split("-") for t in r["torsion-names"]]))
+
+
+def _convert_seq_to_str(seq):
+    """Assuming seq is an int list or int tensor, returns its str representation."""
+    seq_as_str = ""
+    if isinstance(seq, torch.Tensor):
+        seq = seq.numpy()
+    seq = seq.flatten()
+    if len(seq.shape) == 1:
+        # The seq is represented as an integer sequence
+        if len(seq.shape) == 1:
+            seq_as_str = VOCAB.ints2str(seq)
+        elif len(seq.shape) == 2:
+            if seq.shape[0] != 1:
+                raise ValueError(f"Seq shape {seq.shape} is not supported.")
+            else:
+                seq_as_str = VOCAB.ints2str(seq[0])
+    else:
+        raise UnsupportedOperation(f"Seq shape {seq.shape} is not supported.")
+
+    return seq_as_str
 
 
 if __name__ == '__main__':

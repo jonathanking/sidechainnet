@@ -12,14 +12,14 @@ import numpy as np
 import prody as pr
 
 
-def load_ids_from_text_files(directory, training_set):
+def load_ids_from_text_files(directory, thinning):
     """Given a directory where raw ProteinNet records are stored along with .ids files,
     reads and returns the contents of those files.
 
     Effectively returns a list of IDs associated with the training, validation,
     and test sets.
     """
-    with open(os.path.join(directory, f"training_{training_set}_ids.txt"),
+    with open(os.path.join(directory, f"training_{thinning}_ids.txt"),
               "r") as trainf, open(os.path.join(directory, "validation_ids.txt"),
                                    "r") as validf, open(
                                        os.path.join(directory, "testing_ids.txt"),
@@ -128,7 +128,7 @@ def process_file(input_filename_out_dir, return_ids=False):
     input_file = open(input_filename, "r")
     meta_dict = {}
     while True:
-        next_protein = read_protein_from_file(input_file, include_tertiary=True)
+        next_protein = read_protein_from_file(input_file, include_tertiary=False)
         if next_protein is None:
             break
         id_ = next_protein["id"]
@@ -147,7 +147,10 @@ def process_file(input_filename_out_dir, return_ids=False):
         return (input_filename, all_ids)
 
 
-def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
+def parse_raw_proteinnet(proteinnet_in_dir,
+                         proteinnet_out_dir,
+                         thinning,
+                         remove_raw_proteinnet=False):
     """Extract and saves information for a single ProteinNet dataset.
 
     Preprocesses raw ProteinNet records by reading them and transforming them
@@ -157,19 +160,20 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
     Args:
         proteinnet_in_dir: Directory where all raw ProteinNet files are kept
         proteinnet_out_dir: Directory to save processed data
-        training_set: Which thinning of ProteinNet is requested
+        thinning: Which thinning of ProteinNet is requested
+        remove_raw_proteinnet: If True, delete the raw ProteinNet files after processing.
 
     Returns:
-        relevant_ids: A list of ProteinNet IDs from corresponding training_set
+        relevant_ids: A list of ProteinNet IDs from corresponding thinning
     """
-    train_file = f"training_{training_set}.pkl"
+    train_file = f"training_{thinning}.pkl"
 
     # If the desired ProteinNet dataset has already been processed, load its IDs
     if os.path.exists(os.path.join(proteinnet_out_dir, train_file)):
         print(f"Raw ProteinNet files already preprocessed ("
               f"{os.path.join(proteinnet_out_dir, train_file)}).")
         relevant_ids = retrieve_relevant_proteinnetids_from_files(
-            proteinnet_out_dir, training_set)
+            proteinnet_out_dir, thinning)
         return relevant_ids
 
     # If the preprocessed ProteinNet dictionaries don't exist, create them.
@@ -190,11 +194,12 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
         f for f in glob(os.path.join(proteinnet_in_dir, "*[!.ids]"))
         if not os.path.isdir(f)
     ]
-    assert len(input_files) == 8, (
-        f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
-        "could not find all 8.\n Please download from Mohammed "
-        "AlQuraishi's repository: "
-        "https://github.com/aqlaboratory/proteinnet")
+    if thinning != 100:
+        assert len(input_files) == 8, (
+            f"Looking for raw ProteinNet files in '{proteinnet_in_dir}', but"
+            "could not find all 8.\n Please download from Mohammed "
+            "AlQuraishi's repository: "
+            "https://github.com/aqlaboratory/proteinnet")
 
     # Process each ProteinNet file by turning them into PyTorch saved dictionaries
     print("Preprocessing raw ProteinNet files...")
@@ -202,23 +207,27 @@ def parse_raw_proteinnet(proteinnet_in_dir, proteinnet_out_dir, training_set):
         p.map(process_file, zip(input_files, itertools.repeat(proteinnet_out_dir)))
     print(f"Done. Processed ProteinNet files saved to {proteinnet_out_dir}.")
 
+    if remove_raw_proteinnet:
+        for f in input_files:
+            os.remove(f)
+
     # Return the ProteinNet IDs associated with the target dataset
     relevant_ids = retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir,
-                                                              training_set)
+                                                              thinning)
     return relevant_ids
 
 
-def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, training_set):
+def retrieve_relevant_proteinnetids_from_files(proteinnet_out_dir, thinning):
     """Returns a list of ProteinNet IDs relevant for a particular training set.
 
     Args:
         proteinnet_out_dir: Directory containing preprocessed ProteinNet files.
-        training_set: Which training set thinning of CASP to use.
+        thinning: Which training set thinning of CASP to use.
 
     Returns:
         A list of ProteinNet IDs (training, validation, and test set).
     """
-    train_file = f"training_{training_set}.pkl"
+    train_file = f"training_{thinning}.pkl"
     relevant_training_file = os.path.join(proteinnet_out_dir,
                                           train_file.replace(".pkl", "_ids.txt"))
     relevant_id_files = [
