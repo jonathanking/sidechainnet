@@ -91,12 +91,8 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     mask, alignment, ang, crd, dssp, unmod_seq, is_mod, warning = merge(
         aligner,
-        pn_entry["primary"],
-        sc_entry["seq"],
-        sc_entry["ang"],
-        sc_entry["crd"],
-        sc_entry["sec"],
-        pn_entry["mask"],
+        pn_entry,
+        sc_entry,
         pnid,
         ignore_pnmask=ignore_pnmask)
 

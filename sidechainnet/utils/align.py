@@ -182,12 +182,13 @@ def merge(aligner, pn_entry, sc_entry, pnid, attempt_number=0, ignore_pnmask=Fal
 
     elif n_alignments == 0 and attempt_number == 3:
         aligner = init_aligner(allow_target_gaps=True, allow_target_mismatches=True)
-        mask, a0, ang, crd, dssp, warning = merge(aligner,
-                                                  pn_entry,
-                                                  sc_entry,
-                                                  pnid,
-                                                  attempt_number=4,
-                                                  ignore_pnmask=ignore_pnmask)
+        mask, a0, ang, crd, dssp, unmod_seq, is_modified, warning = merge(
+            aligner,
+            pn_entry,
+            sc_entry,
+            pnid,
+            attempt_number=4,
+            ignore_pnmask=ignore_pnmask)
         warning = warning + ", mismatch used in alignment" if warning else "mismatch used in alignment"
         return mask, a0, ang, crd, dssp, unmod_seq, is_modified, warning
 
