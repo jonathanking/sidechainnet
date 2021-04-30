@@ -198,7 +198,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 ## Reproducing or Extending SidechainNet
 
 If you would like to reproduce our work or make modifications/additions to the dataset, please see 
-the example we provide in our **[Colab Walkthrough](https://colab.research.google.com/drive/11ZZyqwfu7ZTyUKdqt9uy59AqqYccRVcU?usp=sharing)**. In simple terms, you will need to call `scn.create`
+the example we provide in our **[Colab Walkthrough](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing)**. In simple terms, you will need to call `scn.create`
 with the desired CASP/ProteinNet information or provide a list of ProteinNet-formatted IDs to
  `scn.create_custom`. Please note that since some data is acquired from ProteinNet directly (e.g., Position Specific Scoring Matrices), protein entries will exclude this data if it was not previously available in ProteinNet.
 
