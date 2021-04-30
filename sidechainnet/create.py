@@ -90,11 +90,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         ignore_pnmask = False
 
     mask, alignment, ang, crd, dssp, unmod_seq, is_mod, warning = merge(
-        aligner,
-        pn_entry,
-        sc_entry,
-        pnid,
-        ignore_pnmask=ignore_pnmask)
+        aligner, pn_entry, sc_entry, pnid, ignore_pnmask=ignore_pnmask)
 
     new_entry = {}
 
@@ -284,7 +280,10 @@ def _create_all(args):
 
     # Generate debug dataset with 200 training examples
     sc_outfile = os.path.join(args.sidechainnet_out, format_sidechainnet_path("debug", 0))
-    debug = organize_data(sidechainnet_raw_100, "debug", "debug")
+    debug = organize_data(sidechainnet_raw_100,
+                          args.casp_version,
+                          thinning=100,
+                          is_debug=True)
     save_data(debug, sc_outfile)
     print(f"SidechainNet for CASP {args.casp_version} (debug) written to {sc_outfile}.")
 

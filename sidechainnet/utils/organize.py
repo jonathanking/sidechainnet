@@ -88,6 +88,7 @@ def get_proteinnetIDs_by_split(casp_version, thinning, custom_ids=None):
 def organize_data(scnet_data,
                   casp_version,
                   thinning,
+                  is_debug=False,
                   description=None,
                   custom_ids=None):
     """Given an unsorted Sidechainnet data dict, organizes into ProteinNet data splits.
@@ -97,6 +98,7 @@ def organize_data(scnet_data,
             SidechainNet ('seq', 'ang', 'crd', 'evo', 'msk').
         casp_version: A string describing the CASP version of this dataset.
         thinning: An integer representing the training set thinning.
+        is_debug: A bool. If True, sample 200 training set IDs.
         description: A string describing the dataset.
         custom_ids: (optional) A list of custom ProteinNet IDs to use for this dataset.
 
@@ -114,7 +116,7 @@ def organize_data(scnet_data,
     # Now, we organize the data by its data splits
     n_proteins = 0
     for split in ["train", "test", "valid"]:
-        if split == "train" and thinning == "debug":
+        if split == "train" and is_debug:
             thinning = 0
             np.random.seed(0)
             split_ids = np.random.choice(ids[split], 200, replace=False)
