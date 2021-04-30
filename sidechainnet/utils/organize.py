@@ -61,8 +61,9 @@ def create_empty_dictionary():
     return data
 
 
-def get_proteinnetIDs_by_split(proteinnet_dir, thinning, custom_ids=None):
+def get_proteinnetIDs_by_split(casp_version, thinning, custom_ids=None):
     """Returns a dict of ProteinNet IDs organized by data split (train/test/valid)."""
+    from sidechainnet.create import get_proteinnet_ids
     if custom_ids is not None:
         ids_datasplit = [(_id, determine_pnid_type(_id)) for _id in custom_ids]
         ids = {"train": [], "valid": [], "test": []}
@@ -72,28 +73,17 @@ def get_proteinnetIDs_by_split(proteinnet_dir, thinning, custom_ids=None):
 
     if thinning == "debug":
         thinning = 100
-    pn_files = [
-        os.path.join(proteinnet_dir, f"training_{thinning}_ids.txt"),
-        os.path.join(proteinnet_dir, "validation_ids.txt"),
-        os.path.join(proteinnet_dir, "testing_ids.txt")
-    ]
-
-    def parse_ids(filepath):
-        with open(filepath, "r") as f:
-            _ids = f.read().splitlines()
-        return _ids
 
     ids = {
-        "train": parse_ids(pn_files[0]),
-        "valid": parse_ids(pn_files[1]),
-        "test": parse_ids(pn_files[2])
+        "train": get_proteinnet_ids(casp_version, "train", thinning=thinning),
+        "valid": get_proteinnet_ids(casp_version, "valid"),
+        "test": get_proteinnet_ids(casp_version, "test")
     }
 
     return ids
 
 
 def organize_data(scnet_data,
-                  proteinnet_dir,
                   casp_version,
                   thinning,
                   description=None,
@@ -103,8 +93,6 @@ def organize_data(scnet_data,
     Args:
         scnet_data: A dictionary mapping ProteinNet ids (pnids) to data recorded by
             SidechainNet ('seq', 'ang', 'crd', 'evo', 'msk').
-        proteinnet_dir: A string representing the path to where the preprocessed
-            ProteinNet files are stored.
         casp_version: A string describing the CASP version of this dataset.
         thinning: An integer representing the training set thinning.
         description: A string describing the dataset.
@@ -116,7 +104,7 @@ def organize_data(scnet_data,
     """
     from sidechainnet.utils.download import DATA_SPLITS
     # First, we need to determine which pnids belong to which data split.
-    ids = get_proteinnetIDs_by_split(proteinnet_dir, thinning, custom_ids)
+    ids = get_proteinnetIDs_by_split(casp_version, thinning, custom_ids)
 
     # Next, we create the empty dictionary for storing the data, organized by data splits
     organized_data = create_empty_dictionary()
@@ -154,11 +142,15 @@ def organize_data(scnet_data,
 
     # Add settings
     organized_data["description"] = description
-    organized_data["settings"]["casp_version"] = int(casp_version) if casp_version.isnumeric() else casp_version
-    organized_data["settings"]["thinning"] = int(thinning) if thinning.isnumeric() else thinning
+    organized_data["settings"]["casp_version"] = int(
+        casp_version) if (isinstance(casp_version, int) or casp_version.isnumeric()) else casp_version
+    organized_data["settings"]["thinning"] = int(
+        thinning) if (isinstance(thinning, int) or thinning.isnumeric()) else thinning
     organized_data["settings"]["n_proteins"] = n_proteins
-    organized_data["settings"]["angle_means"] = compute_angle_means(organized_data['train']['ang'])
-    organized_data["settings"]["lengths"] = np.sort(np.asarray(list(map(len, (v['seq'] for k, v in scnet_data.items())))))
+    organized_data["settings"]["angle_means"] = compute_angle_means(
+        organized_data['train']['ang'])
+    organized_data["settings"]["lengths"] = np.sort(
+        np.asarray(list(map(len, (v['seq'] for k, v in scnet_data.items())))))
     organized_data['settings']['max_length'] = organized_data["settings"]["lengths"].max()
 
     print(f"{n_proteins} included in CASP {casp_version} ({thinning}% thinning).")

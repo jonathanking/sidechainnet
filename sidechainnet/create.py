@@ -135,7 +135,7 @@ def combine_wrapper(pndata_scdata_pnid):
     return combine(pn_data, sc_data, aligner, pnid)
 
 
-def combine_datasets(proteinnet_out, sc_data, thinning):
+def combine_datasets(proteinnet_out, sc_data, thinning=100):
     """Adds sidechain information to ProteinNet to create SidechainNet.
 
     Args:
@@ -238,14 +238,12 @@ def _create(args):
                                                         args.regenerate_scdata)
 
     # Finally, unify the sidechain data with ProteinNet
-    sidechainnet_raw = combine_datasets(args.proteinnet_out, sc_only_data,
-                                        args.thinning)
+    sidechainnet_raw = combine_datasets(args.proteinnet_out, sc_only_data)
 
     sidechainnet_outfile = os.path.join(
         args.sidechainnet_out,
         format_sidechainnet_path(args.casp_version, args.thinning))
-    sidechainnet = organize_data(sidechainnet_raw, args.proteinnet_out, args.casp_version,
-                                 args.thinning)
+    sidechainnet = organize_data(sidechainnet_raw, args.casp_version, args.thinning)
     save_data(sidechainnet, sidechainnet_outfile)
     print(f"SidechainNet for CASP {args.casp_version} written to {sidechainnet_outfile}.")
 
@@ -269,11 +267,11 @@ def _create_all(args):
         regenerate_scdata=args.regenerate_scdata)
 
     # Finally, unify the sidechain data with ProteinNet
-    sidechainnet_raw_100 = combine_datasets(args.proteinnet_out, sc_only_data, 100)
+    sidechainnet_raw_100 = combine_datasets(args.proteinnet_out, sc_only_data)
 
     # Generate debug dataset with 200 training examples
     sc_outfile = os.path.join(args.sidechainnet_out, format_sidechainnet_path("debug", 0))
-    debug = organize_data(sidechainnet_raw_100, args.proteinnet_out, "debug", "debug")
+    debug = organize_data(sidechainnet_raw_100, "debug", "debug")
     save_data(debug, sc_outfile)
     print(f"SidechainNet for CASP {args.casp_version} (debug) written to {sc_outfile}.")
 
@@ -282,8 +280,7 @@ def _create_all(args):
         sc_outfile = os.path.join(
             args.sidechainnet_out,
             format_sidechainnet_path(args.casp_version, thinning))
-        sidechainnet = organize_data(sidechainnet_raw_100, args.proteinnet_out,
-                                     args.casp_version, thinning)
+        sidechainnet = organize_data(sidechainnet_raw_100, args.casp_version, thinning)
         save_data(sidechainnet, sc_outfile)
         print(f"SidechainNet for CASP {args.casp_version} "
               f"({thinning}% thinning) written to {sc_outfile}.")
@@ -351,11 +348,10 @@ def create_custom(pnids,
         output_name=intermediate_filename)
 
     # Finally, unify the sidechain data with ProteinNet
-    sidechainnet_raw = combine_datasets(proteinnet_out, sc_only_data, thinning=100)
+    sidechainnet_raw = combine_datasets(proteinnet_out, sc_only_data)
 
     sidechainnet_outfile = os.path.join(sidechainnet_out, output_filename)
     sidechainnet_dict = organize_data(sidechainnet_raw,
-                                      proteinnet_out,
                                       casp_version="User-specified",
                                       thinning="User-specified",
                                       description=short_description,
