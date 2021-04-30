@@ -1,6 +1,6 @@
 # Reproducing and Extending SidechainNet
 
-This page is out-of-date. Please see the [Colab Walkthrough](https://colab.research.google.com/drive/11ZZyqwfu7ZTyUKdqt9uy59AqqYccRVcU?usp=sharing) for detailed information on generating SidechainNet datasets.
+This page is out-of-date. Please see the Colab Walkthrough linked on the README for detailed information on generating SidechainNet datasets.
 
 *A previous version of SidechainNet relied on raw, unprocessed ProteinNet to generate any SidechainNet dataset. 
 In the current iteration, the process has been simplified and ProteinNet has been downloaded, parsed, and re-uploaded for convenience. The original methodology is retained at the bottom of this page for reference, but is no longer relevant to the end user.*
