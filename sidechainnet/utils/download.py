@@ -6,6 +6,7 @@ import pkg_resources
 from glob import glob
 import re
 import requests
+import sys
 import zipfile
 
 import prody as pr
@@ -144,7 +145,7 @@ def get_sidechain_data(pnids, limit):
         results = list(
             tqdm.tqdm(p.imap(process_id, pnids[:limit]),
                       total=len(pnids[:limit]),
-                      dynamic_ncols=True))
+                      dynamic_ncols=True, smoothing=0))
     all_errors = []
     all_data = dict()
     with open("errors/MODIFIED_MODEL_WARNING.txt", "a") as model_warning_file:
@@ -304,8 +305,13 @@ def get_chain_from_trainid(pnid):
     except (pr.proteins.pdbfile.PDBParseError, IndexError):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
-        struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(pdbid,
-                                                                              chain=chid)
+        try:
+            struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(pdbid,
+                                                                                  chain=chid)
+        except EOFError as e:
+            print(pnid, e)
+            sys.stdout.flush()
+            return pnid, errors.ERRORS["PARSING_ERROR"]                                                                          
         if struct and chnum > 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
@@ -435,7 +441,7 @@ def get_resolution_from_pdbid(pdbid):
     """
     query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
                     "\"){pdbx_vrpt_summary{PDB_resolution}}}")
-    r = requests.get(query_string)
+    r = requests.get(query_string, headers={"User-Agent":"Mozilla/5.0"})
     if r.status_code != 200:
         res = None
     try:
