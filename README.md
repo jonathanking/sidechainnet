@@ -85,7 +85,7 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences, 1-letter codes
         "date": "January 20, 2020"
         }
 ```
-By default, the `load` function downloads the data from the web into the current directory and loads it as a Python dictionary. If the data already exists locally, it reads it from disk. Other than the requirement that the data must be loaded using Python, this method of data loading is agnostic to any downstream analyses
+By default, the `load` function downloads the data from the web into the current directory and loads it as a Python dictionary. If the data already exists locally, it reads it from disk. Other than the requirement that the data must be loaded using Python, this method of data loading is agnostic to any downstream analysis.
 
 ### Loading SidechainNet with PyTorch DataLoaders
 The `load` function can also be used to load SidechainNet data as a dictionary of `torch.utils.data.DataLoader` objects. PyTorch `DataLoaders` make it simple to iterate over dataset items for training machine learning models. This method is recommended for using SidechainNet data with PyTorch.
@@ -193,6 +193,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
 | `batch.resolutions` | Tuple of X-ray crystallographic resolutions, when available. |
 | `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
 | `batch.is_modified` | Tensor of modified residue bit-vectors. Each entry is a bit-vector where a 1 signifies that the residue at that position has been modified to match a standard residue supported by SidechainNet (e.g., selenomethionine -> methionine). |
+| `batch.lengths` | Tuple of protein sequence length |
 
 
 ## Reproducing or Extending SidechainNet

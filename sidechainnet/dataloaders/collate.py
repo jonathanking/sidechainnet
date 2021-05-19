@@ -14,7 +14,8 @@ from sidechainnet.utils.download import MAX_SEQ_LEN
 
 Batch = collections.namedtuple("Batch",
                                "pids seqs msks evos secs angs "
-                               "crds int_seqs seq_evo_sec resolutions is_modified")
+                               "crds int_seqs seq_evo_sec resolutions is_modified "
+                               "lengths")
 
 
 def get_collate_fn(aggregate_input, seqs_as_onehot=None):
@@ -60,7 +61,8 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
         # Instead of working with a list of tuples, we extract out each category of info
         # so it can be padded and re-provided to the user.
         pnids, sequences, masks, pssms, secs, angles, coords, resolutions, mods = list(zip(*insts))
-        max_batch_len = max(len(s) for s in sequences)
+        lengths = (len(s) for s in sequences)
+        max_batch_len = max(lengths)
 
         int_seqs = pad_for_batch(sequences,
                                  max_batch_len,
@@ -95,7 +97,8 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
                          int_seqs=int_seqs,
                          seq_evo_sec=None,
                          resolutions=resolutions,
-                         is_modified=padded_mods)
+                         is_modified=padded_mods,
+                         lengths=lengths)
 
         # Aggregated model input
         elif aggregate_input:
@@ -113,7 +116,8 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
                          int_seqs=int_seqs,
                          seq_evo_sec=seq_evo_sec,
                          resolutions=resolutions,
-                         is_modified=padded_mods)
+                         is_modified=padded_mods,
+                         lengths=lengths)
 
     return collate_fn
 
