@@ -182,7 +182,7 @@ def get_sidechain_data(pnids, limit):
     results = []
     remaining_pnids = [_ for _ in pnids]
     pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
-    while len(pnids_ok_parallel) > multiprocessing.cpu_count():
+    while len(remaining_pnids) > multiprocessing.cpu_count():
         print(f"{len(pnids_ok_parallel)} IDs OK for parallel downloading.")
         with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
             results.extend(
@@ -194,7 +194,7 @@ def get_sidechain_data(pnids, limit):
         pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
 
     # Next, we can download the remaining pnids in sequential order safely.
-    print("Downloading remainder", len(remaining_pnids), " sequentially.")
+    print("Downloading remaining", len(remaining_pnids), " sequentially.")
 
     pbar = tqdm.tqdm(pnids,
                      total=len(remaining_pnids[:limit]),

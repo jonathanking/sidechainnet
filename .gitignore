@@ -119,4 +119,4 @@ errors/
 *.dssp
 *.stride
 *.fa
-sidechainnet/resources/custom*
+sidechainnet/resources/proteinnet*
