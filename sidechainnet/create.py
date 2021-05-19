@@ -24,7 +24,6 @@ Date:   10/28/2020
 import argparse
 from collections import namedtuple
 import os
-import re
 from multiprocessing import Pool, cpu_count
 import pkg_resources
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP

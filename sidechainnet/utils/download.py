@@ -2,6 +2,7 @@
 
 import multiprocessing
 import os
+import pickle
 import pkg_resources
 from glob import glob
 import re
@@ -112,8 +113,23 @@ def download_sidechain_data(pnids,
     else:
         os.makedirs("errors")
 
+    # Try loading pre-parsed data from CASP12/100 to speed up dataset generation.
+    already_downloaded_data = "sidechain-only_12_100.pkl"
+    already_downloaded_data = os.path.join(sidechainnet_out_dir, already_downloaded_data)
+    new_pnids = [p for p in pnids]
+    already_parsed_ids = []
+    if os.path.exists(already_downloaded_data):
+        with open(already_downloaded_data, "rb") as f:
+            existing_data = pickle.load(f)
+        already_parsed_ids = [p for p in pnids if p in existing_data]
+        new_pnids = [p for p in pnids if p not in existing_data]
+        print(f"Will download {len(pnids)-len(new_pnids)} fewer pnids that were already"
+              " processed.")
+
     # Download the sidechain data as a dictionary and report errors.
-    sc_data, pnids_errors = get_sidechain_data(pnids, limit)
+    sc_data, pnids_errors = get_sidechain_data(new_pnids, limit)
+    for p in already_parsed_ids:
+        sc_data[p] = existing_data[p]
     save_data(sc_data, output_path)
     errors.report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
@@ -141,11 +157,44 @@ def get_sidechain_data(pnids, limit):
         Also returns a list of tuples of (pnid, error_code) for those pnids
         that failed to download.
     """
+    # Downloading ProteinNet IDs is not thread safe since multiple pnids have the
+    # same PDB ID and may attempt to download the file simultaneously.
+
+    # First, we take a set of pnids with unique PDB IDs. These can be simultaneously
+    # downloaded.
+    pnids_ok_parallel = []
+    pnids_sequential = []
+    existing_pdbids = set()
+    for p in pnids:
+        if determine_pnid_type(p) == "test":
+            pnids_ok_parallel.append(p)
+            continue
+        pdbid = get_pdbid_from_pnid(p)
+        if pdbid not in existing_pdbids:
+            existing_pdbids.add(pdbid)
+            pnids_ok_parallel.append(p)
+        else:
+            pnids_sequential.append(p)
+    print(f"{len(pnids_ok_parallel)} IDs OK for parallel downloading.")
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
         results = list(
-            tqdm.tqdm(p.imap(process_id, pnids[:limit]),
-                      total=len(pnids[:limit]),
-                      dynamic_ncols=True, smoothing=0))
+            tqdm.tqdm(p.imap(process_id, pnids_ok_parallel[:limit]),
+                      total=len(pnids_ok_parallel[:limit]),
+                      dynamic_ncols=True,
+                      smoothing=0))
+
+    # Next, we can download the remaining pnids in sequential order safely.
+    print("Downloading remainder", len(pnids_sequential), " sequentially.")
+
+    pbar = tqdm.tqdm(pnids,
+                     total=len(pnids_sequential[:limit]),
+                     dynamic_ncols=True,
+                     smoothing=0)
+    for pnid in pnids_sequential:
+        pbar.set_description(pnid)
+        results.append(process_id(pnid))
+        pbar.update()
+
     all_errors = []
     all_data = dict()
     with open("errors/MODIFIED_MODEL_WARNING.txt", "a") as model_warning_file:
@@ -295,10 +344,10 @@ def get_chain_from_trainid(pnid):
                 use_pdb = False
                 modified_model_number = True
             except Exception as e:
-                print(e)
+                print(1, pnid, e)
                 return pnid, errors.ERRORS["PARSING_ERROR_OSERROR"]
         except Exception as e:  # EOFERROR
-            print(e)
+            print(2, pnid, e)
             return pnid, errors.ERRORS["PARSING_ERROR_OSERROR"]
     except AttributeError:
         return pnid, errors.ERRORS["PARSING_ERROR_ATTRIBUTE"]
@@ -306,12 +355,12 @@ def get_chain_from_trainid(pnid):
         # For now, if the requested coordinate set doesn't exist, then we will
         # default to using the only (first) available coordinate set
         try:
-            struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(pdbid,
-                                                                                  chain=chid)
+            struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(
+                pdbid, chain=chid)
         except EOFError as e:
-            print(pnid, e)
+            print(3, pnid, e)
             sys.stdout.flush()
-            return pnid, errors.ERRORS["PARSING_ERROR"]                                                                          
+            return pnid, errors.ERRORS["PARSING_ERROR"]
         if struct and chnum > 1:
             try:
                 chain = pr.parsePDB(pdbid, chain=chid, model=1)
@@ -321,7 +370,7 @@ def get_chain_from_trainid(pnid):
         else:
             return pnid, errors.ERRORS["PARSING_ERROR"]
     except Exception as e:
-        print(e)
+        print(4, pnid, e)
         return pnid, errors.ERRORS["UNKNOWN_EXCEPTIONS"]
 
     if chain is None:
@@ -441,7 +490,7 @@ def get_resolution_from_pdbid(pdbid):
     """
     query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
                     "\"){pdbx_vrpt_summary{PDB_resolution}}}")
-    r = requests.get(query_string, headers={"User-Agent":"Mozilla/5.0"})
+    r = requests.get(query_string, headers={"User-Agent": "Mozilla/5.0"})
     if r.status_code != 200:
         res = None
     try:
