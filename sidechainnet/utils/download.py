@@ -157,40 +157,50 @@ def get_sidechain_data(pnids, limit):
         Also returns a list of tuples of (pnid, error_code) for those pnids
         that failed to download.
     """
+
     # Downloading ProteinNet IDs is not thread safe since multiple pnids have the
     # same PDB ID and may attempt to download the file simultaneously.
 
+    def get_parallel_sequential(pnid_list):
+        pnids_ok_parallel = []
+        pnids_sequential = []
+        existing_pdbids = set()
+        for p in pnid_list:
+            if determine_pnid_type(p) == "test":
+                pnids_ok_parallel.append(p)
+                continue
+            pdbid = get_pdbid_from_pnid(p)
+            if pdbid not in existing_pdbids:
+                existing_pdbids.add(pdbid)
+                pnids_ok_parallel.append(p)
+            else:
+                pnids_sequential.append(p)
+        return pnids_ok_parallel, pnids_sequential
+
     # First, we take a set of pnids with unique PDB IDs. These can be simultaneously
     # downloaded.
-    pnids_ok_parallel = []
-    pnids_sequential = []
-    existing_pdbids = set()
-    for p in pnids:
-        if determine_pnid_type(p) == "test":
-            pnids_ok_parallel.append(p)
-            continue
-        pdbid = get_pdbid_from_pnid(p)
-        if pdbid not in existing_pdbids:
-            existing_pdbids.add(pdbid)
-            pnids_ok_parallel.append(p)
-        else:
-            pnids_sequential.append(p)
-    print(f"{len(pnids_ok_parallel)} IDs OK for parallel downloading.")
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        results = list(
-            tqdm.tqdm(p.imap(process_id, pnids_ok_parallel[:limit]),
-                      total=len(pnids_ok_parallel[:limit]),
-                      dynamic_ncols=True,
-                      smoothing=0))
+    results = []
+    remaining_pnids = [_ for _ in pnids]
+    pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
+    while len(pnids_ok_parallel) > multiprocessing.cpu_count():
+        print(f"{len(pnids_ok_parallel)} IDs OK for parallel downloading.")
+        with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+            results.extend(
+                list(
+                    tqdm.tqdm(p.imap(process_id, pnids_ok_parallel[:limit]),
+                              total=len(pnids_ok_parallel[:limit]),
+                              dynamic_ncols=True,
+                              smoothing=0)))
+        pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
 
     # Next, we can download the remaining pnids in sequential order safely.
-    print("Downloading remainder", len(pnids_sequential), " sequentially.")
+    print("Downloading remainder", len(remaining_pnids), " sequentially.")
 
     pbar = tqdm.tqdm(pnids,
-                     total=len(pnids_sequential[:limit]),
+                     total=len(remaining_pnids[:limit]),
                      dynamic_ncols=True,
                      smoothing=0)
-    for pnid in pnids_sequential:
+    for pnid in remaining_pnids:
         pbar.set_description(pnid)
         results.append(process_id(pnid))
         pbar.update()
@@ -331,16 +341,16 @@ def get_chain_from_trainid(pnid):
     try:
         chain = pr.parsePDB(pdbid, chain=chid, model=chnum)
         if not chain:
-            chain = pr.parseMMCIF(pdbid, chain=chid, model=chnum)
+            chain = pr.parseMMCIF(pdbid.lower(), chain=chid, model=chnum)
             use_pdb = False
     # If the file is too large, then we can download the CIF instead
     except OSError:
         try:
-            chain = pr.parseMMCIF(pdbid, chain=chid, model=chnum)
+            chain = pr.parseMMCIF(pdbid.lower(), chain=chid, model=chnum)
             use_pdb = False
         except IndexError:
             try:
-                chain = pr.parseMMCIF(pdbid, chain=chid, model=1)
+                chain = pr.parseMMCIF(pdbid.lower(), chain=chid, model=1)
                 use_pdb = False
                 modified_model_number = True
             except Exception as e:
@@ -356,7 +366,7 @@ def get_chain_from_trainid(pnid):
         # default to using the only (first) available coordinate set
         try:
             struct = pr.parsePDB(pdbid, chain=chid) if use_pdb else pr.parseMMCIF(
-                pdbid, chain=chid)
+                pdbid.lower(), chain=chid)
         except EOFError as e:
             print(3, pnid, e)
             sys.stdout.flush()
