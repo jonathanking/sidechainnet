@@ -225,6 +225,10 @@ def create(casp_version=12,
     Raises:
         ValueError: when ProteinNet data paths are non-existant or not as expected.
     """
+    if casp_version == "debug":
+        raise ValueError("'debug' is not currently supported by scn.create.\n"
+                         "Use scn.create(12, 'all') and a debug dataset will be created.")
+
     # Download ProteinNet custom-helper package (concatenated ProteinNet datasets)
     proteinnet_in = download_complete_proteinnet()
     proteinnet_out = proteinnet_in
