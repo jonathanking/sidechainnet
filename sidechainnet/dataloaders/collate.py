@@ -61,7 +61,7 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
         # Instead of working with a list of tuples, we extract out each category of info
         # so it can be padded and re-provided to the user.
         pnids, sequences, masks, pssms, secs, angles, coords, resolutions, mods = list(zip(*insts))
-        lengths = (len(s) for s in sequences)
+        lengths = tuple(len(s) for s in sequences)
         max_batch_len = max(lengths)
 
         int_seqs = pad_for_batch(sequences,
