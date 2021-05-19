@@ -443,6 +443,19 @@ def get_proteinnet_ids(casp_version, split, thinning=None):
         return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
 
 
+def generate_all():
+    """Generate all SidechainNet datasets for curation and upload."""
+    import time
+    import sidechainnet as scn
+    t = time.localtime()
+    timestamp = time.strftime('%b-%d-%Y-%H%M', t)
+    pr.startLogfile(f"sidechainnet_generateall_{timestamp}")
+    casps = list(range(7, 13))[::-1]
+    for c in casps:
+        print("CASP", c)
+        scn.create(c, "all", regenerate_scdata=False)
+
+
 def main(args_tuple):
     """Run _create or _create_all using the arguments provided by the namedtuple."""
     if args_tuple.thinning != 'all':

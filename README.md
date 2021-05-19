@@ -244,6 +244,14 @@ Project structure (continuous integration, docs, testing) based on the
 2. [3dmol.js: molecular visualization with WebGL.](https://doi.org/10.1093/bioinformatics/btu829) N. Rego and D. Koes. Bioinformatics, 31(8):1322–1324, (2014).
  
 
+## Other Resources
+Computational Biology Skills Seminar, U.C. Berkeley, May 13, 2021
+
+* [Slides](https://docs.google.com/presentation/d/1yEWBIKjjJ-N1lC7Krw40VlLxg94-cGCrS1R30Pgogq4/edit?usp=sharing)
+* [Notebook](https://colab.research.google.com/drive/1J5pUnPuANM6cPXaR2eVNLI6c5wfZgr3X#scrollTo=4tBXWlrt-IWD)
+* [Recording](https://youtu.be/1gZAYO7hl80)
+
+
 ## Copyright
 
 Copyright (c) 2021, Jonathan King
