@@ -1,4 +1,5 @@
 """A class for creating PDB files/strings given a protein's sequence and coordinates."""
+import itertools
 
 import numpy as np
 
@@ -17,7 +18,7 @@ class PdbBuilder(object):
     """
 
     def __init__(self, seq, coords, atoms_per_res=NUM_COORDS_PER_RES):
-        """Initializes a PdbBuilder.
+        """Initialize a PdbBuilder.
 
         Args:
             coords: A numpy matrix of shape (L x N) x 3, where L is the protein sequence
@@ -49,7 +50,7 @@ class PdbBuilder(object):
                            "{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}")
         self.defaults = {
             "alt_loc": "",
-            "chain_id": "",
+            "chain_id": "A",
             "insertion_code": "",
             "occupancy": 1,
             "temp_factor": 0,
@@ -64,14 +65,14 @@ class PdbBuilder(object):
         self._pdb_lines = []
 
     def _coord_generator(self):
-        """A generator that iteratively yields self.atoms_per_res atoms at a time."""
+        """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
         coord_idx = 0
         while coord_idx < self.coords.shape[0]:
             yield self.coords[coord_idx:coord_idx + self.atoms_per_res]
             coord_idx += self.atoms_per_res
 
     def _get_line_for_atom(self, res_name, atom_name, atom_coords, missing=False):
-        """Returns the 'ATOM...' line in PDB format for the specified atom.
+        """Return the 'ATOM...' line in PDB format for the specified atom.
 
         If missing, this function should have special, but not yet determined,
         behavior.
@@ -88,7 +89,7 @@ class PdbBuilder(object):
             self.defaults["charge"])
 
     def _get_lines_for_residue(self, res_name, atom_names, coords):
-        """Returns a list of PDB-formatted lines for all atoms in a single residue.
+        """Return a list of PDB-formatted lines for all atoms in a single residue.
 
         Calls get_line_for_atom.
         """
@@ -102,7 +103,7 @@ class PdbBuilder(object):
         return residue_lines
 
     def _get_lines_for_protein(self):
-        """Returns a list of PDB-formatted lines for all residues in this protein.
+        """Return a list of PDB-formatted lines for all residues in this protein.
 
         Calls get_lines_for_residue.
         """
@@ -116,10 +117,9 @@ class PdbBuilder(object):
             self.res_nbr += 1
         return self._pdb_body_lines
 
-    @staticmethod
-    def _make_header(title):
+    def _make_header(self, title):
         """Return a string representing the PDB header."""
-        return f"REMARK  {title}"
+        return f"REMARK  {title}" + "\n" + self._make_SEQRES()
 
     @staticmethod
     def _make_footer():
@@ -146,8 +146,22 @@ class PdbBuilder(object):
         self._pdb_str = "\n".join(self._pdb_lines)
         return self._pdb_str
 
+    def _make_SEQRES(self):
+        """Return a SEQRES entry as a multi-line string for this PDB file."""
+        three_letter_seq = [ONE_TO_THREE_LETTER_MAP[c] for c in self.seq]
+        residue_blocks = list(split_every(13, three_letter_seq))
+        lineno = 1
+        nres = len(self.seq)
+        lines = []
+        for block in residue_blocks:
+            res_block_str = " ".join(block)
+            cur_line = f"SEQRES {lineno: >3} {self.defaults['chain_id']} {nres: >4}  {res_block_str: <61}"
+            lines.append(cur_line)
+            lineno += 1
+        return "\n".join(lines)
+
     def save_pdb(self, path, title="UntitledProtein"):
-        """Writes out the generated PDB file as a string to the specified path."""
+        """Write out the generated PDB file as a string to the specified path."""
         with open(path, "w") as outfile:
             outfile.write(self.get_pdb_string(title))
 
@@ -164,6 +178,15 @@ class PdbBuilder(object):
         pymol.cmd.color("oxygen", title)
         pymol.cmd.save(path, quiet=True)
         pymol.cmd.delete("all")
+
+
+def split_every(n, iterable):
+    """Split iterable into chunks. From https://stackoverflow.com/a/1915307/2780645."""
+    i = iter(iterable)
+    piece = list(itertools.islice(i, n))
+    while piece:
+        yield piece
+        piece = list(itertools.islice(i, n))
 
 
 ATOM_MAP_14 = {}

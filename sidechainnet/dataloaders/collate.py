@@ -9,11 +9,13 @@ from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatc
 from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
 from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
-from sidechainnet.utils.download import MAX_SEQ_LEN, VALID_SPLITS
+from sidechainnet.utils.download import MAX_SEQ_LEN
 
 
 Batch = collections.namedtuple("Batch",
-                               "pids seqs msks evos secs angs crds int_seqs seq_evo_sec ress")
+                               "pids seqs msks evos secs angs "
+                               "crds int_seqs seq_evo_sec resolutions is_modified "
+                               "lengths")
 
 
 def get_collate_fn(aggregate_input, seqs_as_onehot=None):
@@ -58,8 +60,9 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
         """
         # Instead of working with a list of tuples, we extract out each category of info
         # so it can be padded and re-provided to the user.
-        pnids, sequences, masks, pssms, secs, angles, coords, ress = list(zip(*insts))
-        max_batch_len = max(len(s) for s in sequences)
+        pnids, sequences, masks, pssms, secs, angles, coords, resolutions, mods = list(zip(*insts))
+        lengths = tuple(len(s) for s in sequences)
+        max_batch_len = max(lengths)
 
         int_seqs = pad_for_batch(sequences,
                                  max_batch_len,
@@ -80,6 +83,7 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
         padded_pssms = pad_for_batch(pssms, max_batch_len, 'pssm')
         padded_angs = pad_for_batch(angles, max_batch_len, 'ang')
         padded_crds = pad_for_batch(coords, max_batch_len, 'crd')
+        padded_mods = pad_for_batch(mods, max_batch_len, 'msk')
 
         # Non-aggregated model input
         if not aggregate_input:
@@ -92,7 +96,9 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
                          crds=padded_crds,
                          int_seqs=int_seqs,
                          seq_evo_sec=None,
-                         ress=ress)
+                         resolutions=resolutions,
+                         is_modified=padded_mods,
+                         lengths=lengths)
 
         # Aggregated model input
         elif aggregate_input:
@@ -109,7 +115,9 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
                          crds=padded_crds,
                          int_seqs=int_seqs,
                          seq_evo_sec=seq_evo_sec,
-                         ress=ress)
+                         resolutions=resolutions,
+                         is_modified=padded_mods,
+                         lengths=lengths)
 
     return collate_fn
 
@@ -208,6 +216,7 @@ def prepare_dataloaders(data,
             its components (sequence, mask pssm).
         batch_size: Batch size to use when yielding batches from a DataLoader.
     """
+    from sidechainnet.utils.download import VALID_SPLITS
     if collate_fn is None:
         collate_fn = get_collate_fn(aggregate_model_input, seqs_as_onehot=seq_as_onehot)
 
@@ -260,3 +269,21 @@ def prepare_dataloaders(data,
     dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in VALID_SPLITS})
 
     return dataloaders
+
+
+def get_dataloader_from_dataset_dict(dictionary):
+    collate_fn = get_collate_fn(False, seqs_as_onehot=True)
+
+    train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        num_workers=num_workers,
+        collate_fn=collate_fn,
+        batch_sampler=SimilarLengthBatchSampler(
+            train_dataset,
+            batch_size,
+            dynamic_batch=batch_size *
+            data['settings']['lengths'].mean() if dynamic_batching else None,
+            optimize_batch_for_cpus=optimize_for_cpu_parallelism,
+        ))
