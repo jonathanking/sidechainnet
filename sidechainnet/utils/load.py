@@ -100,7 +100,8 @@ def load(casp_version=12,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2,
          filter_by_resolution=False,
-         complete_structures_only=False):
+         complete_structures_only=False,
+         local_scn_path=None):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -176,6 +177,8 @@ def load(casp_version=12,
         complete_structures_only (bool, optional): If True, yield only structures from the
             training set that have no missing residues. Filter not applied to other data
             splits. Default False.
+        local_scn_path (str, optional): The path for a locally saved SidechainNet file.
+            This is especially useful for loading custom SidechainNet datasets.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -242,9 +245,12 @@ def load(casp_version=12,
                 ....    prediction = model(sequence, pssm)
                 ....    ...
     """
-    local_path = _get_local_sidechainnet_path(casp_version, thinning, scn_dir)
-    if not local_path:
-        print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
+    if local_scn_path:
+        local_path = local_scn_path
+    else:
+        local_path = _get_local_sidechainnet_path(casp_version, thinning, scn_dir)
+        if not local_path:
+            print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
     if not local_path or force_download:
         # Download SidechainNet if it does not exist locally, or if requested
         local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
@@ -297,15 +303,16 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
         "msk": [],
         "crd": [],
         "sec": [],
-        "res": []
+        "res": [],
+        "ums": [],
+        "mod": []
     }
     train = raw_data["train"]
     n_filtered_entries = 0
     total_entires = 0.
-    for seq, ang, crd, msk, evo, _id, res, sec in zip(train['seq'], train['ang'],
-                                                      train['crd'], train['msk'],
-                                                      train['evo'], train['ids'],
-                                                      train['res'], train['sec']):
+    for seq, ang, crd, msk, evo, _id, res, sec, ums, mod in zip(
+            train['seq'], train['ang'], train['crd'], train['msk'], train['evo'],
+            train['ids'], train['res'], train['sec'], train['ums'], train['mod']):
         total_entires += 1
         if not res or res > threshold:
             n_filtered_entries += 1
@@ -319,6 +326,8 @@ def filter_dictionary_by_resolution(raw_data, threshold=False):
             new_data["crd"].append(crd)
             new_data["sec"].append(sec)
             new_data["res"].append(res)
+            new_data["ums"].append(ums)
+            new_data["mod"].append(mod)
     if n_filtered_entries:
         print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
               " training set entries were excluded based on resolution.")
@@ -343,15 +352,16 @@ def filter_dictionary_by_missing_residues(raw_data):
         "msk": [],
         "crd": [],
         "sec": [],
-        "res": []
+        "res": [],
+        "ums": [],
+        "mod": []
     }
     train = raw_data["train"]
     n_filtered_entries = 0
     total_entires = 0.
-    for seq, ang, crd, msk, evo, _id, res, sec in zip(train['seq'], train['ang'],
-                                                      train['crd'], train['msk'],
-                                                      train['evo'], train['ids'],
-                                                      train['res'], train['sec']):
+    for seq, ang, crd, msk, evo, _id, res, sec, ums, mod in zip(
+            train['seq'], train['ang'], train['crd'], train['msk'], train['evo'],
+            train['ids'], train['res'], train['sec'], train['ums'], train['mod']):
         total_entires += 1
         if "-" in msk:
             n_filtered_entries += 1
@@ -365,6 +375,9 @@ def filter_dictionary_by_missing_residues(raw_data):
             new_data["crd"].append(crd)
             new_data["sec"].append(sec)
             new_data["res"].append(res)
+            new_data["ums"].append(ums)
+            new_data["mod"].append(mod)
+
     if n_filtered_entries:
         print(f"{n_filtered_entries} ({n_filtered_entries/total_entires:.1%})"
               " training set entries were excluded based on missing residues.")

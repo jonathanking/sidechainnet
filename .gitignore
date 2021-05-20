@@ -118,3 +118,5 @@ errors/
 *ignored/
 *.dssp
 *.stride
+*.fa
+sidechainnet/resources/proteinnet*

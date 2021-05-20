@@ -4,14 +4,16 @@ import copy
 import datetime
 import os
 import pickle
+import re
 
 import numpy as np
 
-from sidechainnet.utils.download import DATA_SPLITS, VALID_SPLITS
+from sidechainnet.utils.download import determine_pnid_type
 
 
 def validate_data_dict(data):
     """Performs several sanity checks on the data dict before saving."""
+    from sidechainnet.utils.download import VALID_SPLITS
     # Assert size of each data subset matches
     train_len = len(data["train"]["seq"])
     test_len = len(data["test"]["seq"])
@@ -31,6 +33,7 @@ def validate_data_dict(data):
 
 def create_empty_dictionary():
     """Create an empty SidechainNet dictionary ready to hold SidechainNet data."""
+    from sidechainnet.utils.download import VALID_SPLITS
     basic_data_entries = {
         "seq": [],
         "ang": [],
@@ -39,7 +42,9 @@ def create_empty_dictionary():
         "msk": [],
         "crd": [],
         "sec": [],
-        "res": []
+        "res": [],
+        "ums": [],
+        "mod": []
     }
 
     data = {
@@ -58,46 +63,52 @@ def create_empty_dictionary():
     return data
 
 
-def get_proteinnetIDs_by_split(proteinnet_dir, thinning):
+def get_proteinnetIDs_by_split(casp_version, thinning, custom_ids=None):
     """Returns a dict of ProteinNet IDs organized by data split (train/test/valid)."""
+    from sidechainnet.create import get_proteinnet_ids
+    if custom_ids is not None:
+        ids_datasplit = [(_id, determine_pnid_type(_id)) for _id in custom_ids]
+        ids = {"train": [], "valid": [], "test": []}
+        for _id, split in ids_datasplit:
+            ids[split].append(_id)
+        return ids
+
     if thinning == "debug":
         thinning = 100
-    pn_files = [
-        os.path.join(proteinnet_dir, f"training_{thinning}_ids.txt"),
-        os.path.join(proteinnet_dir, "validation_ids.txt"),
-        os.path.join(proteinnet_dir, "testing_ids.txt")
-    ]
-
-    def parse_ids(filepath):
-        with open(filepath, "r") as f:
-            _ids = f.read().splitlines()
-        return _ids
 
     ids = {
-        "train": parse_ids(pn_files[0]),
-        "valid": parse_ids(pn_files[1]),
-        "test": parse_ids(pn_files[2])
+        "train": get_proteinnet_ids(casp_version, "train", thinning=thinning),
+        "valid": get_proteinnet_ids(casp_version, "valid"),
+        "test": get_proteinnet_ids(casp_version, "test")
     }
 
     return ids
 
 
-def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
+def organize_data(scnet_data,
+                  casp_version,
+                  thinning,
+                  is_debug=False,
+                  description=None,
+                  custom_ids=None):
     """Given an unsorted Sidechainnet data dict, organizes into ProteinNet data splits.
 
     Args:
         scnet_data: A dictionary mapping ProteinNet ids (pnids) to data recorded by
             SidechainNet ('seq', 'ang', 'crd', 'evo', 'msk').
-        proteinnet_dir: A string representing the path to where the preprocessed
-            ProteinNet files are stored.
         casp_version: A string describing the CASP version of this dataset.
+        thinning: An integer representing the training set thinning.
+        is_debug: A bool. If True, sample 200 training set IDs.
+        description: A string describing the dataset.
+        custom_ids: (optional) A list of custom ProteinNet IDs to use for this dataset.
 
     Returns:
         A Python dictionary containing SidechainNet data, but this time, organized
         and divided into the data splits specified by ProteinNet.
     """
+    from sidechainnet.utils.download import DATA_SPLITS
     # First, we need to determine which pnids belong to which data split.
-    ids = get_proteinnetIDs_by_split(proteinnet_dir, thinning)
+    ids = get_proteinnetIDs_by_split(casp_version, thinning, custom_ids)
 
     # Next, we create the empty dictionary for storing the data, organized by data splits
     organized_data = create_empty_dictionary()
@@ -105,7 +116,7 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     # Now, we organize the data by its data splits
     n_proteins = 0
     for split in ["train", "test", "valid"]:
-        if split == "train" and thinning == "debug":
+        if split == "train" and is_debug:
             thinning = 0
             np.random.seed(0)
             split_ids = np.random.choice(ids[split], 200, replace=False)
@@ -126,6 +137,8 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
             organized_data[realsplit]['evo'].append(scnet_data[pnid]['evo'])
             organized_data[realsplit]['sec'].append(scnet_data[pnid]['sec'])
             organized_data[realsplit]['res'].append(scnet_data[pnid]['res'])
+            organized_data[realsplit]['ums'].append(scnet_data[pnid]['ums'])
+            organized_data[realsplit]['mod'].append(scnet_data[pnid]['mod'])
             organized_data[realsplit]['ids'].append(pnid)
             n_proteins += 1
 
@@ -134,9 +147,11 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
         organized_data[split] = sort_datasplit(organized_data[split])
 
     # Add settings
-    organized_data["description"] = f"SidechainNet {casp_version}"
-    organized_data["settings"]["casp_version"] = int(casp_version) if casp_version != "debug" else casp_version
-    organized_data["settings"]["thinning"] = int(thinning)
+    organized_data["description"] = description
+    organized_data["settings"]["casp_version"] = int(
+        casp_version) if (isinstance(casp_version, int) or casp_version.isnumeric()) else casp_version
+    organized_data["settings"]["thinning"] = int(
+        thinning) if (isinstance(thinning, int) or thinning.isnumeric()) else thinning
     organized_data["settings"]["n_proteins"] = n_proteins
     organized_data["settings"]["angle_means"] = compute_angle_means(
         organized_data['train']['ang'])
@@ -149,6 +164,25 @@ def organize_data(scnet_data, proteinnet_dir, casp_version, thinning):
     validate_data_dict(organized_data)
 
     return organized_data
+
+
+def get_validation_split_identifiers_from_pnid_list(pnids):
+    """Return a sorted list of validation set identifiers given a list of ProteinNet IDs.
+
+    Args:
+        pnids (list): List of ProteinNet-formated IDs (90#1A9U_1_A)
+
+    Returns:
+        List: List of validation set identifiers present in the list of pnids.
+
+    Example:
+        >>> pnids = ['40#1XHN_1_A', '10#2MEM_1_A', '90#3EOI_1_A']
+        >>> get_validation_split_identifiers_from_pnid_list(pnids)
+        [10, 40, 90]
+    """
+    matches = (re.match(r"(\d+)#\S+", s) for s in pnids)
+    matches = set((m.group(1) for m in filter(lambda s: s is not None, matches)))
+    return sorted(map(int, matches))
 
 
 def compute_angle_means(angle_list):
