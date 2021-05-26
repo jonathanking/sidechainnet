@@ -17,6 +17,7 @@ from .utils.download import VALID_SPLITS, DATA_SPLITS
 from .utils.measure import GLOBAL_PAD_CHAR
 from .create import create, create_custom, get_proteinnet_ids, generate_all
 from . import utils
+from . import openmm
 
 
 versions = get_versions()
