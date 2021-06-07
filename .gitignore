@@ -120,3 +120,5 @@ errors/
 *.stride
 *.fa
 sidechainnet/resources/proteinnet*
+*sidechainnet/examples/*ipynb
+sidechainnet_data
