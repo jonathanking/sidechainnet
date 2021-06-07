@@ -120,6 +120,5 @@ errors/
 *.stride
 *.fa
 sidechainnet/resources/proteinnet*
-sidechainnet/examples/snNerf Performance Evaluation.ipynb
-sidechainnet/examples/test imports.ipynb
-sidechainnet/examples/test_complete_structures_only.ipynb
+sidechainnet/examples/*.ipynb
+sidechainnet_data
