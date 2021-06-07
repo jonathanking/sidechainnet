@@ -218,26 +218,34 @@ class OpenMMPDB(object):
         return ag
 
 
-def get_zeroindexed_gap_positions(mask):
+def get_zeroindexed_gap_positions(mask, return_lengths=False):
     """Return [start-1, end+1] position of every gap in mask, zero-indexed.
 
     Args:
         mask (str): A SidechainNet mask (sequence of '+' and '-') marking sequence gaps.
+        return_lengths (bool): If True, also return lengths of each interior gap.
 
     Returns:
         list: A list of indices describing the residues immediately preceding and
         following each internal gap in the mask. The numbers are indexed counting only
         the present residues. If there are not internal gaps, returns an empty list.
 
+        If return_lengths == True, returns a Tuple whose second element is a list of the
+        relevant gap lengths.
+
     Examples:
         >>> get_zeroindexed_gap_positions("+++--+")
         [2, 3]
+        >>> get_zeroindexed_gap_positions("+++--+", True)
+        ([2, 3], [2])
         >>> get_zeroindexed_gap_positions("+++-------+")
         [2, 3]
         >>> get_zeroindexed_gap_positions("---++++++---")
         []
     """
     gap_locs = []
+    gap_lengths = []
+    gap_len_counter = 0
     cur_pos = 0
     in_gap = False
     for m in mask:
@@ -248,17 +256,24 @@ def get_zeroindexed_gap_positions(mask):
         elif m == "-" and not in_gap:
             gap_locs.append(cur_pos - 1)
             in_gap = True
+            gap_len_counter += 1
         elif m == "-" and in_gap:
+            gap_len_counter += 1
             continue
         elif m == "+" and in_gap and cur_pos != 0:
             in_gap = False
             gap_locs.append(cur_pos)
+            gap_lengths.append(gap_len_counter)
+            gap_len_counter = 0
             cur_pos += 1
         elif m == "+" and in_gap and cur_pos == 0:
             in_gap = False
             cur_pos += 1
     if in_gap:
         gap_locs.pop()
+
+    if return_lengths:
+        return gap_locs, gap_lengths
 
     return gap_locs
 
