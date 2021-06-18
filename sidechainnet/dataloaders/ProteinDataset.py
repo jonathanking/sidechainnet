@@ -19,6 +19,7 @@ class ProteinDataset(torch.utils.data.Dataset):
 
         # Organize data
         self.seqs = [VOCAB.str2ints(s, add_sos_eos) for s in scn_data_split['seq']]
+        self.raw_seqs = scn_data_split['seq']
         self.angs = scn_data_split['ang']
         self.crds = scn_data_split['crd']
         self.msks = [
@@ -50,6 +51,7 @@ class ProteinDataset(torch.utils.data.Dataset):
                 enumerate(self.angs), key=lambda x: x[1].shape[0], reverse=reverse_sort)
         ]
         self.seqs = [self.seqs[i] for i in sorted_len_indices]
+        self.raw_seqs = [self.raw_seqs[i] for i in sorted_len_indices]
         self.angs = [self.angs[i] for i in sorted_len_indices]
         self.crds = [self.crds[i] for i in sorted_len_indices]
         self.msks = [self.msks[i] for i in sorted_len_indices]
@@ -65,7 +67,7 @@ class ProteinDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return (self.ids[idx], self.seqs[idx], self.msks[idx], self.evos[idx],
                 self.secs[idx], self.angs[idx], self.crds[idx], self.resolutions[idx],
-                self.mods[idx])
+                self.mods[idx], self.raw_seqs[idx])
 
     def __str__(self):
         """Describe this dataset to the user."""
