@@ -185,6 +185,7 @@ The `batch` variable above is a `collections.namedtuple` that has the following 
  | `batch.pids` | Tuple of ProteinNet/SidechainNet IDs for proteins in this batch |
  | `batch.seqs` | Tensor of sequences, either as integers or as one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
   | `batch.int_seqs` | Tensor of sequences in integer sequence format |
+  | `batch.str_seqs` | Tuple of sequences as strings (unpadded) |
 | `batch.msks` | Tensor of missing residue masks, (redundant with padding in data) |
 | `batch.evos` | Tensor of Position Specific Scoring Matrix + Information Content |
 | `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
