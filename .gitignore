@@ -121,5 +121,5 @@ errors/
 *.fa
 sidechainnet/resources/proteinnet*
 *sidechainnet/examples/*ipynb
-sidechainnet_data
 sidechainnet/resources/forcefield_info
+sidechainnet_data

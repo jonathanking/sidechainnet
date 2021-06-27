@@ -10,6 +10,19 @@ import numpy as np
 
 from sidechainnet.utils.download import determine_pnid_type
 
+EMPTY_SPLIT_DICT = {
+    "seq": [],
+    "ang": [],
+    "ids": [],
+    "evo": [],
+    "msk": [],
+    "crd": [],
+    "sec": [],
+    "res": [],
+    "ums": [],
+    "mod": []
+}
+
 
 def validate_data_dict(data):
     """Performs several sanity checks on the data dict before saving."""
@@ -34,29 +47,17 @@ def validate_data_dict(data):
 def create_empty_dictionary():
     """Create an empty SidechainNet dictionary ready to hold SidechainNet data."""
     from sidechainnet.utils.download import VALID_SPLITS
-    basic_data_entries = {
-        "seq": [],
-        "ang": [],
-        "ids": [],
-        "evo": [],
-        "msk": [],
-        "crd": [],
-        "sec": [],
-        "res": [],
-        "ums": [],
-        "mod": []
-    }
 
     data = {
-        "train": copy.deepcopy(basic_data_entries),
-        "test": copy.deepcopy(basic_data_entries),
+        "train": copy.deepcopy(EMPTY_SPLIT_DICT),
+        "test": copy.deepcopy(EMPTY_SPLIT_DICT),
         # To parse date, use datetime.datetime.strptime(date, "%I:%M%p on %B %d, %Y")
         "date": datetime.datetime.now().strftime("%I:%M%p %b %d, %Y"),
         "settings": dict()
     }
 
     validation_subdict = {
-        vsplit: copy.deepcopy(basic_data_entries) for vsplit in VALID_SPLITS
+        vsplit: copy.deepcopy(EMPTY_SPLIT_DICT) for vsplit in VALID_SPLITS
     }
     data.update(validation_subdict)
 
