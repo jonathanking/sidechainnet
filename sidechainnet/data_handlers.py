@@ -14,6 +14,7 @@ from openmm.unit import nanometer, angstroms, kelvin, picosecond, picoseconds
 import openmm
 
 import sidechainnet
+from sidechainnet.structure.structure import coord_generator
 
 
 class SCNDataset(object):
@@ -159,9 +160,9 @@ class SCNProtein(object):
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        coord_generator = _coord_generator(self.coords)
+        coord_gen = coord_generator(self.coords)
         for i, (residue_code, coords,
-                mask_char) in enumerate(zip(self.seq, coord_generator, self.mask)):
+                mask_char) in enumerate(zip(self.seq, coord_gen, self.mask)):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
             if mask_char == "-" and skip_missing_residues:
                 continue

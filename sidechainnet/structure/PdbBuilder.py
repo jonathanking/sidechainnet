@@ -1,5 +1,6 @@
 """A class for creating PDB files/strings given a protein's sequence and coordinates."""
 import itertools
+from sidechainnet.structure.structure import coord_generator
 
 import numpy as np
 
@@ -66,10 +67,7 @@ class PdbBuilder(object):
 
     def _coord_generator(self):
         """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
-        coord_idx = 0
-        while coord_idx < self.coords.shape[0]:
-            yield self.coords[coord_idx:coord_idx + self.atoms_per_res]
-            coord_idx += self.atoms_per_res
+        return coord_generator(self.coords, self.atoms_per_res)
 
     def _get_line_for_atom(self, res_name, atom_name, atom_coords, missing=False):
         """Return the 'ATOM...' line in PDB format for the specified atom.

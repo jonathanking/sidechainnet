@@ -248,5 +248,13 @@ def debug_example():
     sb.build()
 
 
+def coord_generator(coords, atoms_per_res=14):
+    """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
+    coord_idx = 0
+    while coord_idx < coords.shape[0]:
+        yield coords[coord_idx:coord_idx + atoms_per_res]
+        coord_idx += atoms_per_res
+
+
 if __name__ == '__main__':
     debug_example()
