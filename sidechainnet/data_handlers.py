@@ -1,3 +1,5 @@
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet import structure
 import numpy as np
 import prody
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
@@ -15,8 +17,10 @@ import sidechainnet
 
 
 class SCNDataset(object):
+    """A representation of a SidechainNet dataset."""
 
     def __init__(self, data) -> None:
+        """Initialize a SCNDataset from underlying SidechainNet formatted dictionary."""
         super().__init__()
         # Determine available datasplits
         self.splits = []
@@ -58,9 +62,11 @@ class SCNDataset(object):
                 idx += 1
 
     def get_data_split(self, split_name):
+        """Return list of proteins belonging to str split_name."""
         return [p for p in self if p.split == split_name]
 
     def __getitem__(self, id):
+        """Retrieve protein by index or ID (name, i.e. '1A9U_1_A')."""
         if isinstance(id, str):
             return self.ids_to_SCNProtein[id]
         elif isinstance(id, slice):
@@ -74,15 +80,19 @@ class SCNDataset(object):
             return self.idx_to_SCNProtein[id]
 
     def __len__(self):
+        """Return number of proteins in the dataset."""
         return len(self.idx_to_SCNProtein)
 
     def __iter__(self):
+        """Iterate over SCNProtein objects."""
         yield from self.ids_to_SCNProtein.values()
 
     def __repr__(self) -> str:
+        """Represent SCNDataset as a string."""
         return f"SCNDataset(n={len(self)})"
 
     def filter_ids(self, to_keep):
+        """Remove proteins whose IDs are not included in list to_keep."""
         to_delete = []
         for pnid in self.ids_to_SCNProtein.keys():
             if pnid not in to_keep:
@@ -97,6 +107,7 @@ class SCNDataset(object):
 
 
 class SCNProtein(object):
+    """Represent a single protein in SidechainNet."""
 
     def __init__(self, **kwargs) -> None:
         super().__init__()
@@ -112,29 +123,38 @@ class SCNProtein(object):
         self.id = kwargs['id']
         self.split = kwargs['split']
         self.sb = None
+        self.atoms_per_res = NUM_COORDS_PER_RES
 
     def __len__(self):
+        """Return length of protein sequence."""
         return len(self.seq)
 
     def to_3Dmol(self):
+        """Return an interactive visualization of the protein with py3DMol."""
         if self.sb is None:
             self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
         return self.sb.to_3Dmol()
 
-    def to_pdb(self):
+    def to_pdb(self, path, title=None):
+        """Save structure to path as a PDB file."""
+        if not title:
+            title = self.id
         if self.sb is None:
             self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
-        return self.sb.to_pdb()
+        return self.sb.to_pdb(path, title)
 
     @property
-    def missing(self):
+    def num_missing(self):
+        """Return number of missing residues."""
         return self.mask.count("-")
 
     @property
     def seq3(self):
+        """Return 3-letter amino acid sequence for the protein."""
         return " ".join([ONE_TO_THREE_LETTER_MAP[c] for c in self.seq])
 
     def get_openmm_repr(self, skip_missing_residues=True):
+        """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
         self.positions = []
         self.topology = Topology()
         self.openmm_seq = ""
@@ -161,6 +181,7 @@ class SCNProtein(object):
         return self.topology, self.positions
 
     def make_pdbfixer(self):
+        """Construct and return an OpenMM PDBFixer object for this protein."""
         from pdbfixer import PDBFixer
         t, p = self.get_openmm_repr()
         self.pdbfixer = PDBFixer(topology=t,
@@ -170,6 +191,7 @@ class SCNProtein(object):
         return self.pdbfixer
 
     def run_pdbfixer(self):
+        """Add missing atoms to protein's PDBFixer representation."""
         self.pdbfixer.findMissingResidues()
         self.pdbfixer.findMissingAtoms()
         # print("Missing atoms", self.pdbfixer.missingAtoms)
@@ -178,6 +200,7 @@ class SCNProtein(object):
         self.pdbfixer.addMissingHydrogens(7.0)
 
     def minimize_pdbfixer(self):
+        """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
         self.modeller = Modeller(self.pdbfixer.topology, self.pdbfixer.positions)
         self.forcefield = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
         self.system = self.forcefield.createSystem(self.modeller.topology,
@@ -206,29 +229,38 @@ class SCNProtein(object):
         return self.ending_energy - self.starting_energy
 
     def get_energy_difference(self):
+        """Create PDBFixer object, minimize, and report ∆E."""
         self.make_pdbfixer()
         self.run_pdbfixer()
         return self.minimize_pdbfixer()
 
     def get_rmsd_difference(self):
+        """Report difference in start/end coordinates after energy minimization."""
         aligned_minimized = prody.calcTransformation(
             self.ending_positions, self.starting_positions).apply(self.ending_positions)
         rmsd = prody.calcRMSD(self.starting_positions, aligned_minimized)
         return rmsd
 
+
     def __repr__(self) -> str:
-        return f"SCNProtein({self.id}, len={len(self)}, missing={self.mask.count('-')}, split='{self.split}')"
-
-
-def _coord_generator(coords, atoms_per_res=14):
-    """Return a generator to iteratively yield atoms_per_res atoms at a time."""
-    coord_idx = 0
-    while coord_idx < coords.shape[0]:
-        yield coords[coord_idx:coord_idx + atoms_per_res]
-        coord_idx += atoms_per_res
+        """Represent an SCNProtein as a string."""
+        return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
+                f"split='{self.split}')")
 
 
 def get_element_from_atomname(atom_name):
+    """Return openmm.app.element object matching a given atom name.
+
+    Args:
+        atom_name (str): Atom name (PDB format).
+
+    Raises:
+        ValueError: If atom_name is not N, C, O, S, or PAD.
+
+    Returns:
+        openmm.app.element: For example nitrogen, carbon, oxygen, sulfur. Returns None
+        if atom_name is PAD.
+    """
     if atom_name[0] == "N":
         return elem.nitrogen
     elif atom_name[0] == "C":
