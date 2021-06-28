@@ -1,3 +1,5 @@
+from sidechainnet.structure.build_info import SC_BUILD_INFO
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 import numpy as np
 from numpy import cross, eye, dot
 from scipy.linalg import expm, norm
@@ -18,6 +20,31 @@ METHINE_LEN = 1.09
 
 AMINE_ANGLE = 2 * np.pi / 3
 AMINE_LEN = 1.09
+
+# yapf: disable
+HYDROGEN_NAMES = {
+    'ALA': ['H', 'HA', 'HB1', 'HB2', 'HB3'],
+    'ARG': ['H', 'HA', 'HB2', 'HB3', 'HD2', 'HD3', 'HG2', 'HG3', 'HE', 'HH11', 'HH12', 'HH21', 'HH22'],
+    'ASN': ['H', 'HA', 'HB2', 'HB3', 'HD21', 'HD22'],
+    'ASP': ['H', 'HA', 'HB2', 'HB3'],
+    'CYS': ['H', 'HA', 'HB2', 'HB3', 'HG'],
+    'GLN': ['H', 'HA', 'HB2', 'HB3', 'HE21', 'HE22', 'HG2', 'HG3'],
+    'GLU': ['H', 'HA', 'HB2', 'HB3', 'HG2', 'HG3'],
+    'GLY': ['H', 'HA2', 'HA3'],
+    'HIS': ['H', 'HA', 'HB2', 'HB3', 'HD2', 'HE1'],
+    'ILE': ['H', 'HA', 'HB', 'HD11', 'HD12', 'HD13', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23'],
+    'LEU': ['H', 'HA', 'HB2', 'HB3', 'HD11', 'HD12', 'HD13', 'HD21', 'HD22', 'HD23', 'HG'],
+    'LYS': ['H', 'HA', 'HB2', 'HB3', 'HD2', 'HD3', 'HE2', 'HE3', 'HG2', 'HG3', 'HZ1', 'HZ2', 'HZ3'],
+    'MET': ['H', 'HA', 'HB2', 'HB3', 'HE1', 'HE2', 'HE3', 'HG2', 'HG3'],
+    'PHE': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'],
+    'PRO': ['HA', 'HB2', 'HB3', 'HD2', 'HD3', 'HG2', 'HG3'],
+    'SER': ['H', 'HA', 'HB2', 'HB3', 'HG'],
+    'THR': ['H', 'HA', 'HB', 'HG1', 'HG21', 'HG22', 'HG23'],
+    'TRP': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HE3', 'HH2', 'HZ2', 'HZ3'],
+    'TYR': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'],
+    'VAL': ['H', 'HA', 'HB', 'HG11', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23']
+}
+# yapf: enable
 
 
 # Utility functions
@@ -71,7 +98,7 @@ def get_methyl_hydrogens(carbon, prev1, prev2):
     H2 += prev1 + CB
     H3 += prev1 + CB
 
-    return H1, H2, H3
+    return [H1, H2, H3]
 
 
 def get_methylene_hydrogens(R1, carbon, R2):
@@ -108,7 +135,7 @@ def get_methylene_hydrogens(R1, carbon, R2):
     H1 += carbon
     H2 += carbon
 
-    return H1, H2
+    return [H1, H2]
 
 
 def get_single_sp3_hydrogen(center, R1, R2, R3):
@@ -169,5 +196,12 @@ def get_amine_hydrogens(nitrogen, prev1, prev2):
     H1 += prev1 + N
     H2 += prev1 + N
 
-    return H1, H2
+    return [H1, H2]
 
+
+ATOM_MAP_24 = {}
+for one_letter, three_letter in ONE_TO_THREE_LETTER_MAP.items():
+    ATOM_MAP_24[one_letter] = ["N", "CA", "C", "O"] + list(
+        SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
+    ATOM_MAP_24[one_letter].extend(HYDROGEN_NAMES[three_letter])
+    ATOM_MAP_24[one_letter].extend(["PAD"] * (24 - len(ATOM_MAP_24[one_letter])))
