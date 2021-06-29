@@ -139,10 +139,7 @@ def get_methylene_hydrogens(R1, carbon, R2):
 
 
 def get_single_sp3_hydrogen(center, R1, R2, R3):
-    R1 -= center
-    R2 -= center
-    R3 -= center
-    H1 = scale(-(R1 + R2 + R3), target_len=SP3_LEN)
+    H1 = scale(-(R1 + R2 + R3 - (3 * center)), target_len=SP3_LEN)
     return H1 + center
 
 
