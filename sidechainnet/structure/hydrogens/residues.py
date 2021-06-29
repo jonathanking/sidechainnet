@@ -14,10 +14,12 @@ def pad_hydrogens(resname, hydrogens):
     return hydrogens
 
 
-def get_hydrogens_for_res(resname, c):
+def get_hydrogens_for_res(resname, c, prevc):
     """Return a padded list of hydrogens for a given residue name and atom coord tuple."""
-    # All amino acids have an amide-hydrogen along the backbone
-    hs = [hy.get_amide_methine_hydrogen(c.C, c.N, c.CA, amide=True)]
+    # All amino acids have an amide-hydrogen along the backbone; terminal NH3 not yet supported
+    hs = []
+    if prevc:
+        hs.append(hy.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
     # If the amino acid is not Glycine, we can add an sp3-hybridized H to CA
     if resname != "G":
         cah = hy.get_single_sp3_hydrogen(center=c.CA, R1=c.N, R2=c.C, R3=c.CB)

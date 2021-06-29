@@ -1,5 +1,6 @@
 """A class for creating PDB files/strings given a protein's sequence and coordinates."""
 import itertools
+from sidechainnet.structure.hydrogens.hydrogens import ATOM_MAP_24, NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 
 import numpy as np
@@ -37,14 +38,15 @@ class PdbBuilder(object):
         if coords.shape[0] % atoms_per_res != 0:
             raise AssertionError(f"Coords is not divisible by {atoms_per_res}. "
                                  f"{coords.shape}")
-        if atoms_per_res != 14:
+        if atoms_per_res not in (14, 24):
             raise ValueError(
-                "Values for atoms_per_res other than 14 are currently not supported.")
+                "Values for atoms_per_res other than 14/24 are currently not supported.")
 
+        self.atoms_per_res = atoms_per_res
+        self.has_hydrogens = self.atoms_per_res == NUM_COORDS_PER_RES_W_HYDROGENS
         self.coords = coords
         self.seq = seq
         self.mapping = self._make_mapping_from_seq()
-        self.atoms_per_res = atoms_per_res
 
         # PDB Formatting Information
         self.format_str = ("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}"
@@ -126,10 +128,11 @@ class PdbBuilder(object):
 
     def _make_mapping_from_seq(self):
         """Given a protein sequence, this returns a mapping that assumes coords are
-        generated in groups of 14, i.e. the output is L x 14 x 3."""
+        generated in groups of atoms_per_res (the output is L x atoms_per_res x 3.)"""
+        atom_names = ATOM_MAP_14 if not self.has_hydrogens else ATOM_MAP_24
         mapping = []
         for residue in self.seq:
-            mapping.append((residue, ATOM_MAP_14[residue]))
+            mapping.append((residue, atom_names[residue]))
         return mapping
 
     def get_pdb_string(self, title=None):
@@ -140,7 +143,7 @@ class PdbBuilder(object):
             return self._pdb_str
         self._get_lines_for_protein()
         self._pdb_lines = [self._make_header(title)
-                          ] + self._pdb_body_lines + [self._make_footer()]
+                           ] + self._pdb_body_lines + [self._make_footer()]
         self._pdb_str = "\n".join(self._pdb_lines)
         return self._pdb_str
 

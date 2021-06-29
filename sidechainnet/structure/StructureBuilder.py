@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 from io import UnsupportedOperation
+from sidechainnet.structure.hydrogens.hydrogens import NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.hydrogens.residues import get_hydrogens_for_res
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 import numpy as np
@@ -181,10 +182,12 @@ class StructureBuilder(object):
         if not self.pdb_creator:
             from sidechainnet.structure.PdbBuilder import PdbBuilder
             if self.data_type == 'numpy':
-                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords)
+                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords,
+                                              self.atoms_per_res)
             else:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
-                                              self.coords.detach().numpy())
+                                              self.coords.detach().numpy(),
+                                              self.atoms_per_res)
 
     def add_hydrogens(self):
         """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
@@ -193,17 +196,20 @@ class StructureBuilder(object):
                              " not yet been built.")
         coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True)
         new_coords = []
+        prev_res_atoms = None
         for aa, crd in zip(self.seq_as_str, coords):
             # Create an organized mapping from atom name to Catesian coordinates
             d = {name: xyz for (name, xyz) in zip(ATOM_MAP_14[aa], crd)}
             atoms = namedtuple("Atoms", d)(**d)  # Name -> crd
             # Generate hydrogen positions
-            hydrogen_positions = get_hydrogens_for_res(aa, atoms)
+            hydrogen_positions = get_hydrogens_for_res(aa, atoms, prev_res_atoms)
             # Append Hydrogens immediately after heavy atoms, followed by PADs to L=24
             new_coords.append(np.concatenate([crd, hydrogen_positions]))
+            prev_res_atoms = atoms
         new_coords = np.concatenate(new_coords)
         self.coords = new_coords
         self.has_hydrogens = True
+        self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS
 
     def to_pdb(self, path, title="pred"):
         """Save protein structure as a PDB file to given path.
