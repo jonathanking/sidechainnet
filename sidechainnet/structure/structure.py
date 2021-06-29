@@ -6,6 +6,7 @@ import torch
 from sidechainnet.structure import StructureBuilder
 from sidechainnet.structure.build_info import NUM_ANGLES
 from sidechainnet.utils.sequence import VOCAB
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
 
 def angles_to_coords(angles, seq, remove_batch_padding=False):
@@ -248,11 +249,15 @@ def debug_example():
     sb.build()
 
 
-def coord_generator(coords, atoms_per_res=14):
+def coord_generator(coords, atoms_per_res=14, remove_padding=False):
     """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
     coord_idx = 0
     while coord_idx < coords.shape[0]:
-        yield coords[coord_idx:coord_idx + atoms_per_res]
+        _slice = coords[coord_idx:coord_idx + atoms_per_res]
+        if remove_padding:
+            non_pad_locs = (_slice != GLOBAL_PAD_CHAR).any(axis=1)
+            _slice = _slice[non_pad_locs]
+        yield _slice
         coord_idx += atoms_per_res
 
 
