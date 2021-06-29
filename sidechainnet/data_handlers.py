@@ -168,7 +168,7 @@ class SCNProtein(object):
             if mask_char == "-" and skip_missing_residues:
                 continue
             # At this point, hydrogens should already be added
-            if self.sb.has_hydrogens:
+            if not self.has_hydrogens:
                 atom_names = ATOM_MAP_14[residue_code]
             else:
                 atom_names = hy.ATOM_MAP_24[residue_code]
@@ -284,5 +284,7 @@ def get_element_from_atomname(atom_name):
         return elem.sulfur
     elif atom_name == "PAD":
         return None
+    elif atom_name[0] == "H":
+        return elem.hydrogen
     else:
         raise ValueError(f"Unknown element for atom name {atom_name}.")
