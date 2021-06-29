@@ -16,7 +16,8 @@ def pad_hydrogens(resname, hydrogens):
 
 def get_hydrogens_for_res(resname, c, prevc):
     """Return a padded list of hydrogens for a given residue name and atom coord tuple."""
-    # All amino acids have an amide-hydrogen along the backbone; terminal NH3 not yet supported
+    # All amino acids have an amide-hydrogen along the backbone
+    # TODO Support terminal NH3 instead of None check
     hs = []
     if prevc:
         hs.append(hy.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
