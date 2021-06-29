@@ -14,6 +14,7 @@ from openmm.unit import nanometer, angstroms, kelvin, picosecond, picoseconds
 import openmm
 
 import sidechainnet
+import sidechainnet.structure.hydrogens.hydrogens as hy
 from sidechainnet.structure.structure import coord_generator
 
 
@@ -160,13 +161,17 @@ class SCNProtein(object):
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        coord_gen = coord_generator(self.coords)
+        coord_gen = coord_generator(self.coords, self.atoms_per_res)
         for i, (residue_code, coords,
                 mask_char) in enumerate(zip(self.seq, coord_gen, self.mask)):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
             if mask_char == "-" and skip_missing_residues:
                 continue
-            atom_names = ATOM_MAP_14[residue_code]
+            # At this point, hydrogens should already be added
+            if self.sb.has_hydrogens:
+                atom_names = ATOM_MAP_14[residue_code]
+            else:
+                atom_names = hy.ATOM_MAP_24[residue_code]
             residue = self.topology.addResidue(name=residue_name, chain=chain)
             for an, c in zip(atom_names, coords):
                 if an == "PAD":
@@ -242,6 +247,13 @@ class SCNProtein(object):
         rmsd = prody.calcRMSD(self.starting_positions, aligned_minimized)
         return rmsd
 
+    def add_hydrogens(self):
+        """Add hydrogens to the internal protein structure representation."""
+        self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
+        self.sb.add_hydrogens()
+        self.coords = self.sb.coords
+        self.has_hydrogens = True
+        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
 
     def __repr__(self) -> str:
         """Represent an SCNProtein as a string."""

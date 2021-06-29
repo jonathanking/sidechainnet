@@ -1,12 +1,15 @@
 """A class for generating/visualizing protein atomic coordinates from measured angles."""
 
+from collections import namedtuple
 from io import UnsupportedOperation
+from sidechainnet.structure.hydrogens.residues import get_hydrogens_for_res
+from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 import numpy as np
 import torch
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
-from sidechainnet.structure.structure import nerf
+from sidechainnet.structure.structure import coord_generator, nerf
 
 
 class StructureBuilder(object):
@@ -100,6 +103,7 @@ class StructureBuilder(object):
         self.next_bb = None
         self.pdb_creator = None
         self.nerf_method = nerf_method
+        self.has_hydrogens = False
 
     def __len__(self):
         """Return length of the protein sequence.
@@ -181,6 +185,25 @@ class StructureBuilder(object):
             else:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
                                               self.coords.detach().numpy())
+
+    def add_hydrogens(self):
+        """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
+        if self.coords is None or not len(self.coords):
+            raise ValueError("Cannot add hydrogens to a structure whose heavy atoms have"
+                             " not yet been built.")
+        coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True)
+        new_coords = []
+        for aa, crd in zip(self.seq_as_str, coords):
+            # Create an organized mapping from atom name to Catesian coordinates
+            d = {name: xyz for (name, xyz) in zip(ATOM_MAP_14[aa], crd)}
+            atoms = namedtuple("Atoms", d)(**d)  # Name -> crd
+            # Generate hydrogen positions
+            hydrogen_positions = get_hydrogens_for_res(aa, atoms)
+            # Append Hydrogens immediately after heavy atoms, followed by PADs to L=24
+            new_coords.append(np.concatenate([crd, hydrogen_positions]))
+        new_coords = np.concatenate(new_coords)
+        self.coords = new_coords
+        self.has_hydrogens = True
 
     def to_pdb(self, path, title="pred"):
         """Save protein structure as a PDB file to given path.
@@ -279,6 +302,11 @@ class ResidueBuilder(object):
         self.sc = []
         self.coords = []
         self.coordinate_padding = torch.zeros(3)
+
+    @property
+    def AA(self):
+        """Return the one-letter amino acid code (str) for this residue."""
+        return VOCAB.int2char(int(self.name))
 
     def build(self):
         """Construct and return atomic coordinates for this protein."""
@@ -423,7 +451,7 @@ class ResidueBuilder(object):
 
     def __repr__(self):
         """Return a string describing the name of the residue used for this object."""
-        return f"ResidueBuilder({VOCAB.int2char(int(self.name))})"
+        return f"ResidueBuilder({self.AA})"
 
 
 def _get_residue_build_iter(res, build_dictionary):

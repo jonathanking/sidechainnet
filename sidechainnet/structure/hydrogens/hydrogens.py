@@ -4,6 +4,8 @@ import numpy as np
 from numpy import cross, eye, dot
 from scipy.linalg import expm, norm
 
+NUM_COORDS_PER_RES_W_HYDROGENS = 24
+
 METHYL_ANGLE = 109.5
 METHYL_LEN = 1.01
 
@@ -101,20 +103,20 @@ def get_methyl_hydrogens(carbon, prev1, prev2):
     return [H1, H2, H3]
 
 
-def get_methylene_hydrogens(R1, carbon, R2):
+def get_methylene_hydrogens(r1, carbon, r2):
     """Place methylene hydrogens (R1-CH2-R2) on central Carbon.
 
     Args:
-        R1: First atom vector.
+        r1: First atom vector.
         carbon: Second atom vector (Carbon needing hydrogens).
-        R2: Third atom vector.
+        r2: Third atom vector.
 
     Returns:
         Tuple: Hydrogens extending from central Carbon.
     """
     # Define local vectors
-    R1 = R1 - carbon
-    R2 = R2 - carbon
+    R1 = r1 - carbon
+    R2 = r2 - carbon
 
     # Create perpendicular vector
     PV = np.cross(R1, R2)
