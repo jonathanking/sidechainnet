@@ -7,7 +7,7 @@ from scipy.linalg import expm, norm
 NUM_COORDS_PER_RES_W_HYDROGENS = 24
 
 METHYL_ANGLE = 109.5
-METHYL_LEN = 1.01
+METHYL_LEN = 1.09
 
 METHYLENE_ANGLE = np.rad2deg(0.61656)
 METHYLENE_LEN = 1.09
