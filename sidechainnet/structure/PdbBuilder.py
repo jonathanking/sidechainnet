@@ -1,12 +1,12 @@
 """A class for creating PDB files/strings given a protein's sequence and coordinates."""
 import itertools
-from sidechainnet.structure.hydrogens.hydrogens import ATOM_MAP_24, NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 
 import numpy as np
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 from sidechainnet.structure.build_info import SC_BUILD_INFO, NUM_COORDS_PER_RES
+from sidechainnet.structure.hydrogens import ATOM_MAP_24, NUM_COORDS_PER_RES_W_HYDROGENS
 
 
 class PdbBuilder(object):

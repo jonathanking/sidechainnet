@@ -14,7 +14,7 @@ from openmm.unit import nanometer, angstroms, kelvin, picosecond, picoseconds
 import openmm
 
 import sidechainnet
-import sidechainnet.structure.hydrogens.hydrogens as hy
+import sidechainnet.structure.hydrogens as hy
 from sidechainnet.structure.structure import coord_generator
 
 

@@ -2,15 +2,14 @@
 
 from collections import namedtuple
 from io import UnsupportedOperation
-from sidechainnet.structure.hydrogens.hydrogens import NUM_COORDS_PER_RES_W_HYDROGENS
-from sidechainnet.structure.hydrogens.residues import get_hydrogens_for_res
-from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 import numpy as np
 import torch
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
 from sidechainnet.structure.structure import coord_generator, nerf
+from sidechainnet.structure.hydrogens import HydrogenBuilder, NUM_COORDS_PER_RES_W_HYDROGENS
+
 
 
 class StructureBuilder(object):
@@ -191,9 +190,13 @@ class StructureBuilder(object):
 
     def add_hydrogens(self):
         """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
+        from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
         if self.coords is None or not len(self.coords):
             raise ValueError("Cannot add hydrogens to a structure whose heavy atoms have"
                              " not yet been built.")
+        # TODO Can torch and numpy have the same signatures here?
+        hb = HydrogenBuilder(self.seq_as_str, self.coords)
+        cat = np.concatenate if self.data_type == "numpy" else torch.stack
         coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True)
         new_coords = []
         prev_res_atoms = None
@@ -202,11 +205,12 @@ class StructureBuilder(object):
             d = {name: xyz for (name, xyz) in zip(ATOM_MAP_14[aa], crd)}
             atoms = namedtuple("Atoms", d)(**d)  # Name -> crd
             # Generate hydrogen positions
-            hydrogen_positions = get_hydrogens_for_res(aa, atoms, prev_res_atoms)
+            print(self.data_type)
+            hydrogen_positions = hb.get_hydrogens_for_res(aa, atoms, prev_res_atoms)
             # Append Hydrogens immediately after heavy atoms, followed by PADs to L=24
-            new_coords.append(np.concatenate([crd, hydrogen_positions]))
+            new_coords.append(cat((*crd, *hydrogen_positions)))
             prev_res_atoms = atoms
-        new_coords = np.concatenate(new_coords)
+        new_coords = cat(new_coords) if hb.mode == "numpy" else torch.cat(new_coords)
         self.coords = new_coords
         self.has_hydrogens = True
         self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS
