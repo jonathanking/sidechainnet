@@ -1,21 +1,21 @@
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
-from sidechainnet import structure
 import numpy as np
+import openmm
 import prody
-from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
+from openmm import Vec3
+from openmm.app import Topology
 from openmm.app import element as elem
 from openmm.app.forcefield import ForceField, HBonds
 from openmm.app.modeller import Modeller
 from openmm.openmm import LangevinMiddleIntegrator
-from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
-from openmm.app import Topology
-from openmm import Vec3
-from openmm.unit import nanometer, angstroms, kelvin, picosecond, picoseconds
-import openmm
+from openmm.unit import angstroms, kelvin, nanometer, picosecond, picoseconds
 
 import sidechainnet
-import sidechainnet.structure.hydrogens as hy
+import sidechainnet.structure.HydrogenBuilder as hy
+from sidechainnet import structure
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
 
 class SCNDataset(object):

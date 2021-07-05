@@ -5,8 +5,8 @@ import prody as pr
 import torch
 from sidechainnet.structure import StructureBuilder
 from sidechainnet.structure.build_info import NUM_ANGLES
-from sidechainnet.utils.sequence import VOCAB
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.utils.sequence import VOCAB
 
 
 def angles_to_coords(angles, seq, remove_batch_padding=False):

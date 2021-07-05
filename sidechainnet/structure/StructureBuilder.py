@@ -8,7 +8,7 @@ import torch
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
 from sidechainnet.structure.structure import coord_generator, nerf
-from sidechainnet.structure.hydrogens import HydrogenBuilder, NUM_COORDS_PER_RES_W_HYDROGENS
+from sidechainnet.structure.HydrogenBuilder import HydrogenBuilder, NUM_COORDS_PER_RES_W_HYDROGENS
 
 
 

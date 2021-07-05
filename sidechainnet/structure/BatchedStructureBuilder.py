@@ -1,11 +1,10 @@
 """A convenience class for generating multiple protein structures simultaneously."""
 
 import numpy as np
-
-from sidechainnet.dataloaders.collate import pad_for_batch
-from sidechainnet.utils.sequence import VOCAB
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 import sidechainnet as scn
+from sidechainnet.dataloaders.collate import pad_for_batch
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.utils.sequence import VOCAB
 
 
 class BatchedStructureBuilder(object):
