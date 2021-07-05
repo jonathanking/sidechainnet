@@ -1,7 +1,8 @@
 """Methods for adding hydrogen atoms to amino acid residues."""
+import math
+
 import numpy as np
 import torch
-from scipy.linalg import expm
 from sidechainnet.structure.build_info import SC_BUILD_INFO
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
@@ -58,14 +59,19 @@ class HydrogenBuilder(object):
 
         self.seq = seq
         self.coords = coords
-        self.mode = "numpy"
+        self.mode = "torch" if isinstance(coords, torch.Tensor) else "numpy"
+        self.is_numpy = self.mode == "numpy"
         self.atom_map = ATOM_MAP_14
 
-        self.norm = np.linalg.norm if self.mode == "numpy" else torch.norm
-        self.cross = np.cross if self.mode == "numpy" else torch.cross
-        self.dot = np.dot if self.mode == "numpy" else torch.matmul
-        self.eye = np.eye if self.mode == "numpy" else torch.eye
-        self.ones = np.ones if self.mode == "numpy" else torch.ones
+        self.norm = np.linalg.norm if self.is_numpy else torch.norm
+        self.cross = np.cross if self.is_numpy else torch.cross
+        self.dot = np.dot if self.is_numpy else torch.matmul
+        self.eye = np.eye if self.is_numpy else torch.eye
+        self.ones = np.ones if self.is_numpy else torch.ones
+        self.sqrt = math.sqrt if self.is_numpy else torch.sqrt
+        self.stack = np.stack if self.is_numpy else torch.stack
+        self.array = np.asarray if self.is_numpy else torch.tensor
+        self.concatenate = np.concatenate if self.is_numpy else torch.cat
 
     # Utility functions
     def M(self, axis, theta):
@@ -73,11 +79,14 @@ class HydrogenBuilder(object):
 
         From https://stackoverflow.com/questions/6802577/rotation-of-3d-vector.
         """
-        # TODO find torch expm fn
-        m = expm(self.cross(self.eye(3), axis / self.norm(axis) * theta))
-        if self.mode == "numpy":
-            return m
-        return torch.tensor(m)
+        axis = axis / self.sqrt(self.dot(axis, axis))
+        a = np.cos(theta / 2.0)
+        b, c, d = -axis * np.sin(theta / 2.0)
+        aa, bb, cc, dd = a * a, b * b, c * c, d * d
+        bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+        return self.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                           [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                           [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
 
     def scale(self, vector, target_len, v_len=None):
         """Scale a vector to match a given target length."""
@@ -106,8 +115,7 @@ class HydrogenBuilder(object):
 
         # Define perpendicular vector
         PV = self.cross(CB, N)
-        R109 = self.M(PV,
-                      np.deg2rad(METHYL_ANGLE))  # Rotate around PV by 109.5 (tetrahedral)
+        R109 = self.M(PV, np.deg2rad(METHYL_ANGLE))  # Rotate abt PV by 109.5 (tetrahed.)
 
         # Define Hydrogen extending from carbon
         H1 = self.dot(R109, -CB)  # Place Hydrogen by rotating C along perpendicular axis
@@ -172,9 +180,10 @@ class HydrogenBuilder(object):
         PV = self.cross(OS, P2)
 
         # Define rotation matrices
-        RP = self.M(PV, np.pi -
-                    np.deg2rad(THIOL_ANGLE))  # Rotate around PV by 109.5 (tetrahedral)
-        RQ = self.M(OS, np.pi / 2)  # Rotate around thiol axis by 1/4 turn
+        # Rotate around PV by 109.5 (tetrahedral)
+        RP = self.M(PV, np.pi - np.deg2rad(THIOL_ANGLE))
+        # Rotate around thiol axis by 1/4 turn
+        RQ = self.M(OS, np.pi / 2)
 
         # Define Hydrogens
         H1 = self.dot(RQ, self.dot(RP, OS))  # Place Hydrogen by rotating OS vec twice
@@ -230,8 +239,8 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB1, HB2, HB3]
         """
-        hs = self.get_methyl_hydrogens(carbon=c.CB, prev1=c.CA,
-                                       prev2=c.N)  # HB1, HB2, HB3
+        # HB1, HB2, HB3
+        hs = self.get_methyl_hydrogens(carbon=c.CB, prev1=c.CA, prev2=c.N)
         return hs
 
     def arg(self, c):
@@ -398,7 +407,7 @@ class HydrogenBuilder(object):
         pass
 
     def get_hydrogens_for_res(self, resname, c, prevc):
-        """Return a padded list of hydrogens for a given res name & atom coord tuple."""
+        """Return a padded array of hydrogens for a given res name & atom coord tuple."""
         # All amino acids have an amide-hydrogen along the backbone
         # TODO Support terminal NH3 instead of None check
         hs = []
@@ -450,7 +459,7 @@ class HydrogenBuilder(object):
         elif resname == "V":
             hs.extend(self.val(c))
 
-        return self.pad_hydrogens(resname, hs)
+        return self.stack(self.pad_hydrogens(resname, hs), 0)
 
 
 ATOM_MAP_24 = {}
