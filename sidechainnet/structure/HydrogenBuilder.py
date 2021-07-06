@@ -33,10 +33,10 @@ HYDROGEN_NAMES = {
     'ASN': ['H', 'HA', 'HB2', 'HB3', 'HD21', 'HD22'],
     'ASP': ['H', 'HA', 'HB2', 'HB3'],
     'CYS': ['H', 'HA', 'HB2', 'HB3', 'HG'],
-    'GLN': ['H', 'HA', 'HB2', 'HB3', 'HE21', 'HE22', 'HG2', 'HG3'],
+    'GLN': ['H', 'HA', 'HB2', 'HB3', 'HG2', 'HG3', 'HE21', 'HE22'],
     'GLU': ['H', 'HA', 'HB2', 'HB3', 'HG2', 'HG3'],
     'GLY': ['H', 'HA2', 'HA3'],
-    'HIS': ['H', 'HA', 'HB2', 'HB3', 'HD2', 'HE1'],
+    'HIS': ['H', 'HA', 'HB2', 'HB3', 'HE1', 'HD2', 'HD1'],  # CB, CB, CE1, CD2, ND1/HE1
     'ILE': ['H', 'HA', 'HB', 'HD11', 'HD12', 'HD13', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23'],
     'LEU': ['H', 'HA', 'HB2', 'HB3', 'HD11', 'HD12', 'HD13', 'HD21', 'HD22', 'HD23', 'HG'],
     'LYS': ['H', 'HA', 'HB2', 'HB3', 'HD2', 'HD3', 'HE2', 'HE3', 'HG2', 'HG3', 'HZ1', 'HZ2', 'HZ3'],
@@ -53,8 +53,16 @@ HYDROGEN_NAMES = {
 
 
 class HydrogenBuilder(object):
+    """A class for adding Hydrogen positions to set of coordinates."""
 
     def __init__(self, seq, coords):
+        """Create a Hydrogen builder for a protein.
+
+        Args:
+            seq (str): Protein sequence.
+            coords (numpy.ndarray, torch.tensor): Coordinate set for a protein that does
+                not yet contain Hydrogens.
+        """
         from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 
         self.seq = seq
@@ -108,7 +116,6 @@ class HydrogenBuilder(object):
 
         Ex: Alanine: carbon, prev1, prev2 are CB, CA, N.
         """
-        # TODO move to class - remove global variable; easier switch; save states
         # Define local vectors extending from CA
         N = prev2 - prev1
         CB = carbon - prev1
@@ -256,7 +263,7 @@ class HydrogenBuilder(object):
             hs.extend(self.get_methylene_hydrogens(R1, carbon, R2))
         # Amide hydrogen: HE
         hs.append(self.get_amide_methine_hydrogen(c.CD, c.NE, c.CZ, amide=True))
-        # Amide hydrogens: [HH11, HH12, HH21, HH22]
+        # Amine hydrogens: [HH11, HH12, HH21, HH22]
         hs.extend(self.get_amine_hydrogens(c.NH1, c.CZ, c.NE))
         hs.extend(self.get_amine_hydrogens(c.NH2, c.CZ, c.NE))
 
@@ -268,7 +275,12 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HD21, HD22]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Amine: [HD21, HD22]
+        hs.extend(self.get_amine_hydrogens(c.ND2, c.CG, c.CB))
+        return hs
 
     def asp(self, c):
         """Return list of hydrogen positions for asp.
@@ -276,7 +288,10 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        return hs
 
     def cys(self, c):
         """Return list of hydrogen positions for cys.
@@ -284,15 +299,27 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HG]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.SG))
+        # Thiol: HG
+        hs.append(self.get_thiol_hydrogen(c.SG, c.CB, c.CA))
+        return hs
 
     def gln(self, c):
         """Return list of hydrogen positions for gln.
 
         Positions correspond to the following hydrogens:
-            [HB2, HB3, HE21, HE22, HG2, HG3]
+            ['HB2', 'HB3', 'HG2', 'HG3', 'HE21', 'HE22']
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methylene: [HG2, HG3]
+        hs.extend(self.get_methylene_hydrogens(c.CB, c.CG, c.CD))
+        # Amine: [HE21, HE22]
+        hs.extend(self.get_amine_hydrogens(c.NE2, c.CD, c.CG))
+        return hs
 
     def glu(self, c):
         """Return list of hydrogen positions for glu.
@@ -300,23 +327,36 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HG2, HG3]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methylene: [HG2, HG3]
+        hs.extend(self.get_methylene_hydrogens(c.CB, c.CG, c.CD))
+        return hs
 
     def gly(self, c):
         """Return list of hydrogen positions for gly.
 
         Positions correspond to the following hydrogens:
-            [H, HA2, HA3]
+            [HA2, HA3]
         """
-        pass
+        return self.get_methylene_hydrogens(c.N, c.CA, c.C)
 
     def his(self, c):
         """Return list of hydrogen positions for his.
 
         Positions correspond to the following hydrogens:
-            [HB2, HB3, HD2, HE1]
+            [HB2, HB3, HE1, HD2, HD1] # CB, CB, CE1, CD2, (ND1/HD1)
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methine x2: [HE1, HD2]
+        hs.append(self.get_amide_methine_hydrogen(c.ND1, c.CE1, c.NE2, amide=False))
+        hs.append(self.get_amide_methine_hydrogen(c.CG, c.CD2, c.NE2, amide=False))
+        # Amide: [HD1]
+        hs.append(self.get_amide_methine_hydrogen(c.CG, c.ND1, c.CE1, amide=True))
+        return hs
 
     def ile(self, c):
         """Return list of hydrogen positions for ile.
@@ -324,7 +364,16 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB, HD11, HD12, HD13, HG12, HG13, HG21, HG22, HG23]
         """
-        pass
+        hs = []
+        # HB
+        hs.append(self.get_single_sp3_hydrogen(c.CB, c.CA, c.CG1, c.CG2))
+        # HD11, HD12, HD13
+        hs.extend(self.get_methyl_hydrogens(c.CD1, c.CG1, c.CB))
+        # Methylene: HG12, HG13
+        hs.extend(self.get_methylene_hydrogens(c.CB, c.CG1, c.CD1))
+        # Methyl: HG21, HG22, HG23
+        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA))
+        return hs
 
     def leu(self, c):
         """Return list of hydrogen positions for leu.
@@ -332,7 +381,16 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HD11, HD12, HD13, HD21, HD22, HD23, HG]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methyl: HD11, HD12, HD13
+        hs.extend(self.get_methyl_hydrogens(c.CD1, c.CG, c.CB))
+        # Methyl: HD21, HD22, HD23
+        hs.extend(self.get_methyl_hydrogens(c.CD2, c.CG, c.CB))
+        # SP3: HG
+        hs.append(self.get_single_sp3_hydrogen(c.CG, c.CB, c.CD1, c.CD2))
+        return hs
 
     def lys(self, c):
         """Return list of hydrogen positions for lys.
@@ -340,7 +398,14 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HD2, HD3, HE2, HE3, HG2, HG3, HZ1, HZ2, HZ3]
         """
-        pass
+        hs = []
+        # Methylene x4: [HB2, HB3], [HD2, HD3], [HE2, HE3], [HG2, HG3] ie (CB, CD, CE, CG)
+        for r1, carbon, r2 in ((c.CA, c.CB, c.CG), (c.CG, c.CD, c.CE), (c.CD, c.CE, c.NZ),
+                               (c.CB, c.CG, c.CD)):
+            hs.extend(self.get_methylene_hydrogens(r1, carbon, r2))
+        # NH3: HZ1, HZ2, HZ3
+        hs.extend(self.get_methyl_hydrogens(c.NZ, c.CE, c.CD))
+        return hs
 
     def met(self, c):
         """Return list of hydrogen positions for met.
@@ -348,7 +413,14 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HE1, HE2, HE3, HG2, HG3]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methyl: HE1, HE2, HE3
+        hs.extend(self.get_methyl_hydrogens(c.CE, c.SD, c.CG))
+        # Methylene: HG2, HG3
+        hs.extend(self.get_methylene_hydrogens(c.CB, c.CG, c.SD))
+        return hs
 
     def phe(self, c):
         """Return list of hydrogen positions for phe.
@@ -356,15 +428,28 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HD1, HD2, HE1, HE2, HZ]
         """
-        pass
+        hs = []
+        # Methylene: HB2, HB3
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methine x 5: HD1, HD2, HE1, HE2, HZ
+        for r1, center, r2 in ((c.CG, c.CD1, c.CE1), (c.CG, c.CD2, c.CE2),
+                               (c.CD1, c.CE1, c.CZ), (c.CD2, c.CE2, c.CZ), (c.CE1, c.CZ,
+                                                                            c.CE2)):
+            hs.append(self.get_amide_methine_hydrogen(r1, center, r2, amide=False))
+        return hs
 
     def pro(self, c):
         """Return list of hydrogen positions for pro.
 
         Positions correspond to the following hydrogens:
-            [HA, HB2, HB3, HD2, HD3, HG2, HG3]
+            [HB2, HB3, HD2, HD3, HG2, HG3]
         """
-        pass
+        hs = []
+        # Methylene x6: [HB2, HB3], [HD2, HD3], [HG2, HG3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        hs.extend(self.get_methylene_hydrogens(c.N, c.CD, c.CG))
+        hs.extend(self.get_methylene_hydrogens(c.CD, c.CG, c.CB))
+        return hs
 
     def ser(self, c):
         """Return list of hydrogen positions for ser.
@@ -372,7 +457,12 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HG]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.OG))
+        # Hydroxyl: HG
+        hs.append(self.get_thiol_hydrogen(c.OG, c.CB, c.CA))
+        return hs
 
     def thr(self, c):
         """Return list of hydrogen positions for thr.
@@ -380,7 +470,14 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB, HG1, HG21, HG22, HG23]
         """
-        pass
+        hs = []
+        # SP3: HB
+        hs.append(self.get_single_sp3_hydrogen(c.CB, c.CA, c.OG1, c.CG2))
+        # Hydroxyl: HG1
+        hs.append(self.get_thiol_hydrogen(c.OG1, c.CB, c.CA))
+        # Methyl: HG21, HG22, HG23
+        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA))
+        return hs
 
     def trp(self, c):
         """Return list of hydrogen positions for trp.
@@ -388,7 +485,22 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HD1, HE1, HE3, HH2, HZ2, HZ3]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methine: HD1
+        hs.append(self.get_amide_methine_hydrogen(c.CG, c.CD1, c.NE1, amide=False))
+        # Amide/methine: HE1
+        hs.append(self.get_amide_methine_hydrogen(c.CD1, c.NE1, c.CE2, amide=True))
+        # Methine: HE3
+        hs.append(self.get_amide_methine_hydrogen(c.CD2, c.CE3, c.CZ3, amide=False))
+        # Methine: HH2
+        hs.append(self.get_amide_methine_hydrogen(c.CZ3, c.CH2, c.CZ2, amide=False))
+        # Methine HZ2
+        hs.append(self.get_amide_methine_hydrogen(c.CE2, c.CZ2, c.CH2, amide=False))
+        # Methine: HZ3
+        hs.append(self.get_amide_methine_hydrogen(c.CE3, c.CZ3, c.CH2, amide=False))
+        return hs
 
     def tyr(self, c):
         """Return list of hydrogen positions for tyr.
@@ -396,7 +508,17 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB2, HB3, HD1, HD2, HE1, HE2, HH]
         """
-        pass
+        hs = []
+        # Methylene: [HB2, HB3]
+        hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
+        # Methine x4: HD1, HD2, HE1, HE2
+        hs.append(self.get_amide_methine_hydrogen(c.CG, c.CD1, c.CE1, amide=False))
+        hs.append(self.get_amide_methine_hydrogen(c.CG, c.CD2, c.CE2, amide=False))
+        hs.append(self.get_amide_methine_hydrogen(c.CD1, c.CE1, c.CZ, amide=False))
+        hs.append(self.get_amide_methine_hydrogen(c.CD2, c.CE2, c.CZ, amide=False))
+        # Hydroxyl: HH
+        hs.append(self.get_thiol_hydrogen(c.OH, c.CZ, c.CE1))
+        return hs
 
     def val(self, c):
         """Return list of hydrogen positions for val.
@@ -404,14 +526,20 @@ class HydrogenBuilder(object):
         Positions correspond to the following hydrogens:
             [HB, HG11, HG12, HG13, HG21, HG22, HG23]
         """
-        pass
+        hs = []
+        # SP3: HB
+        hs.append(self.get_single_sp3_hydrogen(c.CB, c.CA, c.CG1, c.CG2))
+        # Methyl  x2: [HG11, HG12, HG13], [HG21, HG22, HG23]
+        hs.extend(self.get_methyl_hydrogens(c.CG1, c.CB, c.CA))
+        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA))
+        return hs
 
     def get_hydrogens_for_res(self, resname, c, prevc):
         """Return a padded array of hydrogens for a given res name & atom coord tuple."""
-        # All amino acids have an amide-hydrogen along the backbone
+        # All amino acids except proline have an amide-hydrogen along the backbone
         # TODO Support terminal NH3 instead of None check
         hs = []
-        if prevc:
+        if prevc and resname != "P":
             hs.append(self.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
         # If the amino acid is not Glycine, we can add an sp3-hybridized H to CA
         if resname != "G":
