@@ -12,19 +12,20 @@ NUM_COORDS_PER_RES_W_HYDROGENS = 24
 METHYL_ANGLE = 109.5
 METHYL_LEN = 1.09
 
-METHYLENE_ANGLE = np.rad2deg(0.61656)
+METHYLENE_ANGLE = np.rad2deg(0.61656)  # Check - works
 METHYLENE_LEN = 1.09
 
 SP3_LEN = 1.09
 
 THIOL_ANGLE = 109.5
-THIOL_LEN = 1.09
+THIOL_LEN = 1.336
+HYDROXYL_LEN = 0.96
 
-AMIDE_LEN = 1.09
-METHINE_LEN = 1.09
+AMIDE_LEN = 1.01  # Backbone
+METHINE_LEN = 1.08
 
-AMINE_ANGLE = 2 * np.pi / 3
-AMINE_LEN = 1.09
+AMINE_ANGLE = np.deg2rad(120)
+AMINE_LEN = 1.01
 
 # yapf: disable
 HYDROGEN_NAMES = {
@@ -178,7 +179,12 @@ class HydrogenBuilder(object):
         H1 = self.scale(-(R1 + R2 + R3 - (3 * center)), target_len=SP3_LEN)
         return H1 + center
 
-    def get_thiol_hydrogen(self, oxy_sulfur, prev1, prev2):
+    def get_thiol_hydrogen(self, oxy_sulfur, prev1, prev2, thiol=True):
+        if thiol:
+            length = THIOL_LEN
+        else:
+            length = HYDROXYL_LEN
+
         # Define local vectors
         OS = oxy_sulfur - prev1
         P2 = prev2 - prev1
@@ -189,12 +195,10 @@ class HydrogenBuilder(object):
         # Define rotation matrices
         # Rotate around PV by 109.5 (tetrahedral)
         RP = self.M(PV, np.pi - np.deg2rad(THIOL_ANGLE))
-        # Rotate around thiol axis by 1/4 turn
-        RQ = self.M(OS, np.pi / 2)
 
         # Define Hydrogens
-        H1 = self.dot(RQ, self.dot(RP, OS))  # Place Hydrogen by rotating OS vec twice
-        H1 = self.scale(H1, THIOL_LEN)
+        H1 = self.dot(RP, OS)  # Rotate by tetrahedral angle only
+        H1 = self.scale(H1, length)
         H1 += OS
 
         return H1 + prev1
@@ -258,8 +262,11 @@ class HydrogenBuilder(object):
         """
         hs = []
         # Methylene hydrogens: [HB2, HB3, HD2, HD3, HG2, HG3]
-        for R1, carbon, R2 in [(c.CA, c.CB, c.CG), (c.CB, c.CG, c.CD),
-                               (c.CG, c.CD, c.NE)]:
+        for R1, carbon, R2 in [
+            (c.CA, c.CB, c.CG),
+            (c.CG, c.CD, c.NE),
+            (c.CB, c.CG, c.CD),
+        ]:
             hs.extend(self.get_methylene_hydrogens(R1, carbon, R2))
         # Amide hydrogen: HE
         hs.append(self.get_amide_methine_hydrogen(c.CD, c.NE, c.CZ, amide=True))
@@ -461,7 +468,7 @@ class HydrogenBuilder(object):
         # Methylene: [HB2, HB3]
         hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.OG))
         # Hydroxyl: HG
-        hs.append(self.get_thiol_hydrogen(c.OG, c.CB, c.CA))
+        hs.append(self.get_thiol_hydrogen(c.OG, c.CB, c.CA, thiol=False))
         return hs
 
     def thr(self, c):
@@ -474,7 +481,7 @@ class HydrogenBuilder(object):
         # SP3: HB
         hs.append(self.get_single_sp3_hydrogen(c.CB, c.CA, c.OG1, c.CG2))
         # Hydroxyl: HG1
-        hs.append(self.get_thiol_hydrogen(c.OG1, c.CB, c.CA))
+        hs.append(self.get_thiol_hydrogen(c.OG1, c.CB, c.CA, thiol=False))
         # Methyl: HG21, HG22, HG23
         hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA))
         return hs
@@ -517,7 +524,7 @@ class HydrogenBuilder(object):
         hs.append(self.get_amide_methine_hydrogen(c.CD1, c.CE1, c.CZ, amide=False))
         hs.append(self.get_amide_methine_hydrogen(c.CD2, c.CE2, c.CZ, amide=False))
         # Hydroxyl: HH
-        hs.append(self.get_thiol_hydrogen(c.OH, c.CZ, c.CE1))
+        hs.append(self.get_thiol_hydrogen(c.OH, c.CZ, c.CE1, thiol=False))
         return hs
 
     def val(self, c):
@@ -539,6 +546,10 @@ class HydrogenBuilder(object):
         # All amino acids except proline have an amide-hydrogen along the backbone
         # TODO Support terminal NH3 instead of None check
         hs = []
+        if not prevc:
+            self.n_terminal_hs = self.get_methyl_hydrogens(c.N, c.CA, c.C)
+            # TODO Remove temporary addition
+            hs.append(self.n_terminal_hs[0])
         if prevc and resname != "P":
             hs.append(self.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
         # If the amino acid is not Glycine, we can add an sp3-hybridized H to CA
