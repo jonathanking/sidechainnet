@@ -37,9 +37,10 @@ class PdbBuilder(object):
         if coords.shape[0] % atoms_per_res != 0:
             raise AssertionError(f"Coords is not divisible by {atoms_per_res}. "
                                  f"{coords.shape}")
-        if atoms_per_res not in (14, 24):
+        if atoms_per_res not in (NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS):
             raise ValueError(
-                "Values for atoms_per_res other than 14/24 are currently not supported.")
+                f"Values for atoms_per_res other than {NUM_COORDS_PER_RES}"
+                f"/{NUM_COORDS_PER_RES_W_HYDROGENS} are currently not supported.")
 
         self.atoms_per_res = atoms_per_res
         self.has_hydrogens = self.atoms_per_res == NUM_COORDS_PER_RES_W_HYDROGENS

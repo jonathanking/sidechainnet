@@ -236,6 +236,7 @@ class SCNProtein(object):
 
     def get_energy_difference(self):
         """Create PDBFixer object, minimize, and report ∆E."""
+        self.add_hydrogens()
         self.make_pdbfixer()
         self.run_pdbfixer()
         return self.minimize_pdbfixer()
