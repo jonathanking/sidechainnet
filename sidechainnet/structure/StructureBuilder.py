@@ -258,7 +258,7 @@ class StructureBuilder(object):
             style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
 
         view = py3Dmol.view(**kwargs)
-        view.addModel(self.to_pdbstr(), 'pdb')
+        view.addModel(self.to_pdbstr(), 'pdb', {'keepH': True})
         if style:
             view.setStyle(style)
         view.zoomTo()
