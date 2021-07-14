@@ -11,7 +11,6 @@ from sidechainnet.structure.structure import coord_generator, nerf
 from sidechainnet.structure.HydrogenBuilder import HydrogenBuilder, NUM_COORDS_PER_RES_W_HYDROGENS
 
 
-
 class StructureBuilder(object):
     """Reconstruct a protein's structure given its sequence and angles or coordinates.
 
@@ -105,6 +104,7 @@ class StructureBuilder(object):
         self.nerf_method = nerf_method
         self.has_hydrogens = False
         self.atoms_per_res = NUM_COORDS_PER_RES
+        self.terminal_atoms = None
 
     def __len__(self):
         """Return length of the protein sequence.
@@ -183,35 +183,24 @@ class StructureBuilder(object):
             from sidechainnet.structure.PdbBuilder import PdbBuilder
             if self.data_type == 'numpy':
                 self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords,
-                                              self.atoms_per_res)
+                                              self.atoms_per_res,
+                                              terminal_atoms=self.terminal_atoms)
             else:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
                                               self.coords.detach().numpy(),
-                                              self.atoms_per_res)
+                                              self.atoms_per_res,
+                                              terminal_atoms=self.terminal_atoms)
 
     def add_hydrogens(self):
         """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
-        from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
         if self.coords is None or not len(self.coords):
             raise ValueError("Cannot add hydrogens to a structure whose heavy atoms have"
                              " not yet been built.")
         self.hb = HydrogenBuilder(self.seq_as_str, self.coords)
-        coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True)
-        new_coords = []
-        prev_res_atoms = None
-        for aa, crd in zip(self.seq_as_str, coords):
-            # Create an organized mapping from atom name to Catesian coordinates
-            d = {name: xyz for (name, xyz) in zip(ATOM_MAP_14[aa], crd)}
-            atoms = namedtuple("Atoms", d)(**d)  # Name -> crd
-            # Generate hydrogen positions
-            hydrogen_positions = self.hb.get_hydrogens_for_res(aa, atoms, prev_res_atoms)  # array/tensor
-            # Append Hydrogens immediately after heavy atoms, followed by PADs to L=24
-            new_coords.append(self.hb.concatenate((crd, hydrogen_positions)))
-            prev_res_atoms = atoms
-        new_coords = self.hb.concatenate(new_coords)
-        self.coords = new_coords
+        self.coords = self.hb.build_hydrogens()
         self.has_hydrogens = True
         self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS
+        self.terminal_atoms = self.hb.terminal_atoms
 
     def to_pdb(self, path, title="pred"):
         """Save protein structure as a PDB file to given path.

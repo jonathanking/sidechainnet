@@ -1,9 +1,11 @@
 """Methods for adding hydrogen atoms to amino acid residues."""
+from collections import namedtuple
 import math
+from sidechainnet.structure.structure import coord_generator
 
 import numpy as np
 import torch
-from sidechainnet.structure.build_info import SC_BUILD_INFO
+from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
@@ -26,6 +28,8 @@ METHINE_LEN = 1.08
 
 AMINE_ANGLE = np.deg2rad(120)
 AMINE_LEN = 1.01
+
+OXT_LEN = BB_BUILD_INFO['BONDLENS']['c-oh']
 
 # yapf: disable
 HYDROGEN_NAMES = {
@@ -71,6 +75,7 @@ class HydrogenBuilder(object):
         self.mode = "torch" if isinstance(coords, torch.Tensor) else "numpy"
         self.is_numpy = self.mode == "numpy"
         self.atom_map = ATOM_MAP_14
+        self.terminal_atoms = {"H2": None, "H3": None, "OXT": None}
 
         self.norm = np.linalg.norm if self.is_numpy else torch.norm
         self.cross = np.cross if self.is_numpy else torch.cross
@@ -81,6 +86,29 @@ class HydrogenBuilder(object):
         self.stack = np.stack if self.is_numpy else torch.stack
         self.array = np.asarray if self.is_numpy else torch.tensor
         self.concatenate = np.concatenate if self.is_numpy else torch.cat
+
+    def build_hydrogens(self):
+        """Add hydrogens to internal protein structure."""
+        # TODO assumes only one continuous chain (and 1 set of N & C terminals)
+        coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True)
+        new_coords = []
+        prev_res_atoms = None
+        for i, (aa, crd) in enumerate(zip(self.seq, coords)):
+            # Create an organized mapping from atom name to Catesian coordinates
+            d = {name: xyz for (name, xyz) in zip(self.atom_map[aa], crd)}
+            atoms = namedtuple("Atoms", d)(**d)  # Name -> crd
+            # Generate hydrogen positions as array/tensor
+            hydrogen_positions = self.get_hydrogens_for_res(
+                aa,
+                atoms,
+                prev_res_atoms,
+                n_terminal=i == 0,
+                c_terminal=i == len(self.seq) - 1)
+            # Append Hydrogens immediately after heavy atoms, followed by PADs to L=26
+            new_coords.append(self.concatenate((crd, hydrogen_positions)))
+            prev_res_atoms = atoms
+        self.reduced_coords = self.concatenate(new_coords)
+        return self.reduced_coords
 
     # Utility functions
     def M(self, axis, theta):
@@ -112,11 +140,13 @@ class HydrogenBuilder(object):
     #    5. Methine/Amide  (C=CH1-C, C-NH1-C)
     #    6. Amine          (H2)
 
-    def get_methyl_hydrogens(self, carbon, prev1, prev2):
-        """Place methyl (H3) hydrogens on a Carbon atom.
+    def get_methyl_hydrogens(self, carbon, prev1, prev2, use_amine_length=False):
+        """Place methyl (H3) hydrogens on a Carbon atom. Also supports N-terminal amines.
 
         Ex: Alanine: carbon, prev1, prev2 are CB, CA, N.
         """
+        length = METHYL_LEN if not use_amine_length else AMINE_LEN
+
         # Define local vectors extending from CA
         N = prev2 - prev1
         CB = carbon - prev1
@@ -127,7 +157,7 @@ class HydrogenBuilder(object):
 
         # Define Hydrogen extending from carbon
         H1 = self.dot(R109, -CB)  # Place Hydrogen by rotating C along perpendicular axis
-        H1 = self.scale(H1, METHYL_LEN)
+        H1 = self.scale(H1, length)
 
         R120 = self.M(CB, 2 * np.pi / 3)
         H2 = self.dot(R120, H1)  # Place 2nd Hydrogen by rotating previous H 120 deg
@@ -203,8 +233,10 @@ class HydrogenBuilder(object):
 
         return H1 + prev1
 
-    def get_amide_methine_hydrogen(self, R1, center, R2, amide=True):
+    def get_amide_methine_hydrogen(self, R1, center, R2, amide=True, oxt=False):
+        """Create a planar methine/amide hydrogen (or OXT) given two adjacent atoms."""
         length = AMIDE_LEN if amide else METHINE_LEN
+        length = OXT_LEN if oxt else length
 
         # Define local vectors
         A, B, C = (v - center for v in (R1, center, R2))
@@ -541,21 +573,30 @@ class HydrogenBuilder(object):
         hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA))
         return hs
 
-    def get_hydrogens_for_res(self, resname, c, prevc):
+    def get_hydrogens_for_res(self,
+                              resname,
+                              c,
+                              prevc,
+                              n_terminal=False,
+                              c_terminal=False):
         """Return a padded array of hydrogens for a given res name & atom coord tuple."""
-        # All amino acids except proline have an amide-hydrogen along the backbone
-        # TODO Support terminal NH3 instead of None check
         hs = []
-        if not prevc:
-            self.n_terminal_hs = self.get_methyl_hydrogens(c.N, c.CA, c.C)
-            # TODO Remove temporary addition
-            hs.append(self.n_terminal_hs[0])
+        # Special Cases
+        if n_terminal:
+            h, h2, h3 = self.get_methyl_hydrogens(c.N, c.CA, c.C, use_amine_length=True)
+            self.terminal_atoms.update({"H2": h2, "H3": h3})
+            hs.append(h)  # Used as normal amine hydrogen, H
+        if c_terminal:
+            oxt = self.get_amide_methine_hydrogen(c.CA, c.C, c.O, oxt=True)
+            self.terminal_atoms.update({"OXT": oxt})
+        # All amino acids except proline have an amide-hydrogen along the backbone
         if prevc and resname != "P":
             hs.append(self.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
         # If the amino acid is not Glycine, we can add an sp3-hybridized H to CA
         if resname != "G":
             cah = self.get_single_sp3_hydrogen(center=c.CA, R1=c.N, R2=c.C, R3=c.CB)
             hs.append(cah)
+
         # Now, we can add the remaining unique hydrogens for each amino acid
         if resname == "A":
             hs.extend(self.ala(c))

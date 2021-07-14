@@ -18,7 +18,11 @@ class PdbBuilder(object):
     The Python format string was taken from http://cupnet.net/pdb-format/.
     """
 
-    def __init__(self, seq, coords, atoms_per_res=NUM_COORDS_PER_RES):
+    def __init__(self,
+                 seq,
+                 coords,
+                 atoms_per_res=NUM_COORDS_PER_RES,
+                 terminal_atoms=None):
         """Initialize a PdbBuilder.
 
         Args:
@@ -28,6 +32,8 @@ class PdbBuilder(object):
                 per amino acid.
             atoms_per_res: The number of atoms recorded per residue. This must be the
                 same for every residue.
+            terminal_atoms: Python dictionary mapping "H2", "H3", and "OXT" atom names to
+                their positions in the structure.
         """
         if len(seq) != coords.shape[0] / atoms_per_res:
             raise ValueError(
@@ -47,6 +53,7 @@ class PdbBuilder(object):
         self.coords = coords
         self.seq = seq
         self.mapping = self._make_mapping_from_seq()
+        self.terminal_atoms = terminal_atoms
 
         # PDB Formatting Information
         self.format_str = ("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}"
@@ -88,7 +95,12 @@ class PdbBuilder(object):
             atom_coords[2], occupancy, self.defaults["temp_factor"], atom_name[0],
             self.defaults["charge"])
 
-    def _get_lines_for_residue(self, res_name, atom_names, coords):
+    def _get_lines_for_residue(self,
+                               res_name,
+                               atom_names,
+                               coords,
+                               n_terminal=False,
+                               c_terminal=False):
         """Return a list of PDB-formatted lines for all atoms in a single residue.
 
         Calls get_line_for_atom.
@@ -100,6 +112,18 @@ class PdbBuilder(object):
                 continue
             residue_lines.append(self._get_line_for_atom(res_name, atom_name, atom_coord))
             self.atom_nbr += 1
+
+        # Add Terminal Atoms (Must be provided in terminal_atoms dict; Hs must be built)
+        if n_terminal and self.terminal_atoms:
+            residue_lines.append(
+                self._get_line_for_atom(res_name, "H2", self.terminal_atoms["H2"]))
+            residue_lines.append(
+                self._get_line_for_atom(res_name, "H3", self.terminal_atoms["H3"]))
+            self.atom_nbr += 2
+        if c_terminal and self.terminal_atoms:
+            residue_lines.append(
+                self._get_line_for_atom(res_name, "OXT", self.terminal_atoms["OXT"]))
+
         return residue_lines
 
     def _get_lines_for_protein(self):
@@ -111,9 +135,14 @@ class PdbBuilder(object):
         self.res_nbr = 1
         self.atom_nbr = 1
         mapping_coords = zip(self.mapping, self._coord_generator())
-        for (res_name, atom_names), res_coords in mapping_coords:
+        for index, ((res_name, atom_names), res_coords) in enumerate(mapping_coords):
+            # TODO assumes only first/last residue have terminal atoms
             self._pdb_body_lines.extend(
-                self._get_lines_for_residue(res_name, atom_names, res_coords))
+                self._get_lines_for_residue(res_name,
+                                            atom_names,
+                                            res_coords,
+                                            n_terminal=index == 0,
+                                            c_terminal=index == len(self.seq) - 1))
             self.res_nbr += 1
         return self._pdb_body_lines
 

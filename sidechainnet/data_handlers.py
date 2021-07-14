@@ -126,6 +126,7 @@ class SCNProtein(object):
         self.split = kwargs['split']
         self.sb = None
         self.atoms_per_res = NUM_COORDS_PER_RES
+        self.openmm_initialized = False
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -155,6 +156,9 @@ class SCNProtein(object):
         """Return 3-letter amino acid sequence for the protein."""
         return " ".join([ONE_TO_THREE_LETTER_MAP[c] for c in self.seq])
 
+    def _Vec3(self, single_coord):
+        return Vec3(single_coord[0], single_coord[1], single_coord[2]) * angstroms
+
     def get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
         self.positions = []
@@ -173,25 +177,70 @@ class SCNProtein(object):
             else:
                 atom_names = hy.ATOM_MAP_24[residue_code]
             residue = self.topology.addResidue(name=residue_name, chain=chain)
-            for an, c in zip(atom_names, coords):
+            placed_terminal_h = False
+            placed_terminal_oxt = False
+            for j, (an, c) in enumerate(zip(atom_names, coords)):
+                # Handle N-terminal Hydrogens
+                if an == "PAD" and i == 0 and not placed_terminal_h:
+                    self.topology.addAtom(name="H2",
+                                          element=get_element_from_atomname("H2"),
+                                          residue=residue)
+                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H2"]))
+                    self.topology.addAtom(name="H3",
+                                          element=get_element_from_atomname("H3"),
+                                          residue=residue)
+                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H3"]))
+                    placed_terminal_h = True
+                    continue
+                # Handle C-terminal OXT
+                elif an == "PAD" and i == len(self.seq)-1 and not placed_terminal_oxt:
+                    self.topology.addAtom(name="OXT",
+                                          element=get_element_from_atomname("OXT"),
+                                          residue=residue)
+                    self.positions.append(self._Vec3(self.sb.terminal_atoms["OXT"]))
+                    placed_terminal_oxt = True
+                    continue
                 if an == "PAD":
                     continue
                 self.topology.addAtom(name=an,
                                       element=get_element_from_atomname(an),
                                       residue=residue)
-                pos = Vec3(c[0], c[1], c[2]) * angstroms
+                pos = self._Vec3(c)
                 self.positions.append(pos)
             self.openmm_seq += residue_code
         self.topology.createStandardBonds()
-        self.topology.createDisulfideBonds(self.positions)
+        # TODO think about disulfide bonds at a later point, see CYS/CYX (bridge, no H)
+        # self.topology.createDisulfideBonds(self.positions)
         return self.topology, self.positions
+
+    def initialize_openmm(self):
+        """Creates top., pos., modeller, forcefield, system, integrator, & simulation."""
+        self.get_openmm_repr()
+        self.modeller = Modeller(self.topology, self.positions)
+        self.forcefield = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+        self.system = self.forcefield.createSystem(self.modeller.topology,
+                                                   nonbondedMethod=openmm.app.NoCutoff,
+                                                   nonbondedCutoff=1 * nanometer,
+                                                   constraints=HBonds)
+        self.integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond,
+                                                   0.004 * picoseconds)
+        self.simulation = openmm.app.Simulation(self.modeller.topology, self.system,
+                                                self.integrator)
+        self.openmm_initialized = True
+
+    def get_energy(self):
+        if not self.openmm_initialized:
+            self.initialize_openmm()
+        self.simulation.context.setPositions(self.modeller.positions)
+        self.starting_state = self.simulation.context.getState(getEnergy=True,
+                                                               getForces=True)
+        self.starting_energy = self.starting_state.getPotentialEnergy()
 
     def make_pdbfixer(self):
         """Construct and return an OpenMM PDBFixer object for this protein."""
         from pdbfixer import PDBFixer
-        t, p = self.get_openmm_repr()
-        self.pdbfixer = PDBFixer(topology=t,
-                                 positions=p,
+        self.pdbfixer = PDBFixer(topology=self.topology,
+                                 positions=self.positions,
                                  sequence=self.openmm_seq,
                                  use_topology=True)
         return self.pdbfixer
@@ -200,20 +249,19 @@ class SCNProtein(object):
         """Add missing atoms to protein's PDBFixer representation."""
         self.pdbfixer.findMissingResidues()
         self.pdbfixer.findMissingAtoms()
-        # print("Missing atoms", self.pdbfixer.missingAtoms)
-        self.pdbfixer.findNonstandardResidues()
-        self.pdbfixer.addMissingAtoms()
-        self.pdbfixer.addMissingHydrogens(7.0)
+        print("Missing atoms", self.pdbfixer.missingAtoms)
+        # self.pdbfixer.findNonstandardResidues()
+        # self.pdbfixer.addMissingAtoms()
+        # self.pdbfixer.addMissingHydrogens(7.0)
 
-    def minimize_pdbfixer(self):
+    def minimize(self):
         """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
-        self.modeller = Modeller(self.pdbfixer.topology, self.pdbfixer.positions)
+        self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
         self.system = self.forcefield.createSystem(self.modeller.topology,
                                                    nonbondedMethod=openmm.app.NoCutoff,
                                                    nonbondedCutoff=1 * nanometer,
                                                    constraints=HBonds)
-        # self.modeller.addHydrogens(7.0)
         self.integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond,
                                                    0.004 * picoseconds)
         self.simulation = openmm.app.Simulation(self.modeller.topology, self.system,
@@ -237,9 +285,8 @@ class SCNProtein(object):
     def get_energy_difference(self):
         """Create PDBFixer object, minimize, and report ∆E."""
         self.add_hydrogens()
-        self.make_pdbfixer()
-        self.run_pdbfixer()
-        return self.minimize_pdbfixer()
+        self.topology, self.positions = self.get_openmm_repr()
+        return self.minimize()
 
     def get_rmsd_difference(self):
         """Report difference in start/end coordinates after energy minimization."""
@@ -248,9 +295,13 @@ class SCNProtein(object):
         rmsd = prody.calcRMSD(self.starting_positions, aligned_minimized)
         return rmsd
 
-    def add_hydrogens(self):
+    def add_hydrogens(self, from_angles=False):
         """Add hydrogens to the internal protein structure representation."""
-        self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
+        if from_angles:
+            self.sb = structure.StructureBuilder(self.seq, ang=self.angles)
+            self.sb.build()
+        else:
+            self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
         self.sb.add_hydrogens()
         self.coords = self.sb.coords
         self.has_hydrogens = True
