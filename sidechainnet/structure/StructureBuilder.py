@@ -298,7 +298,7 @@ class ResidueBuilder(object):
         self.bb = []
         self.sc = []
         self.coords = []
-        self.coordinate_padding = torch.zeros(3)
+        self.coordinate_padding = torch.zeros(3, requires_grad=True)
 
     @property
     def AA(self):
@@ -367,12 +367,12 @@ class ResidueBuilder(object):
 
         Placed in an arbitrary plane (z = .001).
         """
-        n = torch.tensor([0, 0, 0.001], device=self.device)
+        n = torch.tensor([0, 0, 0.001], device=self.device, requires_grad=True)
         ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0, 0],
-                              device=self.device)
+                              device=self.device, requires_grad=True)
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
         cy = torch.sin(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]['ca-c']
-        c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32)
+        c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32, requires_grad=True)
         o = nerf(
             n,
             ca,

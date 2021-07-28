@@ -1,6 +1,10 @@
+from collections import OrderedDict
+
 import numpy as np
 import openmm
 import prody
+import torch
+from build.lib.sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from openmm import Vec3
 from openmm.app import Topology
 from openmm.app import element as elem
@@ -127,6 +131,7 @@ class SCNProtein(object):
         self.sb = None
         self.atoms_per_res = NUM_COORDS_PER_RES
         self.openmm_initialized = False
+        self.hydrogen_coords = self.coords.copy()
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -135,7 +140,7 @@ class SCNProtein(object):
     def to_3Dmol(self):
         """Return an interactive visualization of the protein with py3DMol."""
         if self.sb is None:
-            self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+            self.sb = sidechainnet.StructureBuilder(self.seq, self.hydrogen_coords)
         return self.sb.to_3Dmol()
 
     def to_pdb(self, path, title=None):
@@ -143,7 +148,7 @@ class SCNProtein(object):
         if not title:
             title = self.id
         if self.sb is None:
-            self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+            self.sb = sidechainnet.StructureBuilder(self.seq, self.hydrogen_coords)
         return self.sb.to_pdb(path, title)
 
     @property
@@ -161,11 +166,15 @@ class SCNProtein(object):
 
     def get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
+        openmmidx = coordidx = 0
+        self.atommap14idx_to_openmmidx = {}
         self.positions = []
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        coord_gen = coord_generator(self.coords, self.atoms_per_res)
+        coord_gen = coord_generator(self.hydrogen_coords, self.atoms_per_res)
+        placed_terminal_h = False
+        placed_terminal_oxt = False
         for i, (residue_code, coords,
                 mask_char) in enumerate(zip(self.seq, coord_gen, self.mask)):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
@@ -177,8 +186,12 @@ class SCNProtein(object):
             else:
                 atom_names = hy.ATOM_MAP_24[residue_code]
             residue = self.topology.addResidue(name=residue_name, chain=chain)
-            placed_terminal_h = False
-            placed_terminal_oxt = False
+            # Rectify coordinate 14 mapping index to account for padded atoms
+            if i > 0:
+                coordidx -= 1
+                prev_residue_num_atoms = coordidx % NUM_COORDS_PER_RES
+                if prev_residue_num_atoms != 0:
+                    coordidx += NUM_COORDS_PER_RES - prev_residue_num_atoms
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 # Handle N-terminal Hydrogens
                 if an == "PAD" and i == 0 and not placed_terminal_h:
@@ -186,32 +199,74 @@ class SCNProtein(object):
                                           element=get_element_from_atomname("H2"),
                                           residue=residue)
                     self.positions.append(self._Vec3(self.sb.terminal_atoms["H2"]))
+                    openmmidx += 1
                     self.topology.addAtom(name="H3",
                                           element=get_element_from_atomname("H3"),
                                           residue=residue)
                     self.positions.append(self._Vec3(self.sb.terminal_atoms["H3"]))
+                    openmmidx += 1
                     placed_terminal_h = True
                     continue
                 # Handle C-terminal OXT
-                elif an == "PAD" and i == len(self.seq)-1 and not placed_terminal_oxt:
+                elif an == "PAD" and i == len(self.seq) - 1 and not placed_terminal_oxt:
                     self.topology.addAtom(name="OXT",
                                           element=get_element_from_atomname("OXT"),
                                           residue=residue)
                     self.positions.append(self._Vec3(self.sb.terminal_atoms["OXT"]))
+                    openmmidx += 1
                     placed_terminal_oxt = True
                     continue
-                if an == "PAD":
+                elif an == "PAD":
                     continue
                 self.topology.addAtom(name=an,
                                       element=get_element_from_atomname(an),
                                       residue=residue)
-                pos = self._Vec3(c)
-                self.positions.append(pos)
+                self.positions.append(self._Vec3(c))
+
+                # If this is a heavy atom from atommap14, record (coord14idx->openmmmidx)
+                if not an.startswith("H"):
+                    self.atommap14idx_to_openmmidx[coordidx] = (an, openmmidx)
+                    coordidx += 1
+                openmmidx += 1
+
             self.openmm_seq += residue_code
         self.topology.createStandardBonds()
         # TODO think about disulfide bonds at a later point, see CYS/CYX (bridge, no H)
         # self.topology.createDisulfideBonds(self.positions)
         return self.topology, self.positions
+
+    def update_positions(self, skip_missing_residues=True):
+        """Update the positions variable with hydrogen coordinate values."""
+        self.positions = []
+        coord_gen = coord_generator(self.hydrogen_coords, self.atoms_per_res)
+        placed_terminal_h = False
+        placed_terminal_oxt = False
+        for i, (residue_code, coords,
+                mask_char) in enumerate(zip(self.seq, coord_gen, self.mask)):
+            if mask_char == "-" and skip_missing_residues:
+                continue
+            # At this point, hydrogens should already be added
+            if not self.has_hydrogens:
+                atom_names = ATOM_MAP_14[residue_code]
+            else:
+                atom_names = hy.ATOM_MAP_24[residue_code]
+            for j, (an, c) in enumerate(zip(atom_names, coords)):
+                # Handle N-terminal Hydrogens
+                if an == "PAD" and i == 0 and not placed_terminal_h:
+                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H2"]))
+                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H3"]))
+                    placed_terminal_h = True
+                    continue
+                # Handle C-terminal OXT
+                elif an == "PAD" and i == len(self.seq) - 1 and not placed_terminal_oxt:
+                    self.positions.append(self._Vec3(self.sb.terminal_atoms["OXT"]))
+                    placed_terminal_oxt = True
+                    continue
+                elif an == "PAD":
+                    continue
+                self.positions.append(self._Vec3(c))
+
+        return self.positions
 
     def initialize_openmm(self):
         """Creates top., pos., modeller, forcefield, system, integrator, & simulation."""
@@ -231,10 +286,24 @@ class SCNProtein(object):
     def get_energy(self):
         if not self.openmm_initialized:
             self.initialize_openmm()
-        self.simulation.context.setPositions(self.modeller.positions)
+        self.simulation.context.setPositions(self.positions)
         self.starting_state = self.simulation.context.getState(getEnergy=True,
                                                                getForces=True)
         self.starting_energy = self.starting_state.getPotentialEnergy()
+        return self.starting_energy
+
+    def get_forces(self):
+        if not self.starting_energy:
+            self.get_energy()
+        forces = self.starting_state.getForces()  # Matches OpenMM Topology; includes terminal atoms and Hs
+        force_array = torch.zeros(len(self.seq) * NUM_COORDS_PER_RES,
+                                  3)  # Matches 14-atom coords
+        for atommap14_idx, (name, openmmidx) in self.atommap14idx_to_openmmidx.items():
+            force_array[atommap14_idx] = torch.tensor([
+                forces[openmmidx]._value[0], forces[openmmidx]._value[1],
+                forces[openmmidx]._value[2]
+            ])
+        return force_array
 
     def make_pdbfixer(self):
         """Construct and return an OpenMM PDBFixer object for this protein."""
@@ -295,17 +364,20 @@ class SCNProtein(object):
         rmsd = prody.calcRMSD(self.starting_positions, aligned_minimized)
         return rmsd
 
-    def add_hydrogens(self, from_angles=False):
+    def add_hydrogens(self, from_angles=False, coords=None):
         """Add hydrogens to the internal protein structure representation."""
         if from_angles:
             self.sb = structure.StructureBuilder(self.seq, ang=self.angles)
             self.sb.build()
+        elif coords is not None:
+            self.sb = structure.StructureBuilder(self.seq, crd=coords)
         else:
             self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
         self.sb.add_hydrogens()
-        self.coords = self.sb.coords
+        self.hydrogen_coords = self.sb.coords
         self.has_hydrogens = True
         self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
+        self.update_positions()
 
     def __repr__(self) -> str:
         """Represent an SCNProtein as a string."""

@@ -2,6 +2,7 @@
 
 import pickle
 import os
+from sidechainnet.data_handlers import SCNDataset
 
 import requests
 import tqdm
@@ -101,7 +102,8 @@ def load(casp_version=12,
          train_eval_downsample=.2,
          filter_by_resolution=False,
          complete_structures_only=False,
-         local_scn_path=None):
+         local_scn_path=None,
+         scn_dataset=False):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -179,6 +181,9 @@ def load(casp_version=12,
             splits. Default False.
         local_scn_path (str, optional): The path for a locally saved SidechainNet file.
             This is especially useful for loading custom SidechainNet datasets.
+        scn_dataset (bool, optional): If True, return a sidechainnet.SCNDataset object
+            for conveniently accessing properties of the data.
+            (See sidechainnet.SCNDataset) for more information.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -261,8 +266,10 @@ def load(casp_version=12,
         scn_dict = filter_dictionary_by_missing_residues(scn_dict)
 
     # By default, the load function returns a dictionary
-    if not with_pytorch:
+    if not with_pytorch and not scn_dataset:
         return scn_dict
+    elif not with_pytorch and scn_dataset:
+        return SCNDataset(scn_dict)
 
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
