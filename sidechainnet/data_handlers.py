@@ -11,7 +11,7 @@ from openmm.app import element as elem
 from openmm.app.forcefield import ForceField, HBonds
 from openmm.app.modeller import Modeller
 from openmm.openmm import LangevinMiddleIntegrator
-from openmm.unit import angstroms, kelvin, nanometer, picosecond, picoseconds
+from openmm.unit import angstroms, kelvin, nanometer, picosecond, picoseconds, kilojoule_per_mole, angstrom
 
 import sidechainnet
 import sidechainnet.structure.HydrogenBuilder as hy
@@ -20,6 +20,8 @@ from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
+
+OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
 
 
 class SCNDataset(object):
@@ -272,7 +274,7 @@ class SCNProtein(object):
         """Creates top., pos., modeller, forcefield, system, integrator, & simulation."""
         self.get_openmm_repr()
         self.modeller = Modeller(self.topology, self.positions)
-        self.forcefield = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+        self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
         self.system = self.forcefield.createSystem(self.modeller.topology,
                                                    nonbondedMethod=openmm.app.NoCutoff,
                                                    nonbondedCutoff=1 * nanometer,
@@ -326,7 +328,7 @@ class SCNProtein(object):
     def minimize(self):
         """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
         self.modeller = Modeller(self.topology, self.positions)
-        self.forcefield = ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+        self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
         self.system = self.forcefield.createSystem(self.modeller.topology,
                                                    nonbondedMethod=openmm.app.NoCutoff,
                                                    nonbondedCutoff=1 * nanometer,
