@@ -5,6 +5,7 @@ import prody as pr
 import torch
 from sidechainnet.structure import StructureBuilder
 from sidechainnet.structure.build_info import NUM_ANGLES
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import VOCAB
 
 
@@ -246,6 +247,18 @@ def debug_example():
     ang = d["train"]["ang"][70]
     sb = StructureBuilder.StructureBuilder(seq, ang)
     sb.build()
+
+
+def coord_generator(coords, atoms_per_res=14, remove_padding=False):
+    """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
+    coord_idx = 0
+    while coord_idx < coords.shape[0]:
+        _slice = coords[coord_idx:coord_idx + atoms_per_res]
+        if remove_padding:
+            non_pad_locs = (_slice != GLOBAL_PAD_CHAR).any(axis=1)
+            _slice = _slice[non_pad_locs]
+        yield _slice
+        coord_idx += atoms_per_res
 
 
 if __name__ == '__main__':

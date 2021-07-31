@@ -7,6 +7,7 @@ import torch
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
 from sidechainnet.structure.structure import nerf
+from sidechainnet.structure.HydrogenBuilder import HydrogenBuilder, NUM_COORDS_PER_RES_W_HYDROGENS
 
 
 class StructureBuilder(object):
@@ -100,6 +101,9 @@ class StructureBuilder(object):
         self.next_bb = None
         self.pdb_creator = None
         self.nerf_method = nerf_method
+        self.has_hydrogens = False
+        self.atoms_per_res = NUM_COORDS_PER_RES
+        self.terminal_atoms = None
 
     def __len__(self):
         """Return length of the protein sequence.
@@ -177,10 +181,25 @@ class StructureBuilder(object):
         if not self.pdb_creator:
             from sidechainnet.structure.PdbBuilder import PdbBuilder
             if self.data_type == 'numpy':
-                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords)
+                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords,
+                                              self.atoms_per_res,
+                                              terminal_atoms=self.terminal_atoms)
             else:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
-                                              self.coords.detach().numpy())
+                                              self.coords.detach().numpy(),
+                                              self.atoms_per_res,
+                                              terminal_atoms=self.terminal_atoms)
+
+    def add_hydrogens(self):
+        """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
+        if self.coords is None or not len(self.coords):
+            raise ValueError("Cannot add hydrogens to a structure whose heavy atoms have"
+                             " not yet been built.")
+        self.hb = HydrogenBuilder(self.seq_as_str, self.coords)
+        self.coords = self.hb.build_hydrogens()
+        self.has_hydrogens = True
+        self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS
+        self.terminal_atoms = self.hb.terminal_atoms
 
     def to_pdb(self, path, title="pred"):
         """Save protein structure as a PDB file to given path.
@@ -227,7 +246,7 @@ class StructureBuilder(object):
             style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
 
         view = py3Dmol.view(**kwargs)
-        view.addModel(self.to_pdbstr(), 'pdb')
+        view.addModel(self.to_pdbstr(), 'pdb', {'keepH': True})
         if style:
             view.setStyle(style)
         view.zoomTo()
@@ -278,7 +297,12 @@ class ResidueBuilder(object):
         self.bb = []
         self.sc = []
         self.coords = []
-        self.coordinate_padding = torch.zeros(3)
+        self.coordinate_padding = torch.zeros(3, requires_grad=True)
+
+    @property
+    def AA(self):
+        """Return the one-letter amino acid code (str) for this residue."""
+        return VOCAB.int2char(int(self.name))
 
     def build(self):
         """Construct and return atomic coordinates for this protein."""
@@ -342,12 +366,12 @@ class ResidueBuilder(object):
 
         Placed in an arbitrary plane (z = .001).
         """
-        n = torch.tensor([0, 0, 0.001], device=self.device)
+        n = torch.tensor([0, 0, 0.001], device=self.device, requires_grad=True)
         ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0, 0],
-                              device=self.device)
+                              device=self.device, requires_grad=True)
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
         cy = torch.sin(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]['ca-c']
-        c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32)
+        c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32, requires_grad=True)
         o = nerf(
             n,
             ca,
@@ -423,7 +447,7 @@ class ResidueBuilder(object):
 
     def __repr__(self):
         """Return a string describing the name of the residue used for this object."""
-        return f"ResidueBuilder({VOCAB.int2char(int(self.name))})"
+        return f"ResidueBuilder({self.AA})"
 
 
 def _get_residue_build_iter(res, build_dictionary):
