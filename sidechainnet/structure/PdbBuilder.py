@@ -2,9 +2,10 @@
 import itertools
 
 import numpy as np
-
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.structure.HydrogenBuilder import ATOM_MAP_24, NUM_COORDS_PER_RES_W_HYDROGENS
+from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
-from sidechainnet.structure.build_info import SC_BUILD_INFO, NUM_COORDS_PER_RES
 
 
 class PdbBuilder(object):
@@ -17,7 +18,11 @@ class PdbBuilder(object):
     The Python format string was taken from http://cupnet.net/pdb-format/.
     """
 
-    def __init__(self, seq, coords, atoms_per_res=NUM_COORDS_PER_RES):
+    def __init__(self,
+                 seq,
+                 coords,
+                 atoms_per_res=NUM_COORDS_PER_RES,
+                 terminal_atoms=None):
         """Initialize a PdbBuilder.
 
         Args:
@@ -27,6 +32,8 @@ class PdbBuilder(object):
                 per amino acid.
             atoms_per_res: The number of atoms recorded per residue. This must be the
                 same for every residue.
+            terminal_atoms: Python dictionary mapping "H2", "H3", and "OXT" atom names to
+                their positions in the structure.
         """
         if len(seq) != coords.shape[0] / atoms_per_res:
             raise ValueError(
@@ -36,14 +43,17 @@ class PdbBuilder(object):
         if coords.shape[0] % atoms_per_res != 0:
             raise AssertionError(f"Coords is not divisible by {atoms_per_res}. "
                                  f"{coords.shape}")
-        if atoms_per_res != 14:
+        if atoms_per_res not in (NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS):
             raise ValueError(
-                "Values for atoms_per_res other than 14 are currently not supported.")
+                f"Values for atoms_per_res other than {NUM_COORDS_PER_RES}"
+                f"/{NUM_COORDS_PER_RES_W_HYDROGENS} are currently not supported.")
 
+        self.atoms_per_res = atoms_per_res
+        self.has_hydrogens = self.atoms_per_res == NUM_COORDS_PER_RES_W_HYDROGENS
         self.coords = coords
         self.seq = seq
         self.mapping = self._make_mapping_from_seq()
-        self.atoms_per_res = atoms_per_res
+        self.terminal_atoms = terminal_atoms
 
         # PDB Formatting Information
         self.format_str = ("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}"
@@ -66,10 +76,7 @@ class PdbBuilder(object):
 
     def _coord_generator(self):
         """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
-        coord_idx = 0
-        while coord_idx < self.coords.shape[0]:
-            yield self.coords[coord_idx:coord_idx + self.atoms_per_res]
-            coord_idx += self.atoms_per_res
+        return coord_generator(self.coords, self.atoms_per_res)
 
     def _get_line_for_atom(self, res_name, atom_name, atom_coords, missing=False):
         """Return the 'ATOM...' line in PDB format for the specified atom.
@@ -88,7 +95,12 @@ class PdbBuilder(object):
             atom_coords[2], occupancy, self.defaults["temp_factor"], atom_name[0],
             self.defaults["charge"])
 
-    def _get_lines_for_residue(self, res_name, atom_names, coords):
+    def _get_lines_for_residue(self,
+                               res_name,
+                               atom_names,
+                               coords,
+                               n_terminal=False,
+                               c_terminal=False):
         """Return a list of PDB-formatted lines for all atoms in a single residue.
 
         Calls get_line_for_atom.
@@ -100,6 +112,18 @@ class PdbBuilder(object):
                 continue
             residue_lines.append(self._get_line_for_atom(res_name, atom_name, atom_coord))
             self.atom_nbr += 1
+
+        # Add Terminal Atoms (Must be provided in terminal_atoms dict; Hs must be built)
+        if n_terminal and self.terminal_atoms:
+            residue_lines.append(
+                self._get_line_for_atom(res_name, "H2", self.terminal_atoms["H2"]))
+            residue_lines.append(
+                self._get_line_for_atom(res_name, "H3", self.terminal_atoms["H3"]))
+            self.atom_nbr += 2
+        if c_terminal and self.terminal_atoms:
+            residue_lines.append(
+                self._get_line_for_atom(res_name, "OXT", self.terminal_atoms["OXT"]))
+
         return residue_lines
 
     def _get_lines_for_protein(self):
@@ -111,9 +135,14 @@ class PdbBuilder(object):
         self.res_nbr = 1
         self.atom_nbr = 1
         mapping_coords = zip(self.mapping, self._coord_generator())
-        for (res_name, atom_names), res_coords in mapping_coords:
+        for index, ((res_name, atom_names), res_coords) in enumerate(mapping_coords):
+            # TODO assumes only first/last residue have terminal atoms
             self._pdb_body_lines.extend(
-                self._get_lines_for_residue(res_name, atom_names, res_coords))
+                self._get_lines_for_residue(res_name,
+                                            atom_names,
+                                            res_coords,
+                                            n_terminal=index == 0,
+                                            c_terminal=index == len(self.seq) - 1))
             self.res_nbr += 1
         return self._pdb_body_lines
 
@@ -128,10 +157,11 @@ class PdbBuilder(object):
 
     def _make_mapping_from_seq(self):
         """Given a protein sequence, this returns a mapping that assumes coords are
-        generated in groups of 14, i.e. the output is L x 14 x 3."""
+        generated in groups of atoms_per_res (the output is L x atoms_per_res x 3.)"""
+        atom_names = ATOM_MAP_14 if not self.has_hydrogens else ATOM_MAP_24
         mapping = []
         for residue in self.seq:
-            mapping.append((residue, ATOM_MAP_14[residue]))
+            mapping.append((residue, atom_names[residue]))
         return mapping
 
     def get_pdb_string(self, title=None):
@@ -142,7 +172,7 @@ class PdbBuilder(object):
             return self._pdb_str
         self._get_lines_for_protein()
         self._pdb_lines = [self._make_header(title)
-                          ] + self._pdb_body_lines + [self._make_footer()]
+                           ] + self._pdb_body_lines + [self._make_footer()]
         self._pdb_str = "\n".join(self._pdb_lines)
         return self._pdb_str
 
