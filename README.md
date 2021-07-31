@@ -59,8 +59,8 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 ### Loading SidechainNet as a Python dictionary
 
 ```python
-import sidechainnet as scn
-data = scn.load(casp_version=12, thinning=30)
+>>> import sidechainnet as scn
+>>> data = scn.load(casp_version=12, thinning=30)
 ```
 In its most basic form, SidechainNet is stored as a Python dictionary organized by train, validation, and test splits. These splits are identical to those described in ProteinNet.
  
@@ -86,6 +86,32 @@ data = {"train": {"seq": [seq1, seq2, ...],  # Sequences, 1-letter codes
         }
 ```
 By default, the `load` function downloads the data from the web into the current directory and loads it as a Python dictionary. If the data already exists locally, it reads it from disk. Other than the requirement that the data must be loaded using Python, this method of data loading is agnostic to any downstream analysis.
+
+### Loading SidechainNet as an interactive SCNDataset object
+
+The easiest way to interact with SidechainNet is most likely by using the SCNDataset and
+`SCNProtein` objects. 
+
+```python
+>>> data = scn.load("debug", scn_dataset=True)
+>>> data
+SCNDataset(n=461)
+>>> data["1HD1_1_A"]
+SCNProtein(1HD1_1_A, len=75, missing=0, split='train')
+>>> data[0]
+SCNProtein(2CMY_d2cmyb1, len=23, missing=2, split='train')
+```
+
+Available features:
+* `SCNDataset` is iterable,
+* proteins (`SCNProtein`s) can selected from the dataset by name or index,
+* proteins can be visualized with `.to_3Dmol()` and writable to PDBs with `.to_pdb()`. 
+* non-terminal hydrogens can be added with `SCNProtein.add_hydrogens()`,
+
+Additionally, all of the attributes below are available directly from the `SCNProtein` object:
+* `coords, angles, seq, unmodified_seq, mask, evolutionary, secondary_structure, resolution, is_modified, id, split`
+
+
 
 ### Loading SidechainNet with PyTorch DataLoaders
 The `load` function can also be used to load SidechainNet data as a dictionary of `torch.utils.data.DataLoader` objects. PyTorch `DataLoaders` make it simple to iterate over dataset items for training machine learning models. This method is recommended for using SidechainNet data with PyTorch.
