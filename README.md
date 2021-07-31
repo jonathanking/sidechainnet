@@ -89,7 +89,7 @@ By default, the `load` function downloads the data from the web into the current
 
 ### Loading SidechainNet as an interactive SCNDataset object
 
-The easiest way to interact with SidechainNet is most likely by using the SCNDataset and
+The easiest way to interact with SidechainNet is most likely by using the `SCNDataset` and
 `SCNProtein` objects. 
 
 ```python
