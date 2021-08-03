@@ -45,7 +45,7 @@ from openmm.unit import angstroms, kelvin, nanometer, picosecond, picoseconds, k
 import sidechainnet
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
@@ -164,6 +164,16 @@ class SCNProtein(object):
         self.has_hydrogens = False
         self.openmm_initialized = False
         self.hydrogen_coords = self.coords.copy()
+        self.starting_energy = None
+
+    def generate_heavy_atom_mapping(self):
+        # Need to generate small to expanded mapping (602 -> 1050)
+        atom_indicies_padded = list(range(self.coords.shape[0]))  # [0..1049]
+        atom_indicies_padded = atom_indicies_padded[(self.coords == GLOBAL_PAD_CHAR).all(
+            dim=-1)]
+        self.unpadded_to_padded_atom_map = OrderedDict()
+        for (upidx, pidx) in zip(range(len(atom_indicies_padded), atom_indicies_padded)):
+            self.unpadded_to_padded_atom_map[upidx] = pidx
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -204,8 +214,9 @@ class SCNProtein(object):
 
     def get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
-        openmmidx = coordidx = 0
+        openmmidx = coordidx = coordidx24 = 0
         self.atommap14idx_to_openmmidx = {}
+        self.atommap24idx_to_openmmidx = {}
         self.positions = []
         self.topology = Topology()
         self.openmm_seq = ""
@@ -230,6 +241,11 @@ class SCNProtein(object):
                 prev_residue_num_atoms = coordidx % NUM_COORDS_PER_RES
                 if prev_residue_num_atoms != 0:
                     coordidx += NUM_COORDS_PER_RES - prev_residue_num_atoms
+
+                coordidx24 -= 1
+                prev_residue_num_atoms = coordidx24 % hy.NUM_COORDS_PER_RES_W_HYDROGENS
+                if prev_residue_num_atoms != 0:
+                    coordidx24 += hy.NUM_COORDS_PER_RES_W_HYDROGENS - prev_residue_num_atoms
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 # Handle N-terminal Hydrogens
                 if an == "PAD" and i == 0 and not placed_terminal_h:
@@ -265,6 +281,9 @@ class SCNProtein(object):
                 if not an.startswith("H"):
                     self.atommap14idx_to_openmmidx[coordidx] = (an, openmmidx)
                     coordidx += 1
+                if an not in ["H2", "H3", "OXT"]:
+                    self.atommap24idx_to_openmmidx[coordidx24] = (an, openmmidx)
+                    coordidx24 += 1
                 openmmidx += 1
 
             self.openmm_seq += residue_code
@@ -333,15 +352,33 @@ class SCNProtein(object):
     def get_forces(self):
         if not self.starting_energy:
             self.get_energy()
+        forces = self.starting_state.getForces()  # Matches OpenMM Topology; includes terminal atoms and Hs
+        force_array = torch.zeros(len(self.seq) * NUM_COORDS_PER_RES, 3, dtype=torch.float64)  # Matches 14-atom coords
+        for atommap14_idx, (name, openmmidx) in self.atommap14idx_to_openmmidx.items():
+            f = forces[openmmidx] / (kilojoule_per_mole / angstrom)
+            force_array[atommap14_idx] = torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
+            # force_array[atommap14_idx] = torch.tensor([
+            #     forces[openmmidx]._value[0], forces[openmmidx]._value[1],
+            #     forces[openmmidx]._value[2]
+            # ])
+        return force_array
+
+    def get_forces_w_hydrogens(self):
+        if not self.starting_energy:
+            self.get_energy()
         forces = self.starting_state.getForces(
         )  # Matches OpenMM Topology; includes terminal atoms and Hs
-        force_array = torch.zeros(len(self.seq) * NUM_COORDS_PER_RES,
-                                  3)  # Matches 14-atom coords
-        for atommap14_idx, (name, openmmidx) in self.atommap14idx_to_openmmidx.items():
-            force_array[atommap14_idx] = torch.tensor([
-                forces[openmmidx]._value[0], forces[openmmidx]._value[1],
-                forces[openmmidx]._value[2]
-            ])
+        force_array = torch.zeros(len(self.seq) * hy.NUM_COORDS_PER_RES_W_HYDROGENS,
+                                  3,
+                                  dtype=torch.float64)  # Matches 24-atom coords
+        for atommap24_idx, (name, openmmidx) in self.atommap24idx_to_openmmidx.items():
+            f = forces[openmmidx] / (kilojoule_per_mole / angstrom)
+            force_array[atommap24_idx] = torch.tensor([f.x, f.y, f.z],
+                                                      dtype=torch.float64)
+            # force_array[atommap14_idx] = torch.tensor([
+            #     forces[openmmidx]._value[0], forces[openmmidx]._value[1],
+            #     forces[openmmidx]._value[2]
+            # ])
         return force_array
 
     def make_pdbfixer(self):
@@ -422,6 +459,25 @@ class SCNProtein(object):
         """Represent an SCNProtein as a string."""
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
+
+    def hydrogenrep_to_heavyatomrep(self, hcoords):
+        to_stack = []
+
+        # new_coords = torch.zeros(len(self.seq)*NUM_COORDS_PER_RES, 3, requires_grad=True)
+        for i, s in enumerate(self.seq3.split(" ")):
+            num_heavy = 4 + len(SC_BUILD_INFO[s]['atom-names'])
+            h_start = i * hy.NUM_COORDS_PER_RES_W_HYDROGENS
+            h_end = h_start + num_heavy
+
+            c_start = i * NUM_COORDS_PER_RES
+            c_end = c_start + num_heavy
+            n_pad = NUM_COORDS_PER_RES - num_heavy
+
+            to_stack.extend([hcoords[h_start:h_end], torch.zeros(n_pad, 3, requires_grad=True)])
+
+            # new_coords[c_start:c_end] = hcoords[h_start:h_end]
+
+        return torch.cat(to_stack)
 
 
 def get_element_from_atomname(atom_name):
