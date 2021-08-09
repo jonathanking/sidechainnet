@@ -327,8 +327,11 @@ class SCNProtein(object):
                                                    constraints=HBonds)
         self.integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond,
                                                    0.004 * picoseconds)
+        self.platform = Platform.getPlatformByName('CUDA')
+        properties = {'DeviceIndex': '0', 'Precision': 'double'}
         self.simulation = openmm.app.Simulation(self.modeller.topology, self.system,
-                                                self.integrator)
+                                                self.integrator, platform=self.platform,
+                                                platformProperties=properties)
         self.openmm_initialized = True
 
     def get_energy(self):
