@@ -2,6 +2,7 @@ import sidechainnet as scn
 import torch
 import sidechainnet.utils.openmm as mm
 import torch.optim as optim
+import numpy as np
 
 
 def test_pytorch_layer():
@@ -48,3 +49,35 @@ def test_add_hydrogens_to_struct_with_existing_h():
     energy = p.get_energy()
     p.add_hydrogens()
     assert energy == p.get_energy()
+
+
+def gradcheck(protein, coords, eps=1e-5):
+    energy_loss = mm.OpenMMEnergy()
+    energy = energy_loss.apply
+    c1, c2 = torch.tensor(coords.clone().detach()), torch.tensor(coords.clone().detach())
+    c1[0,0] += eps
+    c2[0,0] -= eps
+    f1, _ = energy(protein, c1)
+    f2, _ = energy(protein, c2)
+    dfdx = (f1 - f2) / 2 * eps
+
+    analytical_energy = mm.OpenMMEnergy()
+    analytical_energy, forces = analytical_energy.apply(protein, coords)
+    force = -forces[0,0]
+
+    difference = np.float64(torch.abs(dfdx-force)) / max(np.float64(torch.abs(dfdx)), np.float64(torch.abs(force)))
+    return difference
+
+def test_gradcheck():
+    # Load data
+    d = scn.load("debug", scn_dir="/home/jok120/openmm_loss/sidechainnet_data", scn_dataset=True)
+    p = d["1HD1_1_A"]
+
+    # Truncate to 2 AAs
+    p.seq = p.seq[:2]
+    p.hcoords = p.hcoords[:14*2]
+    p.angles = torch.tensor(p.angles[:12*2], requires_grad=True)
+    p.coords = torch.tensor(p.coords[:14*2], requires_grad=True)
+
+
+    dfdx, forces = gradcheck(p, p.coords)

@@ -171,11 +171,11 @@ def load(casp_version=12,
             training set at the start of training, and use that downsampled dataset during
             the whole of model training. Defaults to .2.
         filter_by_resolution (float, bool, optional): If True, only use structures with a
-            reported resolution < 3 Angstroms. Structures wit no reported resolutions will
-            also be excluded. If filter_by_resolution is a float, then only structures
-            having a resolution value LESS than or equal this threshold will be included.
-            For example, a value of 2.5 will exclude all structures with resolution
-            greater than 2.5 Angstrom. Only the training set is filtered.
+            reported resolution < 3 Angstroms. Structures with no reported resolutions
+            will also be excluded. If filter_by_resolution is a float, then only
+            structures having a resolution value LESS than or equal this threshold will be
+            included. For example, a value of 2.5 will exclude all structures with
+            resolution greater than 2.5 Angstrom. Only the training set is filtered.
         complete_structures_only (bool, optional): If True, yield only structures from the
             training set that have no missing residues. Filter not applied to other data
             splits. Default False.

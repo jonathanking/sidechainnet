@@ -26,15 +26,15 @@ Available SCNProtein attributes include:
 
 Other features:
     * add non-terminal hydrogens to a protein's coordinates with SCNProtein.add_hydrogens
-    * visualize proteins with SCNProtein.to_3Dmol() 
+    * visualize proteins with SCNProtein.to_3Dmol()
     * write PDB files for proteins with SCNProtein.to_PDB()
 """
 import numpy as np
 import openmm
 import prody
 import torch
-from build.lib.sidechainnet.utils.measure import GLOBAL_PAD_CHAR
-from openmm import Vec3
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from openmm import Vec3, Platform
 from openmm.app import Topology
 from openmm.app import element as elem
 from openmm.app.forcefield import ForceField, HBonds
@@ -163,17 +163,8 @@ class SCNProtein(object):
         self.atoms_per_res = NUM_COORDS_PER_RES
         self.has_hydrogens = False
         self.openmm_initialized = False
-        self.hydrogen_coords = self.coords.copy()
+        self.hcoords = self.coords.copy()
         self.starting_energy = None
-
-    def generate_heavy_atom_mapping(self):
-        # Need to generate small to expanded mapping (602 -> 1050)
-        atom_indicies_padded = list(range(self.coords.shape[0]))  # [0..1049]
-        atom_indicies_padded = atom_indicies_padded[(self.coords == GLOBAL_PAD_CHAR).all(
-            dim=-1)]
-        self.unpadded_to_padded_atom_map = OrderedDict()
-        for (upidx, pidx) in zip(range(len(atom_indicies_padded), atom_indicies_padded)):
-            self.unpadded_to_padded_atom_map[upidx] = pidx
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -221,7 +212,7 @@ class SCNProtein(object):
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        coord_gen = coord_generator(self.hydrogen_coords, self.atoms_per_res)
+        coord_gen = coord_generator(self.hcoords, self.atoms_per_res)
         placed_terminal_h = False
         placed_terminal_oxt = False
         for i, (residue_code, coords,
@@ -238,14 +229,14 @@ class SCNProtein(object):
             # Rectify coordinate 14 mapping index to account for padded atoms
             if i > 0:
                 coordidx -= 1
-                prev_residue_num_atoms = coordidx % NUM_COORDS_PER_RES
-                if prev_residue_num_atoms != 0:
-                    coordidx += NUM_COORDS_PER_RES - prev_residue_num_atoms
+                prev_residue_n_atoms = coordidx % NUM_COORDS_PER_RES
+                if prev_residue_n_atoms != 0:
+                    coordidx += NUM_COORDS_PER_RES - prev_residue_n_atoms
 
                 coordidx24 -= 1
-                prev_residue_num_atoms = coordidx24 % hy.NUM_COORDS_PER_RES_W_HYDROGENS
-                if prev_residue_num_atoms != 0:
-                    coordidx24 += hy.NUM_COORDS_PER_RES_W_HYDROGENS - prev_residue_num_atoms
+                prev_residue_n_atoms = coordidx24 % hy.NUM_COORDS_PER_RES_W_HYDROGENS
+                if prev_residue_n_atoms != 0:
+                    coordidx24 += hy.NUM_COORDS_PER_RES_W_HYDROGENS - prev_residue_n_atoms
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 # Handle N-terminal Hydrogens
                 if an == "PAD" and i == 0 and not placed_terminal_h:
@@ -295,7 +286,7 @@ class SCNProtein(object):
     def update_positions(self, skip_missing_residues=True):
         """Update the positions variable with hydrogen coordinate values."""
         self.positions = []
-        coord_gen = coord_generator(self.hydrogen_coords, self.atoms_per_res)
+        coord_gen = coord_generator(self.hcoords, self.atoms_per_res)
         placed_terminal_h = False
         placed_terminal_oxt = False
         for i, (residue_code, coords,
@@ -326,7 +317,7 @@ class SCNProtein(object):
         return self.positions
 
     def initialize_openmm(self):
-        """Creates top., pos., modeller, forcefield, system, integrator, & simulation."""
+        """Create top., pos., modeller, forcefield, system, integrator, & simulation."""
         self.get_openmm_repr()
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
@@ -341,6 +332,7 @@ class SCNProtein(object):
         self.openmm_initialized = True
 
     def get_energy(self):
+        """Return potential energy of the system given current atom positions."""
         if not self.openmm_initialized:
             self.initialize_openmm()
         self.simulation.context.setPositions(self.positions)
@@ -350,6 +342,7 @@ class SCNProtein(object):
         return self.starting_energy
 
     def get_forces(self):
+        """Return an array of forces matching the heavy atom coordinate representation."""
         if not self.starting_energy:
             self.get_energy()
         forces = self.starting_state.getForces()  # Matches OpenMM Topology; includes terminal atoms and Hs
@@ -364,6 +357,7 @@ class SCNProtein(object):
         return force_array
 
     def get_forces_w_hydrogens(self):
+        """Return an array of forces matching the all atom coordinate representation."""
         if not self.starting_energy:
             self.get_energy()
         forces = self.starting_state.getForces(
@@ -450,7 +444,7 @@ class SCNProtein(object):
         else:
             self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
         self.sb.add_hydrogens()
-        self.hydrogen_coords = self.sb.coords
+        self.hcoords = self.sb.coords
         self.has_hydrogens = True
         self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
         self.update_positions()
@@ -461,21 +455,17 @@ class SCNProtein(object):
                 f"split='{self.split}')")
 
     def hydrogenrep_to_heavyatomrep(self, hcoords):
+        """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
         to_stack = []
 
-        # new_coords = torch.zeros(len(self.seq)*NUM_COORDS_PER_RES, 3, requires_grad=True)
         for i, s in enumerate(self.seq3.split(" ")):
             num_heavy = 4 + len(SC_BUILD_INFO[s]['atom-names'])
             h_start = i * hy.NUM_COORDS_PER_RES_W_HYDROGENS
             h_end = h_start + num_heavy
 
-            c_start = i * NUM_COORDS_PER_RES
-            c_end = c_start + num_heavy
             n_pad = NUM_COORDS_PER_RES - num_heavy
 
             to_stack.extend([hcoords[h_start:h_end], torch.zeros(n_pad, 3, requires_grad=True)])
-
-            # new_coords[c_start:c_end] = hcoords[h_start:h_end]
 
         return torch.cat(to_stack)
 
