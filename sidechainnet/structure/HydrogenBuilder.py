@@ -53,6 +53,37 @@ HYDROGEN_NAMES = {
     'TYR': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'],
     'VAL': ['H', 'HA', 'HB', 'HG11', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23']
 }
+
+HYDROGEN_PARTNERS = {  # Lists the atom each hydrogen (from list above) is connected to
+    'ALA': ['N', 'CA', 'CB', 'CB', 'CB'],
+    'ARG': ['N', 'CA', 'CB', 'CB', 'CD', 'CD', 'CG', 'CG', 'NE', 'NH1', 'NH1', 'NH2', 'NH2'],
+    'ASN': ['N', 'CA', 'CB', 'CB', 'ND2', 'ND2'],
+    'ASP': ['N', 'CA', 'CB', 'CB'],
+    'CYS': ['N', 'CA', 'CB', 'CB', 'SG'],
+    'GLN': ['N', 'CA', 'CB', 'CB', 'CG', 'CG', 'NE2', 'NE2'],
+    'GLU': ['N', 'CA', 'CB', 'CB', 'CG', 'CG'],
+    'GLY': ['N', 'CA', 'CA'],
+    'HIS': ['N', 'CA', 'CB', 'CB', 'CE1', 'CD2', 'ND1'],  # CB, CB, CE1, CD2, ND1/HE1
+    'ILE': ['N', 'CA', 'CB', 'CD1', 'CD1', 'CD1', 'CG1', 'CG1', 'CG2', 'CG2', 'CG2'],
+    'LEU': ['N', 'CA', 'CB', 'CB', 'CD1', 'CD1', 'CD1', 'CD2', 'CD2', 'CD2', 'CG'],
+    'LYS': ['N', 'CA', 'CB', 'CB', 'CD', 'CD', 'CE', 'CE', 'CG', 'CG', 'NZ', 'NZ', 'NZ'],
+    'MET': ['N', 'CA', 'CB', 'CB', 'CE', 'CE', 'CE', 'CG', 'CG'],
+    'PHE': ['N', 'CA', 'CB', 'CB', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ'],
+    'PRO': ['CA', 'CB', 'CB', 'CD', 'CD', 'CG', 'CG'],
+    'SER': ['N', 'CA', 'CB', 'CB', 'OG'],
+    'THR': ['N', 'CA', 'CB', 'OG1', 'CG2', 'CG2', 'CG2'],
+    'TRP': ['N', 'CA', 'CB', 'CB', 'CD', 'NE1', 'CE3', 'CH2', 'CZ2', 'CZ3'],
+    'TYR': ['N', 'CA', 'CB', 'CB', 'CD1', 'CD2', 'CE1', 'CE2', 'OH'],
+    'VAL': ['N', 'CA', 'CB', 'CG1', 'CG1', 'CG1', 'CG2', 'CG2', 'CG2']
+}
+
+HYDROGEN_NAMES_TO_PARTNERS = {}
+for resname in HYDROGEN_NAMES.keys():
+    if resname not in HYDROGEN_NAMES_TO_PARTNERS:
+        HYDROGEN_NAMES_TO_PARTNERS[resname] = {}
+    for hname, pname in zip(HYDROGEN_NAMES[resname], HYDROGEN_PARTNERS[resname]):
+        HYDROGEN_NAMES_TO_PARTNERS[resname][hname] = pname
+    HYDROGEN_NAMES_TO_PARTNERS[resname]["H2"] = HYDROGEN_NAMES_TO_PARTNERS[resname]["H3"] = "N"
 # yapf: enable
 
 
@@ -90,7 +121,7 @@ class HydrogenBuilder(object):
     def build_hydrogens(self):
         """Add hydrogens to internal protein structure."""
         # TODO assumes only one continuous chain (and 1 set of N & C terminals)
-        coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True)
+        coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True, seq=self.seq)
         new_coords = []
         prev_res_atoms = None
         for i, (aa, crd) in enumerate(zip(self.seq, coords)):

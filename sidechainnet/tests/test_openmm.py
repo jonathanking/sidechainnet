@@ -3,6 +3,8 @@ import torch
 import sidechainnet.utils.openmm as mm
 import torch.optim as optim
 import numpy as np
+from sidechainnet.utils.openmm import OpenMMEnergy
+from tqdm import tqdm
 
 
 def test_pytorch_layer():
@@ -81,3 +83,38 @@ def test_gradcheck():
 
 
     dfdx, forces = gradcheck(p, p.coords)
+
+
+def test_hydrogen_partners():
+    from sidechainnet.structure.HydrogenBuilder import HYDROGEN_NAMES, HYDROGEN_PARTNERS
+
+    for resname in HYDROGEN_NAMES.keys():
+        assert len(HYDROGEN_NAMES[resname]) == len(HYDROGEN_PARTNERS[resname])
+        for atomname in HYDROGEN_PARTNERS[resname]:
+            assert not atomname.startswith("H")
+
+def test_gradcheck_hsum():
+    # Load data
+    d = scn.load("debug", scn_dir="/home/jok120/openmm_loss/sidechainnet_data", scn_dataset=True)
+    p = d["1HD1_1_A"]
+
+    # Truncate to 2 AAs
+    p.seq = p.seq[:2]
+    p.hcoords = p.hcoords[:14*2]
+    p.angles = torch.tensor(p.angles[:12*2], requires_grad=True)
+    p.coords = torch.tensor(p.coords[:14*2], requires_grad=True)
+
+    energy_loss = OpenMMEnergy()
+    opt = torch.optim.LBFGS([p.coords], lr=1e-7)
+
+    losses = []
+
+    for i in tqdm(range(50)):
+        def closure():
+            opt.zero_grad()
+            loss = energy_loss.apply(p, p.coords)
+            loss.backward()
+            print(loss)
+            losses.append(float(loss.detach().numpy()))
+            return loss
+        opt.step(closure)

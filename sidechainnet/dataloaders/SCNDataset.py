@@ -329,8 +329,10 @@ class SCNProtein(object):
                                                    0.004 * picoseconds)
         self.platform = Platform.getPlatformByName('CUDA')
         properties = {'DeviceIndex': '0', 'Precision': 'double'}
-        self.simulation = openmm.app.Simulation(self.modeller.topology, self.system,
-                                                self.integrator, platform=self.platform,
+        self.simulation = openmm.app.Simulation(self.modeller.topology,
+                                                self.system,
+                                                self.integrator,
+                                                platform=self.platform,
                                                 platformProperties=properties)
         self.openmm_initialized = True
 
@@ -344,39 +346,59 @@ class SCNProtein(object):
         self.starting_energy = self.starting_state.getPotentialEnergy()
         return self.starting_energy
 
-    def get_forces(self):
-        """Return an array of forces matching the heavy atom coordinate representation."""
-        if not self.starting_energy:
-            self.get_energy()
-        forces = self.starting_state.getForces()  # Matches OpenMM Topology; includes terminal atoms and Hs
-        force_array = torch.zeros(len(self.seq) * NUM_COORDS_PER_RES, 3, dtype=torch.float64)  # Matches 14-atom coords
-        for atommap14_idx, (name, openmmidx) in self.atommap14idx_to_openmmidx.items():
-            f = forces[openmmidx] / (kilojoule_per_mole / angstrom)
-            force_array[atommap14_idx] = torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
-            # force_array[atommap14_idx] = torch.tensor([
-            #     forces[openmmidx]._value[0], forces[openmmidx]._value[1],
-            #     forces[openmmidx]._value[2]
-            # ])
-        return force_array
-
-    def get_forces_w_hydrogens(self):
-        """Return an array of forces matching the all atom coordinate representation."""
+    def get_forces_dict(self):
+        """Return a dictionary mapping resnum -> {atomname: (resname, force)}."""
         if not self.starting_energy:
             self.get_energy()
         forces = self.starting_state.getForces(
         )  # Matches OpenMM Topology; includes terminal atoms and Hs
-        force_array = torch.zeros(len(self.seq) * hy.NUM_COORDS_PER_RES_W_HYDROGENS,
-                                  3,
-                                  dtype=torch.float64)  # Matches 24-atom coords
-        for atommap24_idx, (name, openmmidx) in self.atommap24idx_to_openmmidx.items():
-            f = forces[openmmidx] / (kilojoule_per_mole / angstrom)
-            force_array[atommap24_idx] = torch.tensor([f.x, f.y, f.z],
-                                                      dtype=torch.float64)
-            # force_array[atommap14_idx] = torch.tensor([
-            #     forces[openmmidx]._value[0], forces[openmmidx]._value[1],
-            #     forces[openmmidx]._value[2]
-            # ])
-        return force_array
+        force_dict = {}
+        for atom, force in zip(self.topology.atoms(), forces):
+            resnum = atom.residue.index
+            atomname = atom.name
+            resname = atom.residue.name
+            if resnum not in force_dict:
+                force_dict[resnum] = {}
+            force_dict[resnum][atomname] = resname, force / (kilojoule_per_mole /
+                                                             angstrom)
+        return force_dict
+
+    def get_forces(self, output_rep="heavy", sum_hydrogens=False):
+        """Return tensor of forces as requested."""
+        if output_rep == "heavy":
+            outdim = NUM_COORDS_PER_RES  # 14
+        elif output_rep == "all":
+            outdim = hy.NUM_COORDS_PER_RES_W_HYDROGENS  # 24
+        else:
+            raise ValueError(f"{output_rep} is not a valid output representation. "
+                             "Choose either 'heavy' or 'all'.")
+        if sum_hydrogens and output_rep == "all":
+            raise ValueError("Cannot sum hydrogen forces for output dim 'all'.")
+
+        force_dict = self.get_forces_dict()
+        force_array = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
+        force_array_raw = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
+        force_idx = 0
+
+        for resnum in range(len(force_dict)):
+            cur_atom_num = 0
+            atom_positions = {}
+            for atomname, (resname, f) in force_dict[resnum].items():
+                if (atomname.startswith("H") and output_rep == "heavy" and not sum_hydrogens):
+                    break
+                elif atomname.startswith("H") and output_rep == "heavy" and sum_hydrogens:
+                    heavyatom = hy.HYDROGEN_NAMES_TO_PARTNERS[resname][atomname]
+                    heavyatom_idx = atom_positions[heavyatom]
+                    force_array[heavyatom_idx] += torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
+                    continue
+                force_array[force_idx] = force_array_raw[force_idx] = torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
+                atom_positions[atomname] = force_idx
+                force_idx += 1
+                cur_atom_num += 1
+
+            force_idx += (outdim - cur_atom_num)  # skip padded atoms
+
+        return force_array, force_array_raw
 
     def make_pdbfixer(self):
         """Construct and return an OpenMM PDBFixer object for this protein."""
@@ -468,7 +490,8 @@ class SCNProtein(object):
 
             n_pad = NUM_COORDS_PER_RES - num_heavy
 
-            to_stack.extend([hcoords[h_start:h_end], torch.zeros(n_pad, 3, requires_grad=True)])
+            to_stack.extend(
+                [hcoords[h_start:h_end], torch.zeros(n_pad, 3, requires_grad=True)])
 
         return torch.cat(to_stack)
 

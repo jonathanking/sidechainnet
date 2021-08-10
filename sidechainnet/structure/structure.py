@@ -4,9 +4,8 @@ import numpy as np
 import prody as pr
 import torch
 from sidechainnet.structure import StructureBuilder
-from sidechainnet.structure.build_info import NUM_ANGLES
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
-from sidechainnet.utils.sequence import VOCAB
+from sidechainnet.structure.build_info import NUM_ANGLES, SC_BUILD_INFO
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 
 
 def angles_to_coords(angles, seq, remove_batch_padding=False):
@@ -249,14 +248,17 @@ def debug_example():
     sb.build()
 
 
-def coord_generator(coords, atoms_per_res=14, remove_padding=False):
+def coord_generator(coords, atoms_per_res=14, remove_padding=False, seq=""):
     """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
+    if remove_padding and not seq:
+        raise ValueError("A sequence (1-letter code) must be provided to remove padding.")
     coord_idx = 0
     while coord_idx < coords.shape[0]:
         _slice = coords[coord_idx:coord_idx + atoms_per_res]
         if remove_padding:
-            non_pad_locs = (_slice != GLOBAL_PAD_CHAR).any(axis=1)
-            _slice = _slice[non_pad_locs]
+            resname = ONE_TO_THREE_LETTER_MAP[seq[coord_idx//atoms_per_res]]
+            n_atoms = len(["N", "CA", "C", "O"] + SC_BUILD_INFO[resname]["atom-names"])
+            _slice = _slice[0:n_atoms]
         yield _slice
         coord_idx += atoms_per_res
 
