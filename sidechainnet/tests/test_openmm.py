@@ -12,7 +12,7 @@ def test_pytorch_layer():
                  scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
                  scn_dataset=True)
     p = d["40#2BDS_1_A"]
-    p.add_hydrogens()      # Must be done at every step of optimization
+    p.add_hydrogens()  # Must be done at every step of optimization
     p.initialize_openmm()  # Need only be done once, but does need to see hydrogens
     energy = p.get_energy()
     print(energy)
@@ -53,36 +53,58 @@ def test_add_hydrogens_to_struct_with_existing_h():
     assert energy == p.get_energy()
 
 
-def gradcheck(protein, coords, eps=1e-5):
+def _gradcheck(protein, coords, eps=1e-5):
     energy_loss = mm.OpenMMEnergy()
     energy = energy_loss.apply
     c1, c2 = torch.tensor(coords.clone().detach()), torch.tensor(coords.clone().detach())
-    c1[0,0] += eps
-    c2[0,0] -= eps
+    c1[0, 0] += eps
+    c2[0, 0] -= eps
     f1, _ = energy(protein, c1)
     f2, _ = energy(protein, c2)
     dfdx = (f1 - f2) / 2 * eps
 
     analytical_energy = mm.OpenMMEnergy()
     analytical_energy, forces = analytical_energy.apply(protein, coords)
-    force = -forces[0,0]
+    force = -forces[0, 0]
 
-    difference = np.float64(torch.abs(dfdx-force)) / max(np.float64(torch.abs(dfdx)), np.float64(torch.abs(force)))
+    difference = np.float64(torch.abs(dfdx - force)) / max(np.float64(torch.abs(dfdx)),
+                                                           np.float64(torch.abs(force)))
     return difference
+
 
 def test_gradcheck():
     # Load data
-    d = scn.load("debug", scn_dir="/home/jok120/openmm_loss/sidechainnet_data", scn_dataset=True)
+    d = scn.load("debug",
+                 scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
+                 scn_dataset=True)
     p = d["1HD1_1_A"]
 
     # Truncate to 2 AAs
     p.seq = p.seq[:2]
-    p.hcoords = p.hcoords[:14*2]
-    p.angles = torch.tensor(p.angles[:12*2], requires_grad=True)
-    p.coords = torch.tensor(p.coords[:14*2], requires_grad=True)
+    p.hcoords = p.hcoords[:14 * 2]
+    p.angles = torch.tensor(p.angles[:12 * 2], requires_grad=True)
+    p.coords = torch.tensor(p.coords[:14 * 2], requires_grad=True)
+
+    dfdx, forces = _gradcheck(p, p.coords)
 
 
-    dfdx, forces = gradcheck(p, p.coords)
+def test_gradcheck2():
+    d = scn.load("debug",
+                 scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
+                 scn_dataset=True)
+
+    p = d["1HD1_1_A"]
+    p.seq = p.seq[:2]
+    p.coords = p.coords[:14 * 2]
+    p.add_hydrogens()
+    p.hcoords = p.hcoords[:24 * 2]
+    p.hcoords = torch.tensor(p.hcoords, dtype=torch.float64, requires_grad=True)
+    to_optim = torch.tensor(p.hcoords, dtype=torch.float64, requires_grad=True)
+
+    openmmf = OpenMMEnergy()
+    _input = p, to_optim, "all", False
+    test = torch.autograd.gradcheck(openmmf.apply, _input, check_undefined_grad=True)
+    assert test
 
 
 def test_hydrogen_partners():
@@ -93,16 +115,19 @@ def test_hydrogen_partners():
         for atomname in HYDROGEN_PARTNERS[resname]:
             assert not atomname.startswith("H")
 
+
 def test_gradcheck_hsum():
     # Load data
-    d = scn.load("debug", scn_dir="/home/jok120/openmm_loss/sidechainnet_data", scn_dataset=True)
+    d = scn.load("debug",
+                 scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
+                 scn_dataset=True)
     p = d["1HD1_1_A"]
 
     # Truncate to 2 AAs
     p.seq = p.seq[:2]
-    p.hcoords = p.hcoords[:14*2]
-    p.angles = torch.tensor(p.angles[:12*2], requires_grad=True)
-    p.coords = torch.tensor(p.coords[:14*2], requires_grad=True)
+    p.hcoords = p.hcoords[:14 * 2]
+    p.angles = torch.tensor(p.angles[:12 * 2], requires_grad=True)
+    p.coords = torch.tensor(p.coords[:14 * 2], requires_grad=True)
 
     energy_loss = OpenMMEnergy()
     opt = torch.optim.LBFGS([p.coords], lr=1e-7)
@@ -110,6 +135,7 @@ def test_gradcheck_hsum():
     losses = []
 
     for i in tqdm(range(50)):
+
         def closure():
             opt.zero_grad()
             loss = energy_loss.apply(p, p.coords)
@@ -117,4 +143,5 @@ def test_gradcheck_hsum():
             print(loss)
             losses.append(float(loss.detach().numpy()))
             return loss
+
         opt.step(closure)

@@ -391,6 +391,8 @@ class SCNProtein(object):
                     heavyatom_idx = atom_positions[heavyatom]
                     force_array[heavyatom_idx] += torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
                     continue
+                elif atomname in ["H2", "H3", "OXT"]:  # Not present in any representation
+                    continue
                 force_array[force_idx] = force_array_raw[force_idx] = torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
                 atom_positions[atomname] = force_idx
                 force_idx += 1
@@ -473,6 +475,25 @@ class SCNProtein(object):
         self.has_hydrogens = True
         self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
         self.update_positions()
+
+    def update_hydrogens(self, hcoords):
+        """Take a set a hydrogen coordinates and use it to update this protein."""
+        mask = self.get_hydrogen_coord_mask()
+        self.hcoords = hcoords * mask
+        self.has_hydrogens = True
+        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
+        self.update_positions()
+
+    def get_hydrogen_coord_mask(self):
+        """Return a torch tensor with 0s representing pad characters in self.hcoords."""
+        mask = torch.zeros_like(self.hcoords)
+        for i, (res3, res1) in enumerate(zip(self.seq3.split(" "), self.seq)):
+            n_heavy_atoms = sum([True if an != "PAD" else False for an in ATOM_MAP_14[res1]])
+            n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
+            mask[i * hy.NUM_COORDS_PER_RES_W_HYDROGENS:i *
+                 hy.NUM_COORDS_PER_RES_W_HYDROGENS + n_heavy_atoms + n_hydrogens, :] = 1.0
+        return mask
+
 
     def __repr__(self) -> str:
         """Represent an SCNProtein as a string."""
