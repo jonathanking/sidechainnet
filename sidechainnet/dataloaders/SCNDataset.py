@@ -173,7 +173,7 @@ class SCNProtein(object):
     def to_3Dmol(self):
         """Return an interactive visualization of the protein with py3DMol."""
         if self.sb is None:
-            if self._has_hydrogens:
+            if self.has_hydrogens:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
@@ -184,7 +184,7 @@ class SCNProtein(object):
         if not title:
             title = self.id
         if self.sb is None:
-            if self._has_hydrogens:
+            if self.has_hydrogens:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
