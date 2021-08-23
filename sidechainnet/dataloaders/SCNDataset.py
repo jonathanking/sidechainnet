@@ -359,7 +359,7 @@ class SCNProtein(object):
 
             force_idx += (outdim - cur_atom_num)  # skip padded atoms
 
-        return force_array, force_array_raw
+        return force_array
 
     def make_pdbfixer(self):
         """Construct and return an OpenMM PDBFixer object for this protein."""
@@ -496,6 +496,7 @@ class SCNProtein(object):
 
         if pprint:
             for ans in all_atom_name_list:
+                ans = [f"{a: <3}" for a in ans]
                 print(" ".join(ans))
             return None
 
