@@ -3,7 +3,7 @@ import itertools
 
 import numpy as np
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
-from sidechainnet.structure.HydrogenBuilder import ATOM_MAP_24, NUM_COORDS_PER_RES_W_HYDROGENS
+from sidechainnet.structure.HydrogenBuilder import ATOM_MAP_H, NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
@@ -158,7 +158,7 @@ class PdbBuilder(object):
     def _make_mapping_from_seq(self):
         """Given a protein sequence, this returns a mapping that assumes coords are
         generated in groups of atoms_per_res (the output is L x atoms_per_res x 3.)"""
-        atom_names = ATOM_MAP_14 if not self.has_hydrogens else ATOM_MAP_24
+        atom_names = ATOM_MAP_14 if not self.has_hydrogens else ATOM_MAP_H
         mapping = []
         for residue in self.seq:
             mapping.append((residue, atom_names[residue]))

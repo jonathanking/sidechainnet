@@ -33,7 +33,6 @@ import numpy as np
 import openmm
 import prody
 import torch
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from openmm import Vec3, Platform
 from openmm.app import Topology
 from openmm.app import element as elem
@@ -213,18 +212,11 @@ class SCNProtein(object):
         self.openmm_seq = ""
         chain = self.topology.addChain()
         coord_gen = coord_generator(self.hcoords, self.atoms_per_res)
-        placed_terminal_h = False
-        placed_terminal_oxt = False
-        for i, (residue_code, coords,
-                mask_char) in enumerate(zip(self.seq, coord_gen, self.mask)):
+        for i, (residue_code, coords, mask_char, atom_names) in enumerate(
+                zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
             if mask_char == "-" and skip_missing_residues:
                 continue
-            # At this point, hydrogens should already be added
-            if not self.has_hydrogens:
-                atom_names = ATOM_MAP_14[residue_code]
-            else:
-                atom_names = hy.ATOM_MAP_24[residue_code]
             residue = self.topology.addResidue(name=residue_name, chain=chain)
             # Rectify coordinate 14 mapping index to account for padded atoms
             if i > 0:
@@ -238,30 +230,7 @@ class SCNProtein(object):
                 if prev_residue_n_atoms != 0:
                     coordidx24 += hy.NUM_COORDS_PER_RES_W_HYDROGENS - prev_residue_n_atoms
             for j, (an, c) in enumerate(zip(atom_names, coords)):
-                # Handle N-terminal Hydrogens
-                if an == "PAD" and i == 0 and not placed_terminal_h:
-                    self.topology.addAtom(name="H2",
-                                          element=get_element_from_atomname("H2"),
-                                          residue=residue)
-                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H2"]))
-                    openmmidx += 1
-                    self.topology.addAtom(name="H3",
-                                          element=get_element_from_atomname("H3"),
-                                          residue=residue)
-                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H3"]))
-                    openmmidx += 1
-                    placed_terminal_h = True
-                    continue
-                # Handle C-terminal OXT
-                elif an == "PAD" and i == len(self.seq) - 1 and not placed_terminal_oxt:
-                    self.topology.addAtom(name="OXT",
-                                          element=get_element_from_atomname("OXT"),
-                                          residue=residue)
-                    self.positions.append(self._Vec3(self.sb.terminal_atoms["OXT"]))
-                    openmmidx += 1
-                    placed_terminal_oxt = True
-                    continue
-                elif an == "PAD":
+                if an == "PAD":
                     continue
                 self.topology.addAtom(name=an,
                                       element=get_element_from_atomname(an),
@@ -272,9 +241,9 @@ class SCNProtein(object):
                 if not an.startswith("H"):
                     self.atommap14idx_to_openmmidx[coordidx] = (an, openmmidx)
                     coordidx += 1
-                if an not in ["H2", "H3", "OXT"]:
-                    self.atommap24idx_to_openmmidx[coordidx24] = (an, openmmidx)
-                    coordidx24 += 1
+
+                self.atommap24idx_to_openmmidx[coordidx24] = (an, openmmidx)
+                coordidx24 += 1
                 openmmidx += 1
 
             self.openmm_seq += residue_code
@@ -287,34 +256,23 @@ class SCNProtein(object):
         """Update the positions variable with hydrogen coordinate values."""
         self.positions = []
         coord_gen = coord_generator(self.hcoords, self.atoms_per_res)
-        placed_terminal_h = False
-        placed_terminal_oxt = False
-        for i, (residue_code, coords,
-                mask_char) in enumerate(zip(self.seq, coord_gen, self.mask)):
+        for i, (residue_code, coords, mask_char, atom_names) in enumerate(
+                zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
             if mask_char == "-" and skip_missing_residues:
                 continue
-            # At this point, hydrogens should already be added
-            if not self.has_hydrogens:
-                atom_names = ATOM_MAP_14[residue_code]
-            else:
-                atom_names = hy.ATOM_MAP_24[residue_code]
             for j, (an, c) in enumerate(zip(atom_names, coords)):
-                # Handle N-terminal Hydrogens
-                if an == "PAD" and i == 0 and not placed_terminal_h:
-                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H2"]))
-                    self.positions.append(self._Vec3(self.sb.terminal_atoms["H3"]))
-                    placed_terminal_h = True
-                    continue
-                # Handle C-terminal OXT
-                elif an == "PAD" and i == len(self.seq) - 1 and not placed_terminal_oxt:
-                    self.positions.append(self._Vec3(self.sb.terminal_atoms["OXT"]))
-                    placed_terminal_oxt = True
-                    continue
-                elif an == "PAD":
+                if an == "PAD":
                     continue
                 self.positions.append(self._Vec3(c))
 
         return self.positions
+
+    def insert_terminal_atoms_into_name_list(self, atom_names, terminal_atom_names):
+        """Insert a list of atoms into an existing list, keeping lengths the same."""
+        pad_idx = atom_names.index("PAD")
+        new_list = list(atom_names)
+        new_list[pad_idx:pad_idx + len(terminal_atom_names)] = terminal_atom_names
+        return new_list
 
     def initialize_openmm(self):
         """Create top., pos., modeller, forcefield, system, integrator, & simulation."""
@@ -384,16 +342,17 @@ class SCNProtein(object):
             cur_atom_num = 0
             atom_positions = {}
             for atomname, (resname, f) in force_dict[resnum].items():
-                if (atomname.startswith("H") and output_rep == "heavy" and not sum_hydrogens):
+                if (atomname.startswith("H") and output_rep == "heavy" and
+                        not sum_hydrogens):
                     break
                 elif atomname.startswith("H") and output_rep == "heavy" and sum_hydrogens:
                     heavyatom = hy.HYDROGEN_NAMES_TO_PARTNERS[resname][atomname]
                     heavyatom_idx = atom_positions[heavyatom]
-                    force_array[heavyatom_idx] += torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
+                    force_array[heavyatom_idx] += torch.tensor([f.x, f.y, f.z],
+                                                               dtype=torch.float64)
                     continue
-                elif atomname in ["H2", "H3", "OXT"]:  # Not present in any representation
-                    continue
-                force_array[force_idx] = force_array_raw[force_idx] = torch.tensor([f.x, f.y, f.z], dtype=torch.float64)
+                force_array[force_idx] = force_array_raw[force_idx] = torch.tensor(
+                    [f.x, f.y, f.z], dtype=torch.float64)
                 atom_positions[atomname] = force_idx
                 force_idx += 1
                 cur_atom_num += 1
@@ -488,12 +447,13 @@ class SCNProtein(object):
         """Return a torch tensor with 0s representing pad characters in self.hcoords."""
         mask = torch.zeros_like(self.hcoords)
         for i, (res3, res1) in enumerate(zip(self.seq3.split(" "), self.seq)):
-            n_heavy_atoms = sum([True if an != "PAD" else False for an in ATOM_MAP_14[res1]])
+            n_heavy_atoms = sum(
+                [True if an != "PAD" else False for an in ATOM_MAP_14[res1]])
             n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
-            mask[i * hy.NUM_COORDS_PER_RES_W_HYDROGENS:i *
-                 hy.NUM_COORDS_PER_RES_W_HYDROGENS + n_heavy_atoms + n_hydrogens, :] = 1.0
+            mask[i *
+                 hy.NUM_COORDS_PER_RES_W_HYDROGENS:i * hy.NUM_COORDS_PER_RES_W_HYDROGENS +
+                 n_heavy_atoms + n_hydrogens, :] = 1.0
         return mask
-
 
     def __repr__(self) -> str:
         """Represent an SCNProtein as a string."""
@@ -512,9 +472,46 @@ class SCNProtein(object):
             n_pad = NUM_COORDS_PER_RES - num_heavy
 
             to_stack.extend(
-                [hcoords[h_start:h_end], torch.zeros(n_pad, 3, requires_grad=True)])
+                [hcoords[h_start:h_end],
+                 torch.zeros(n_pad, 3, requires_grad=True)])
 
         return torch.cat(to_stack)
+
+    def get_atom_names(self, zip_coords=False, pprint=False):
+        """Return or print atom name list for each residue including terminal atoms."""
+        all_atom_name_list = []
+        for i in range(len(self.seq)):
+            if not self.has_hydrogens:
+                atom_names = ATOM_MAP_14[self.seq[i]]
+            else:
+                atom_names = hy.ATOM_MAP_H[self.seq[i]]
+            # Update atom names with terminal atoms
+            if i == 0:
+                atom_names = self.insert_terminal_atoms_into_name_list(
+                    atom_names, ["H2", "H3"])
+            elif i == len(self.seq) - 1:
+                atom_names = self.insert_terminal_atoms_into_name_list(
+                    atom_names, ["OXT"])
+            all_atom_name_list.append(atom_names)
+
+        if pprint:
+            for ans in all_atom_name_list:
+                print(" ".join(ans))
+            return None
+
+        # Prints a representation of coordinates and their atom names
+        if zip_coords:
+            flat_list = [item for sublist in all_atom_name_list for item in sublist]
+            if self.has_hydrogens:
+                items = list(zip(self.hcoords, flat_list))
+            else:
+                items = list(zip(self.coords, flat_list))
+            for i in items:
+                i = list(i)
+                i[0] = i[0].detach().numpy()
+                print(i)
+            return None
+        return all_atom_name_list
 
 
 def get_element_from_atomname(atom_name):

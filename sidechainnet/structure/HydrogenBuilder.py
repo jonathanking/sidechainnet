@@ -8,7 +8,7 @@ from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
-NUM_COORDS_PER_RES_W_HYDROGENS = 24
+NUM_COORDS_PER_RES_W_HYDROGENS = 26
 
 METHYL_ANGLE = 109.5
 METHYL_LEN = 1.09
@@ -127,7 +127,7 @@ class HydrogenBuilder(object):
         for i, (aa, crd) in enumerate(zip(self.seq, coords)):
             # Add empty hydrogen coordinates for missing residues
             if crd.sum() == 0:
-                new_coords.append(self.ones((NUM_COORDS_PER_RES_W_HYDROGENS, 3))*0)
+                new_coords.append(self.ones((NUM_COORDS_PER_RES_W_HYDROGENS, 3)) * 0)
                 prev_res_atoms = None
                 continue
             # Create an organized mapping from atom name to Catesian coordinates
@@ -622,9 +622,6 @@ class HydrogenBuilder(object):
             h, h2, h3 = self.get_methyl_hydrogens(c.N, c.CA, c.C, use_amine_length=True)
             self.terminal_atoms.update({"H2": h2, "H3": h3})
             hs.append(h)  # Used as normal amine hydrogen, H
-        if c_terminal:
-            oxt = self.get_amide_methine_hydrogen(c.CA, c.C, c.O, oxt=True)
-            self.terminal_atoms.update({"OXT": oxt})
         # All amino acids except proline have an amide-hydrogen along the backbone
         if prevc and resname != "P":
             hs.append(self.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
@@ -675,6 +672,14 @@ class HydrogenBuilder(object):
         elif resname == "V":
             hs.extend(self.val(c))
 
+        # Terminal atoms
+        if n_terminal:
+            hs.extend([self.terminal_atoms["H2"], self.terminal_atoms["H3"]])
+        if c_terminal:
+            oxt = self.get_amide_methine_hydrogen(c.CA, c.C, c.O, oxt=True)
+            self.terminal_atoms.update({"OXT": oxt})
+            hs.append(oxt)
+
         return self.stack(self.pad_hydrogens(resname, hs), 0)
 
 
@@ -707,9 +712,10 @@ class AtomHolder(dict):
         self.__dict__.update({key: value})
 
 
-ATOM_MAP_24 = {}
+ATOM_MAP_H = {}
 for one_letter, three_letter in ONE_TO_THREE_LETTER_MAP.items():
-    ATOM_MAP_24[one_letter] = ["N", "CA", "C", "O"] + list(
+    ATOM_MAP_H[one_letter] = ["N", "CA", "C", "O"] + list(
         SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
-    ATOM_MAP_24[one_letter].extend(HYDROGEN_NAMES[three_letter])
-    ATOM_MAP_24[one_letter].extend(["PAD"] * (24 - len(ATOM_MAP_24[one_letter])))
+    ATOM_MAP_H[one_letter].extend(HYDROGEN_NAMES[three_letter])
+    ATOM_MAP_H[one_letter].extend(
+        ["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[one_letter])))
