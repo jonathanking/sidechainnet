@@ -509,17 +509,17 @@ class SCNProtein(object):
 
         # Prints a representation of coordinates and their atom names
         if zip_coords:
-            flat_list = [item for sublist in all_atom_name_list for item in sublist]
+            flat_list = [f"{item: <4}" for sublist in all_atom_name_list for item in sublist]
             if heavy_only:
-                items = list(zip(self.coords, flat_list))
+                items = list(zip(flat_list, self.coords))
             elif self.has_hydrogens:
-                items = list(zip(self.hcoords, flat_list))
+                items = list(zip(flat_list, self.hcoords))
             else:
-                items = list(zip(self.coords, flat_list))
-            for i in items:
-                i = list(i)
-                i[0] = i[0].detach().numpy()
-                print(i)
+                items = list(zip(flat_list, self.coords))
+            for i, xy in enumerate(items):
+                xy = list(xy)
+                xy[1] = xy[1].detach().numpy()
+                print(f"{i: <2}", xy[0], xy[1])
             return None
         return all_atom_name_list
 
@@ -527,9 +527,8 @@ class SCNProtein(object):
 def atom_name_pprint(atom_names, values):
     """Nicely print atom names and values."""
     flat_list = [item for sublist in atom_names for item in sublist]
-    maxan_len = max((len(an) for an in flat_list))
     for i, (an, vals) in enumerate(zip(flat_list, values)):
-        print(f"{i: <2}", f"{an: <maxan_len}", vals)
+        print(f"{i: <2}", f"{an: <4}", vals)
 
 
 def get_element_from_atomname(atom_name):
