@@ -501,9 +501,9 @@ class SCNProtein(object):
         if pprint:
             _size = self.atoms_per_res if not heavy_only else NUM_COORDS_PER_RES
             nums = list(range(_size))
-            print(" ".join([f"{n: <3}" for n in nums]))
+            print(" ".join([f"{n: <4}" for n in nums]))
             for ans in all_atom_name_list:
-                ans = [f"{a: <3}" for a in ans]
+                ans = [f"{a: <4}" for a in ans]
                 print(" ".join(ans))
             return None
 
@@ -527,8 +527,9 @@ class SCNProtein(object):
 def atom_name_pprint(atom_names, values):
     """Nicely print atom names and values."""
     flat_list = [item for sublist in atom_names for item in sublist]
+    maxan_len = max((len(an) for an in flat_list))
     for i, (an, vals) in enumerate(zip(flat_list, values)):
-        print(f"{i: <2}", f"{an: <3}", vals)
+        print(f"{i: <2}", f"{an: <maxan_len}", vals)
 
 
 def get_element_from_atomname(atom_name):
