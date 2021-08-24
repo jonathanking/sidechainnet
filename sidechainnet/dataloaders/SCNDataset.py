@@ -321,7 +321,7 @@ class SCNProtein(object):
                                                              angstrom)
         return force_dict
 
-    def get_forces(self, output_rep="heavy", sum_hydrogens=False):
+    def get_forces(self, output_rep="heavy", sum_hydrogens=False, pprint=False):
         """Return tensor of forces as requested."""
         if output_rep == "heavy":
             outdim = NUM_COORDS_PER_RES  # 14
@@ -358,6 +358,10 @@ class SCNProtein(object):
                 cur_atom_num += 1
 
             force_idx += (outdim - cur_atom_num)  # skip padded atoms
+
+        if pprint:
+            atom_name_pprint(self.get_atom_names(heavy_only=output_rep=="heavy"), force_array)
+            return
 
         return force_array
 
@@ -477,24 +481,27 @@ class SCNProtein(object):
 
         return torch.cat(to_stack)
 
-    def get_atom_names(self, zip_coords=False, pprint=False):
+    def get_atom_names(self, zip_coords=False, pprint=False, heavy_only=False):
         """Return or print atom name list for each residue including terminal atoms."""
         all_atom_name_list = []
         for i in range(len(self.seq)):
-            if not self.has_hydrogens:
+            if not self.has_hydrogens or heavy_only:
                 atom_names = ATOM_MAP_14[self.seq[i]]
             else:
                 atom_names = hy.ATOM_MAP_H[self.seq[i]]
             # Update atom names with terminal atoms
-            if i == 0:
+            if i == 0 and not heavy_only:
                 atom_names = self.insert_terminal_atoms_into_name_list(
                     atom_names, ["H2", "H3"])
-            elif i == len(self.seq) - 1:
+            elif i == len(self.seq) - 1 and not heavy_only:
                 atom_names = self.insert_terminal_atoms_into_name_list(
                     atom_names, ["OXT"])
             all_atom_name_list.append(atom_names)
 
         if pprint:
+            _size = self.atoms_per_res if not heavy_only else NUM_COORDS_PER_RES
+            nums = list(range(_size))
+            print(" ".join([f"{n: <3}" for n in nums]))
             for ans in all_atom_name_list:
                 ans = [f"{a: <3}" for a in ans]
                 print(" ".join(ans))
@@ -503,7 +510,9 @@ class SCNProtein(object):
         # Prints a representation of coordinates and their atom names
         if zip_coords:
             flat_list = [item for sublist in all_atom_name_list for item in sublist]
-            if self.has_hydrogens:
+            if heavy_only:
+                items = list(zip(self.coords, flat_list))
+            elif self.has_hydrogens:
                 items = list(zip(self.hcoords, flat_list))
             else:
                 items = list(zip(self.coords, flat_list))
@@ -513,6 +522,13 @@ class SCNProtein(object):
                 print(i)
             return None
         return all_atom_name_list
+
+
+def atom_name_pprint(atom_names, values):
+    """Nicely print atom names and values."""
+    flat_list = [item for sublist in atom_names for item in sublist]
+    for i, (an, vals) in enumerate(zip(flat_list, values)):
+        print(f"{i: <2}", f"{an: <3}", vals)
 
 
 def get_element_from_atomname(atom_name):
