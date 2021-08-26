@@ -121,7 +121,10 @@ class HydrogenBuilder(object):
     def build_hydrogens(self):
         """Add hydrogens to internal protein structure."""
         # TODO assumes only one continuous chain (and 1 set of N & C terminals)
-        coords = coord_generator(self.coords, NUM_COORDS_PER_RES, remove_padding=True, seq=self.seq)
+        coords = coord_generator(self.coords,
+                                 NUM_COORDS_PER_RES,
+                                 remove_padding=True,
+                                 seq=self.seq)
         new_coords = []
         prev_res_atoms = None
         for i, (aa, crd) in enumerate(zip(self.seq, coords)):
@@ -132,7 +135,9 @@ class HydrogenBuilder(object):
                 continue
             # Create an organized mapping from atom name to Catesian coordinates
             d = {name: xyz for (name, xyz) in zip(self.atom_map[aa], crd)}
-            atoms = AtomHolder(d, default=None)  # default=self.empty_coord would allow building hydrogens from missing coords
+            atoms = AtomHolder(
+                d, default=None
+            )  # default=self.empty_coord would allow building hydrogens from missing coords
             # Generate hydrogen positions as array/tensor
             hydrogen_positions = self.get_hydrogens_for_res(
                 aa,
@@ -157,9 +162,23 @@ class HydrogenBuilder(object):
         b, c, d = -axis * np.sin(theta / 2.0)
         aa, bb, cc, dd = a * a, b * b, c * c, d * d
         bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
-        return self.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
-                           [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
-                           [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+        rot_matrix = self.array([
+            [0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.],
+        ],
+                                dtype=torch.float64)
+        rot_matrix[0, 0] = aa + bb - cc - dd
+        rot_matrix[0, 1] = 2 * (bc + ad)
+        rot_matrix[0, 2] = 2 * (bd - ac)
+        rot_matrix[1, 0] = 2 * (bc - ad)
+        rot_matrix[1, 1] = aa + cc - bb - dd
+        rot_matrix[1, 2] = 2 * (cd + ab)
+        rot_matrix[2, 0] = 2 * (bd + ac)
+        rot_matrix[2, 1] = 2 * (cd - ab)
+        rot_matrix[2, 2] = aa + dd - bb - cc
+
+        return rot_matrix
 
     def scale(self, vector, target_len, v_len=None):
         """Scale a vector to match a given target length."""
@@ -196,8 +215,8 @@ class HydrogenBuilder(object):
         H1 = self.scale(H1, length)
 
         R120 = self.M(CB, 2 * np.pi / 3)
-        H2 = self.dot(R120, H1)  # Place 2nd Hydrogen by rotating previous H 120 deg
-        H3 = self.dot(R120, H2)  # Place 3rd Hydrogen by rotating previous H 120 deg
+        H2 = self.dot(R120, H1.clone())  # Place 2nd Hydrogen by rotating previous H 120 deg
+        H3 = self.dot(R120, H2.clone())  # Place 3rd Hydrogen by rotating previous H 120 deg
 
         H1 += prev1 + CB
         H2 += prev1 + CB
@@ -294,7 +313,7 @@ class HydrogenBuilder(object):
         H1 = self.scale(vector=H1, target_len=AMINE_LEN, v_len=vector_len)
 
         # Rotate the previous vector around the same axis by another 120 degrees
-        H2 = self.dot(R, H1)
+        H2 = self.dot(R, H1.clone())
         H2 = self.scale(vector=H2, target_len=AMINE_LEN, v_len=vector_len)
 
         H1 += prev1 + N
