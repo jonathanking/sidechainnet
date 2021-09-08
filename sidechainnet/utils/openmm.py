@@ -6,32 +6,55 @@ than perform any differentiation directly.
 """
 
 import torch
+from torch.autograd.functional import jacobian as get_jacobian
 
 
 class OpenMMEnergy(torch.autograd.Function):
     """A force-field based loss function."""
 
     @staticmethod
-    def forward(ctx, protein, coords, output_rep="heavy", sum_hydrogens=False):
+    def forward(ctx, protein, coords, output_rep="all", jacobian=None):
         """Compute potential energy of the protein system and save atomic forces."""
-        # Update atomic position for all atoms when optimizing hydrogens directly
-        protein.update_hydrogens(coords)
+        # Compute Jacobian if not provided
+        if jacobian is not None:
+            protein.add_hydrogens(coords=coords)
+            ctx.dxh_dx = jacobian
+        else:
+            new_coords = coords.detach().clone().requires_grad_(True)
+            add_h = _get_alias(protein)
+            ctx.dxh_dx = get_jacobian(add_h, new_coords)
 
-        # Compute potential energy
-        energy = torch.tensor(protein.get_energy()._value, requires_grad=True, dtype=torch.float64)
+        # Compute potential energy and forces
+        energy = torch.tensor(protein.get_energy()._value,
+                              requires_grad=True,
+                              dtype=torch.float64)
+        forces = protein.get_forces(output_rep)
 
         # Save context
-        forces, raw_forces = protein.get_forces(output_rep, sum_hydrogens)
         ctx.forces = forces
-        protein._force_array = forces
-        protein._force_array_raw = raw_forces
+        protein._forces = forces
+        protein._dxh_dx = ctx.dxh_dx
 
         return energy
 
     @staticmethod
     def backward(ctx, grad_output=None):
         """Return the negative force acting on each heavy atom."""
-        # Unpack saved variables
-        forces = ctx.forces
+        forces = ctx.forces.view(1, -1)                    # (1 x M)
+        dxh_dx = ctx.dxh_dx                                # (26L x 3 x 14L x 3)
+        a, b, c, d = dxh_dx.shape
+        dxh_dx = dxh_dx.view(a * b, c * d)                 # (M x N)
 
-        return None, -forces * grad_output, None, None
+        de_dx = torch.matmul(-forces, dxh_dx).view(-1, 3)  # (1 x N) -> (14L x 3)
+
+        return None, de_dx * grad_output, None, None, None
+
+
+def _get_alias(protein):
+
+    def add_h(tcoords):
+        """Mimics f(X) -> X_H."""
+        protein.add_hydrogens(coords=tcoords)
+        return protein.hcoords
+
+    return add_h
