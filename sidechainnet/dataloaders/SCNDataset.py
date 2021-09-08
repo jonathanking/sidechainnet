@@ -450,9 +450,10 @@ class SCNProtein(object):
     def get_hydrogen_coord_mask(self):
         """Return a torch tensor with 0s representing pad characters in self.hcoords."""
         mask = torch.zeros_like(self.hcoords)
-        for i, (res3, res1) in enumerate(zip(self.seq3.split(" "), self.seq)):
-            n_heavy_atoms = sum(
-                [True if an != "PAD" else False for an in ATOM_MAP_14[res1]])
+        for i, (res3,
+                atom_names) in enumerate(zip(self.seq3.split(" "),
+                                             self.get_atom_names())):
+            n_heavy_atoms = sum([True if an != "PAD" else False for an in atom_names])
             n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
             mask[i *
                  hy.NUM_COORDS_PER_RES_W_HYDROGENS:i * hy.NUM_COORDS_PER_RES_W_HYDROGENS +
