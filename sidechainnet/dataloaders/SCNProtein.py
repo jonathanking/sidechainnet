@@ -155,6 +155,7 @@ class SCNProtein(object):
             # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
             self.forces[hcoord_idx] = self._forces_raw[pos_or_force_idx]
         # TODO try vector assignment
+        # TODO change positions to be a numpy array instead of a list
 
         if pprint:
             atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
@@ -172,17 +173,14 @@ class SCNProtein(object):
 
     def update_positions(self):
         """Update the positions variable with hydrogen coordinate values."""
+        hcoords = self.hcoords.detach().numpy()
         for hcoord_idx, pos_idx in self.hcoord_to_pos_map.items():
-            self.positions[pos_idx] = self._Vec3(self.hcoords[hcoord_idx])
-        return self.positions
+            self.positions[pos_idx] = hcoords[hcoord_idx] # np.apply
+        return self.positions  # TODO Try vector assignments/slicing, numba JIT compile
 
     ##########################################
     #         OPENMM SETUP FUNCTIONS         #
     ##########################################
-
-    def _Vec3(self, single_coord):
-        return Vec3(single_coord[0], single_coord[1], single_coord[2])
-        # /10 if not scaled prior to running
 
     def get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
@@ -208,7 +206,7 @@ class SCNProtein(object):
                 self.topology.addAtom(name=an,
                                       element=get_element_from_atomname(an),
                                       residue=residue)
-                self.positions.append(self._Vec3(c))
+                self.positions.append(c)
                 self.hcoord_to_pos_map[hcoord_idx] = pos_idx
                 hcoord_idx += 1
                 pos_idx += 1
@@ -218,7 +216,7 @@ class SCNProtein(object):
         self.topology.createStandardBonds()
         # TODO think about disulfide bonds at a later point, see CYS/CYX (bridge, no H)
         # self.topology.createDisulfideBonds(self.positions)
-        # self.positions = np.array(self.positions)
+        self.positions = np.array(self.positions)
         return self.topology, self.positions
 
     def initialize_openmm(self):

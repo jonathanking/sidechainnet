@@ -168,7 +168,7 @@ class StructureBuilder(object):
             prev_res = res
 
         if self.data_type == 'torch':
-            self.coords = torch.stack(self.coords)
+            self.coords = torch.stack(self.coords).double()
         else:
             self.coords = np.stack(self.coords)
 
