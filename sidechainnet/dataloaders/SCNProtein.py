@@ -120,7 +120,7 @@ class SCNProtein(object):
         self.hcoords = self.sb.coords
         self.has_hydrogens = True
         self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
-        if not self.positions:
+        if self.positions is None:
             self.initialize_openmm()
         self.update_positions()
 
@@ -151,9 +151,7 @@ class SCNProtein(object):
         self._forces_raw = self.starting_state.getForces(asNumpy=True)
 
         # Assign forces from OpenMM to their places in the hydrogen coord representation
-        for hcoord_idx, pos_or_force_idx in self.hcoord_to_pos_map.items():
-            # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
-            self.forces[hcoord_idx] = self._forces_raw[pos_or_force_idx]
+        self.forces[list(self.hcoord_to_pos_map.keys())] = self._forces_raw[list(self.hcoord_to_pos_map.values())]
         # TODO try vector assignment
         # TODO change positions to be a numpy array instead of a list
 
@@ -174,9 +172,8 @@ class SCNProtein(object):
     def update_positions(self):
         """Update the positions variable with hydrogen coordinate values."""
         hcoords = self.hcoords.detach().numpy()
-        for hcoord_idx, pos_idx in self.hcoord_to_pos_map.items():
-            self.positions[pos_idx] = hcoords[hcoord_idx] # np.apply
-        return self.positions  # TODO Try vector assignments/slicing, numba JIT compile
+        self.positions[list(self.hcoord_to_pos_map.values())] = hcoords[list(self.hcoord_to_pos_map.keys())]
+        return self.positions  # TODO numba JIT compile
 
     ##########################################
     #         OPENMM SETUP FUNCTIONS         #
@@ -190,7 +187,7 @@ class SCNProtein(object):
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        coord_gen = coord_generator(self.hcoords, self.atoms_per_res)
+        coord_gen = coord_generator(self.hcoords.detach().numpy(), self.atoms_per_res)
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
