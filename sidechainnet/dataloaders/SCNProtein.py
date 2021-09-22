@@ -138,7 +138,7 @@ class SCNProtein(object):
         self.starting_energy = self.starting_state.getPotentialEnergy()
         return self.starting_energy
 
-    def get_forces(self, output_rep="heavy", sum_hydrogens=False, pprint=False):
+    def get_forces(self, output_rep="heavy", pprint=False):
         """Return tensor of forces as requested."""
         if output_rep == "heavy":
             outdim = NUM_COORDS_PER_RES  # 14
@@ -148,24 +148,26 @@ class SCNProtein(object):
             raise ValueError(f"{output_rep} is not a valid output representation. "
                              "Choose either 'heavy' or 'all'.")
 
+        # Initialize tensor and energy
         if self.forces is None:
-            self.forces = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
-
+            self.forces = np.zeros((len(self.seq) * outdim, 3))
         if not self.starting_energy:
             self.get_energy()
+
+        # Compute forces with OpenMM
         self._forces_raw = self.starting_state.getForces()
 
         for hcoord_idx, pos_or_force_idx in self.hcoord_to_pos_map.items():
             # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
             item = self._forces_raw[pos_or_force_idx]
-            self.forces[hcoord_idx] = torch.tensor([item.x, item.y, item.z])
+            self.forces[hcoord_idx] = item.x, item.y, item.z
 
         if pprint:
             atom_name_pprint(self.get_atom_names(heavy_only=output_rep == "heavy"),
                              self.forces)
             return
 
-        return self.forces
+        return torch.tensor(self.forces)
 
     def update_hydrogens(self, hcoords):
         """Take a set a hydrogen coordinates and use it to update this protein."""
@@ -177,9 +179,8 @@ class SCNProtein(object):
 
     def update_positions(self):
         """Update the positions variable with hydrogen coordinate values."""
-        for hcoord_idx in self.hcoord_to_pos_map:
-            self.positions[self.hcoord_to_pos_map[hcoord_idx]] = self._Vec3(
-                self.hcoords[hcoord_idx])
+        for hcoord_idx, pos_idx in self.hcoord_to_pos_map.items():
+            self.positions[pos_idx] = self._Vec3(self.hcoords[hcoord_idx])
         return self.positions
 
     ##########################################
@@ -224,7 +225,7 @@ class SCNProtein(object):
         self.topology.createStandardBonds()
         # TODO think about disulfide bonds at a later point, see CYS/CYX (bridge, no H)
         # self.topology.createDisulfideBonds(self.positions)
-        self.positions = np.array(self.positions)
+        # self.positions = np.array(self.positions)
         return self.topology, self.positions
 
     def initialize_openmm(self):
@@ -377,7 +378,7 @@ class SCNProtein(object):
         new_list = list(atom_names)
         new_list[pad_idx:pad_idx + len(terminal_atom_names)] = terminal_atom_names
         return new_list
-    
+
     def hydrogenrep_to_heavyatomrep(self, hcoords=None):
         """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
         to_stack = []
