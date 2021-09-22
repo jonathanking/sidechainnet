@@ -3,8 +3,12 @@ import torch
 from torch.autograd.functional import jacobian as get_jacobian
 from torch.autograd import gradcheck
 
+import cProfile
+from pstats import Stats, SortKey
+from tqdm import tqdm
+
 import sidechainnet as scn
-from sidechainnet.utils.openmm import OpenMMEnergy
+from sidechainnet.utils.openmm import OpenMMEnergy, OpenMMEnergyH
 
 torch.autograd.set_detect_anomaly(True)
 torch.set_printoptions(sci_mode=False, precision=3)
@@ -106,3 +110,45 @@ def test_openmm_gradcheck3():
     _input = p, p.coords, "all", j
     test = gradcheck(openmmf.apply, _input, check_undefined_grad=True)
     print(test)
+
+
+def test_openmm_energy_h():
+    openmmf = OpenMMEnergyH()
+    p = load_p(start=38, l=2)
+    p.add_hydrogens()
+    loss = openmmf.apply(p, p.hcoords)
+    _input = p, p.hcoords
+    test = gradcheck(openmmf.apply, _input, check_undefined_grad=True)
+    print(test)
+
+
+def test_optimize_with_profiling():
+    p = load_p(0, -1)
+    p.add_hydrogens()
+    to_optim = p.hcoords.detach().clone().requires_grad_(True)
+    energy_loss = OpenMMEnergyH()
+    opt = torch.optim.LBFGS([to_optim], lr=1e-3)
+    losses = []
+
+    for i in tqdm(range(50)):
+        def closure():
+            opt.zero_grad()
+            loss = energy_loss.apply(p, to_optim)
+            loss.backward()
+            losses.append(float(loss.detach().numpy()))
+            return loss
+
+        opt.step(closure)
+    print(losses[0], losses[-1])
+
+
+def test_profile_training():
+    with cProfile.Profile() as pr:
+        test_optimize_with_profiling()
+
+    with open('profiling_stats.txt', 'w') as stream:
+        stats = Stats(pr, stream=stream)
+        stats.strip_dirs()
+        stats.sort_stats('time')
+        stats.dump_stats('.prof_stats')
+        stats.print_stats()

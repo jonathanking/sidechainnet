@@ -164,6 +164,8 @@ class SCNProtein(object):
         self.openmm_initialized = False
         self.hcoords = self.coords.copy()
         self.starting_energy = None
+        self.positions = None
+        self.forces = None
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -200,13 +202,12 @@ class SCNProtein(object):
         return " ".join([ONE_TO_THREE_LETTER_MAP[c] for c in self.seq])
 
     def _Vec3(self, single_coord):
-        return Vec3(single_coord[0], single_coord[1], single_coord[2]) * angstroms
+        return Vec3(single_coord[0], single_coord[1], single_coord[2])  #/10 if not scaled prior to running
 
     def get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
-        openmmidx = coordidx = coordidx24 = 0
-        self.atommap14idx_to_openmmidx = {}
-        self.atommap24idx_to_openmmidx = {}
+        self.hcoord_to_pos_map = {}
+        pos_idx = hcoord_idx = 0
         self.positions = []
         self.topology = Topology()
         self.openmm_seq = ""
@@ -216,56 +217,29 @@ class SCNProtein(object):
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
             if mask_char == "-" and skip_missing_residues:
+                hcoord_idx += hy.NUM_COORDS_PER_RES_W_HYDROGENS
                 continue
             residue = self.topology.addResidue(name=residue_name, chain=chain)
-            # Rectify coordinate 14 mapping index to account for padded atoms
-            if i > 0:
-                coordidx -= 1
-                prev_residue_n_atoms = coordidx % NUM_COORDS_PER_RES
-                if prev_residue_n_atoms != 0:
-                    coordidx += NUM_COORDS_PER_RES - prev_residue_n_atoms
 
-                coordidx24 -= 1
-                prev_residue_n_atoms = coordidx24 % hy.NUM_COORDS_PER_RES_W_HYDROGENS
-                if prev_residue_n_atoms != 0:
-                    coordidx24 += hy.NUM_COORDS_PER_RES_W_HYDROGENS - prev_residue_n_atoms
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 if an == "PAD":
+                    hcoord_idx += 1
                     continue
                 self.topology.addAtom(name=an,
                                       element=get_element_from_atomname(an),
                                       residue=residue)
                 self.positions.append(self._Vec3(c))
-
-                # If this is a heavy atom from atommap14, record (coord14idx->openmmmidx)
-                if not an.startswith("H"):
-                    self.atommap14idx_to_openmmidx[coordidx] = (an, openmmidx)
-                    coordidx += 1
-
-                self.atommap24idx_to_openmmidx[coordidx24] = (an, openmmidx)
-                coordidx24 += 1
-                openmmidx += 1
+                self.hcoord_to_pos_map[hcoord_idx] = pos_idx
+                hcoord_idx += 1
+                pos_idx += 1
 
             self.openmm_seq += residue_code
+
         self.topology.createStandardBonds()
         # TODO think about disulfide bonds at a later point, see CYS/CYX (bridge, no H)
         # self.topology.createDisulfideBonds(self.positions)
+        self.positions = np.array(self.positions)
         return self.topology, self.positions
-
-    def update_positions(self, skip_missing_residues=True):
-        """Update the positions variable with hydrogen coordinate values."""
-        self.positions = []
-        coord_gen = coord_generator(self.hcoords, self.atoms_per_res)
-        for i, (residue_code, coords, mask_char, atom_names) in enumerate(
-                zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
-            if mask_char == "-" and skip_missing_residues:
-                continue
-            for j, (an, c) in enumerate(zip(atom_names, coords)):
-                if an == "PAD":
-                    continue
-                self.positions.append(self._Vec3(c))
-
-        return self.positions
 
     def insert_terminal_atoms_into_name_list(self, atom_names, terminal_atom_names):
         """Insert a list of atoms into an existing list, keeping lengths the same."""
@@ -300,7 +274,8 @@ class SCNProtein(object):
             self.initialize_openmm()
         self.simulation.context.setPositions(self.positions)
         self.starting_state = self.simulation.context.getState(getEnergy=True,
-                                                               getForces=True)
+                                                               getForces=True,
+                                                               getPositions=True)
         self.starting_energy = self.starting_state.getPotentialEnergy()
         return self.starting_energy
 
@@ -308,17 +283,16 @@ class SCNProtein(object):
         """Return a dictionary mapping resnum -> {atomname: (resname, force)}."""
         if not self.starting_energy:
             self.get_energy()
-        forces = self.starting_state.getForces(
+        self._forces_raw = self.starting_state.getForces(
         )  # Matches OpenMM Topology; includes terminal atoms and Hs
         force_dict = {}
-        for atom, force in zip(self.topology.atoms(), forces):
+        for atom, force in zip(self.topology.atoms(), self._forces_raw):
             resnum = atom.residue.index
             atomname = atom.name
             resname = atom.residue.name
             if resnum not in force_dict:
                 force_dict[resnum] = {}
-            force_dict[resnum][atomname] = resname, force / (kilojoule_per_mole /
-                                                             angstrom)
+            force_dict[resnum][atomname] = resname, force
         return force_dict
 
     def get_forces(self, output_rep="heavy", sum_hydrogens=False, pprint=False):
@@ -326,44 +300,29 @@ class SCNProtein(object):
         if output_rep == "heavy":
             outdim = NUM_COORDS_PER_RES  # 14
         elif output_rep == "all":
-            outdim = hy.NUM_COORDS_PER_RES_W_HYDROGENS  # 24
+            outdim = hy.NUM_COORDS_PER_RES_W_HYDROGENS  # 26
         else:
             raise ValueError(f"{output_rep} is not a valid output representation. "
                              "Choose either 'heavy' or 'all'.")
-        if sum_hydrogens and output_rep == "all":
-            raise ValueError("Cannot sum hydrogen forces for output dim 'all'.")
 
-        force_dict = self.get_forces_dict()
-        force_array = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
-        force_array_raw = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
-        force_idx = 0
+        if self.forces is None:
+            self.forces = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
 
-        for resnum in range(len(force_dict)):
-            cur_atom_num = 0
-            atom_positions = {}
-            for atomname, (resname, f) in force_dict[resnum].items():
-                if (atomname.startswith("H") and output_rep == "heavy" and
-                        not sum_hydrogens):
-                    break
-                elif atomname.startswith("H") and output_rep == "heavy" and sum_hydrogens:
-                    heavyatom = hy.HYDROGEN_NAMES_TO_PARTNERS[resname][atomname]
-                    heavyatom_idx = atom_positions[heavyatom]
-                    force_array[heavyatom_idx] += torch.tensor([f.x, f.y, f.z],
-                                                               dtype=torch.float64)
-                    continue
-                force_array[force_idx] = force_array_raw[force_idx] = torch.tensor(
-                    [f.x, f.y, f.z], dtype=torch.float64)
-                atom_positions[atomname] = force_idx
-                force_idx += 1
-                cur_atom_num += 1
+        if not self.starting_energy:
+            self.get_energy()
+        self._forces_raw = self.starting_state.getForces()
 
-            force_idx += (outdim - cur_atom_num)  # skip padded atoms
+        for hcoord_idx, pos_or_force_idx in self.hcoord_to_pos_map.items():
+            # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
+            item = self._forces_raw[pos_or_force_idx]
+            self.forces[hcoord_idx] = torch.tensor([item.x, item.y, item.z])
 
         if pprint:
-            atom_name_pprint(self.get_atom_names(heavy_only=output_rep=="heavy"), force_array)
+            atom_name_pprint(self.get_atom_names(heavy_only=output_rep == "heavy"),
+                             self.forces)
             return
 
-        return force_array
+        return self.forces
 
     def make_pdbfixer(self):
         """Construct and return an OpenMM PDBFixer object for this protein."""
@@ -437,6 +396,8 @@ class SCNProtein(object):
         self.hcoords = self.sb.coords
         self.has_hydrogens = True
         self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
+        if not self.positions:
+            self.initialize_openmm()
         self.update_positions()
 
     def update_hydrogens(self, hcoords):
@@ -446,6 +407,27 @@ class SCNProtein(object):
         self.has_hydrogens = True
         self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
         self.update_positions()
+
+    def update_positions(self, skip_missing_residues=True):
+        """Update the positions variable with hydrogen coordinate values."""
+        # self.positions = np.zeros_like(self.positions)
+        # print(self.hcoord_to_pos_map)
+        for hcoord_idx in self.hcoord_to_pos_map:
+            self.positions[self.hcoord_to_pos_map[hcoord_idx]] = self._Vec3(self.hcoords[hcoord_idx])
+        # pos = 0
+        # coord_gen = coord_generator(self.hcoords, self.atoms_per_res)
+        # for i, (residue_code, coords, mask_char, atom_names) in enumerate(
+        #         zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
+        #     if mask_char == "-" and skip_missing_residues:
+        #         continue
+        #     for j, (an, c) in enumerate(zip(atom_names, coords)):
+        #         if an == "PAD":
+        #             continue
+        #         # self.positions.append(self._Vec3(c))
+        #         self.positions[pos] = self._Vec3(c)
+        # pos += 1
+        # self.positions /= 10
+        return self.positions
 
     def get_hydrogen_coord_mask(self):
         """Return a torch tensor with 0s representing pad characters in self.hcoords."""
@@ -465,9 +447,11 @@ class SCNProtein(object):
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
 
-    def hydrogenrep_to_heavyatomrep(self, hcoords):
+    def hydrogenrep_to_heavyatomrep(self, hcoords=None):
         """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
         to_stack = []
+        if hcoords is None:
+            hcoords = self.hcoords
 
         for i, s in enumerate(self.seq3.split(" ")):
             num_heavy = 4 + len(SC_BUILD_INFO[s]['atom-names'])
