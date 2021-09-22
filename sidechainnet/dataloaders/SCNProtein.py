@@ -101,6 +101,91 @@ class SCNProtein(object):
         """Return 3-letter amino acid sequence for the protein."""
         return " ".join([ONE_TO_THREE_LETTER_MAP[c] for c in self.seq])
 
+    def __repr__(self) -> str:
+        """Represent an SCNProtein as a string."""
+        return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
+                f"split='{self.split}')")
+
+    def add_hydrogens(self, from_angles=False, coords=None):
+        """Add hydrogens to the internal protein structure representation."""
+        if from_angles:
+            self.sb = structure.StructureBuilder(self.seq, ang=self.angles)
+            self.sb.build()
+        elif coords is not None:
+            self.sb = structure.StructureBuilder(self.seq, crd=coords)
+        else:
+            self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
+        self.sb.add_hydrogens()
+        self.hcoords = self.sb.coords
+        self.has_hydrogens = True
+        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
+        if not self.positions:
+            self.initialize_openmm()
+        self.update_positions()
+
+    ##########################################
+    #        OPENMM PRIMARY FUNCTIONS        #
+    ##########################################
+
+    def get_energy(self):
+        """Return potential energy of the system given current atom positions."""
+        if not self.openmm_initialized:
+            self.initialize_openmm()
+        self.simulation.context.setPositions(self.positions)
+        self.starting_state = self.simulation.context.getState(getEnergy=True,
+                                                               getForces=True,
+                                                               getPositions=True)
+        self.starting_energy = self.starting_state.getPotentialEnergy()
+        return self.starting_energy
+
+    def get_forces(self, output_rep="heavy", sum_hydrogens=False, pprint=False):
+        """Return tensor of forces as requested."""
+        if output_rep == "heavy":
+            outdim = NUM_COORDS_PER_RES  # 14
+        elif output_rep == "all":
+            outdim = hy.NUM_COORDS_PER_RES_W_HYDROGENS  # 26
+        else:
+            raise ValueError(f"{output_rep} is not a valid output representation. "
+                             "Choose either 'heavy' or 'all'.")
+
+        if self.forces is None:
+            self.forces = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
+
+        if not self.starting_energy:
+            self.get_energy()
+        self._forces_raw = self.starting_state.getForces()
+
+        for hcoord_idx, pos_or_force_idx in self.hcoord_to_pos_map.items():
+            # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
+            item = self._forces_raw[pos_or_force_idx]
+            self.forces[hcoord_idx] = torch.tensor([item.x, item.y, item.z])
+
+        if pprint:
+            atom_name_pprint(self.get_atom_names(heavy_only=output_rep == "heavy"),
+                             self.forces)
+            return
+
+        return self.forces
+
+    def update_hydrogens(self, hcoords):
+        """Take a set a hydrogen coordinates and use it to update this protein."""
+        mask = self.get_hydrogen_coord_mask()
+        self.hcoords = hcoords * mask
+        self.has_hydrogens = True
+        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
+        self.update_positions()
+
+    def update_positions(self):
+        """Update the positions variable with hydrogen coordinate values."""
+        for hcoord_idx in self.hcoord_to_pos_map:
+            self.positions[self.hcoord_to_pos_map[hcoord_idx]] = self._Vec3(
+                self.hcoords[hcoord_idx])
+        return self.positions
+
+    ##########################################
+    #         OPENMM SETUP FUNCTIONS         #
+    ##########################################
+
     def _Vec3(self, single_coord):
         return Vec3(single_coord[0], single_coord[1],
                     single_coord[2])  # /10 if not scaled prior to running
@@ -142,13 +227,6 @@ class SCNProtein(object):
         self.positions = np.array(self.positions)
         return self.topology, self.positions
 
-    def insert_terminal_atoms_into_name_list(self, atom_names, terminal_atom_names):
-        """Insert a list of atoms into an existing list, keeping lengths the same."""
-        pad_idx = atom_names.index("PAD")
-        new_list = list(atom_names)
-        new_list[pad_idx:pad_idx + len(terminal_atom_names)] = terminal_atom_names
-        return new_list
-
     def initialize_openmm(self):
         """Create top., pos., modeller, forcefield, system, integrator, & simulation."""
         self.get_openmm_repr()
@@ -169,45 +247,22 @@ class SCNProtein(object):
                                                 platformProperties=properties)
         self.openmm_initialized = True
 
-    def get_energy(self):
-        """Return potential energy of the system given current atom positions."""
-        if not self.openmm_initialized:
-            self.initialize_openmm()
-        self.simulation.context.setPositions(self.positions)
-        self.starting_state = self.simulation.context.getState(getEnergy=True,
-                                                               getForces=True,
-                                                               getPositions=True)
-        self.starting_energy = self.starting_state.getPotentialEnergy()
-        return self.starting_energy
+    def get_hydrogen_coord_mask(self):
+        """Return a torch tensor with 0s representing pad characters in self.hcoords."""
+        mask = torch.zeros_like(self.hcoords)
+        for i, (res3,
+                atom_names) in enumerate(zip(self.seq3.split(" "),
+                                             self.get_atom_names())):
+            n_heavy_atoms = sum([True if an != "PAD" else False for an in atom_names])
+            n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
+            mask[i *
+                 hy.NUM_COORDS_PER_RES_W_HYDROGENS:i * hy.NUM_COORDS_PER_RES_W_HYDROGENS +
+                 n_heavy_atoms + n_hydrogens, :] = 1.0
+        return mask
 
-    def get_forces(self, output_rep="heavy", sum_hydrogens=False, pprint=False):
-        """Return tensor of forces as requested."""
-        if output_rep == "heavy":
-            outdim = NUM_COORDS_PER_RES  # 14
-        elif output_rep == "all":
-            outdim = hy.NUM_COORDS_PER_RES_W_HYDROGENS  # 26
-        else:
-            raise ValueError(f"{output_rep} is not a valid output representation. "
-                             "Choose either 'heavy' or 'all'.")
-
-        if self.forces is None:
-            self.forces = torch.zeros(len(self.seq) * outdim, 3, dtype=torch.float64)
-
-        if not self.starting_energy:
-            self.get_energy()
-        self._forces_raw = self.starting_state.getForces()
-
-        for hcoord_idx, pos_or_force_idx in self.hcoord_to_pos_map.items():
-            # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
-            item = self._forces_raw[pos_or_force_idx]
-            self.forces[hcoord_idx] = torch.tensor([item.x, item.y, item.z])
-
-        if pprint:
-            atom_name_pprint(self.get_atom_names(heavy_only=output_rep == "heavy"),
-                             self.forces)
-            return
-
-        return self.forces
+    ##########################################
+    #         OTHER OPENMM FUNCTIONS         #
+    ##########################################
 
     def make_pdbfixer(self):
         """Construct and return an OpenMM PDBFixer object for this protein."""
@@ -268,74 +323,9 @@ class SCNProtein(object):
         rmsd = prody.calcRMSD(self.starting_positions, aligned_minimized)
         return rmsd
 
-    def add_hydrogens(self, from_angles=False, coords=None):
-        """Add hydrogens to the internal protein structure representation."""
-        if from_angles:
-            self.sb = structure.StructureBuilder(self.seq, ang=self.angles)
-            self.sb.build()
-        elif coords is not None:
-            self.sb = structure.StructureBuilder(self.seq, crd=coords)
-        else:
-            self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
-        self.sb.add_hydrogens()
-        self.hcoords = self.sb.coords
-        self.has_hydrogens = True
-        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
-        if not self.positions:
-            self.initialize_openmm()
-        self.update_positions()
-
-    def update_hydrogens(self, hcoords):
-        """Take a set a hydrogen coordinates and use it to update this protein."""
-        mask = self.get_hydrogen_coord_mask()
-        self.hcoords = hcoords * mask
-        self.has_hydrogens = True
-        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
-        self.update_positions()
-
-    def update_positions(self):
-        """Update the positions variable with hydrogen coordinate values."""
-        for hcoord_idx in self.hcoord_to_pos_map:
-            self.positions[self.hcoord_to_pos_map[hcoord_idx]] = self._Vec3(
-                self.hcoords[hcoord_idx])
-        return self.positions
-
-    def get_hydrogen_coord_mask(self):
-        """Return a torch tensor with 0s representing pad characters in self.hcoords."""
-        mask = torch.zeros_like(self.hcoords)
-        for i, (res3,
-                atom_names) in enumerate(zip(self.seq3.split(" "),
-                                             self.get_atom_names())):
-            n_heavy_atoms = sum([True if an != "PAD" else False for an in atom_names])
-            n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
-            mask[i *
-                 hy.NUM_COORDS_PER_RES_W_HYDROGENS:i * hy.NUM_COORDS_PER_RES_W_HYDROGENS +
-                 n_heavy_atoms + n_hydrogens, :] = 1.0
-        return mask
-
-    def __repr__(self) -> str:
-        """Represent an SCNProtein as a string."""
-        return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
-                f"split='{self.split}')")
-
-    def hydrogenrep_to_heavyatomrep(self, hcoords=None):
-        """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
-        to_stack = []
-        if hcoords is None:
-            hcoords = self.hcoords
-
-        for i, s in enumerate(self.seq3.split(" ")):
-            num_heavy = 4 + len(SC_BUILD_INFO[s]['atom-names'])
-            h_start = i * hy.NUM_COORDS_PER_RES_W_HYDROGENS
-            h_end = h_start + num_heavy
-
-            n_pad = NUM_COORDS_PER_RES - num_heavy
-
-            to_stack.extend(
-                [hcoords[h_start:h_end],
-                 torch.zeros(n_pad, 3, requires_grad=True)])
-
-        return torch.cat(to_stack)
+    ###################################
+    #         OTHER FUNCTIONS         #
+    ###################################
 
     def get_atom_names(self, zip_coords=False, pprint=False, heavy_only=False):
         """Return or print atom name list for each residue including terminal atoms."""
@@ -380,6 +370,32 @@ class SCNProtein(object):
                 print(f"{i: <2}", xy[0], xy[1])
             return None
         return all_atom_name_list
+
+    def insert_terminal_atoms_into_name_list(self, atom_names, terminal_atom_names):
+        """Insert a list of atoms into an existing list, keeping lengths the same."""
+        pad_idx = atom_names.index("PAD")
+        new_list = list(atom_names)
+        new_list[pad_idx:pad_idx + len(terminal_atom_names)] = terminal_atom_names
+        return new_list
+    
+    def hydrogenrep_to_heavyatomrep(self, hcoords=None):
+        """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
+        to_stack = []
+        if hcoords is None:
+            hcoords = self.hcoords
+
+        for i, s in enumerate(self.seq3.split(" ")):
+            num_heavy = 4 + len(SC_BUILD_INFO[s]['atom-names'])
+            h_start = i * hy.NUM_COORDS_PER_RES_W_HYDROGENS
+            h_end = h_start + num_heavy
+
+            n_pad = NUM_COORDS_PER_RES - num_heavy
+
+            to_stack.extend(
+                [hcoords[h_start:h_end],
+                 torch.zeros(n_pad, 3, requires_grad=True)])
+
+        return torch.cat(to_stack)
 
 
 def atom_name_pprint(atom_names, values):
