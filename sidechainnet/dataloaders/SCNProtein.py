@@ -148,13 +148,13 @@ class SCNProtein(object):
             self.get_energy()
 
         # Compute forces with OpenMM
-        self._forces_raw = self.starting_state.getForces()
+        self._forces_raw = self.starting_state.getForces(asNumpy=True)
 
         # Assign forces from OpenMM to their places in the hydrogen coord representation
         for hcoord_idx, pos_or_force_idx in self.hcoord_to_pos_map.items():
             # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
-            item = self._forces_raw[pos_or_force_idx]
-            self.forces[hcoord_idx] = item.x, item.y, item.z
+            self.forces[hcoord_idx] = self._forces_raw[pos_or_force_idx]
+        # TODO try vector assignment
 
         if pprint:
             atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)

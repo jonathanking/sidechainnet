@@ -152,3 +152,8 @@ def test_profile_training():
         stats.sort_stats('time')
         stats.dump_stats('.prof_stats')
         stats.print_stats()
+
+
+if __name__ == "__main__":
+    test_optimize_with_profiling()
+    # pass
