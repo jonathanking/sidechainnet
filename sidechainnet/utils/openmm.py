@@ -67,7 +67,6 @@ class OpenMMEnergyH(torch.autograd.Function):
 
         # Save context
         ctx.forces = forces
-        protein._forces = forces
         ctx.gradient_scale = force_scaling
 
         return energy
