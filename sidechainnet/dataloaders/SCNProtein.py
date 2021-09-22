@@ -151,7 +151,8 @@ class SCNProtein(object):
         self._forces_raw = self.starting_state.getForces(asNumpy=True)
 
         # Assign forces from OpenMM to their places in the hydrogen coord representation
-        self.forces[list(self.hcoord_to_pos_map.keys())] = self._forces_raw[list(self.hcoord_to_pos_map.values())]
+        self.forces[list(self.hcoord_to_pos_map.keys())] = self._forces_raw[list(
+            self.hcoord_to_pos_map.values())]
         # TODO try vector assignment
         # TODO change positions to be a numpy array instead of a list
 
@@ -172,7 +173,8 @@ class SCNProtein(object):
     def update_positions(self):
         """Update the positions variable with hydrogen coordinate values."""
         hcoords = self.hcoords.detach().numpy()
-        self.positions[list(self.hcoord_to_pos_map.values())] = hcoords[list(self.hcoord_to_pos_map.keys())]
+        self.positions[list(self.hcoord_to_pos_map.values())] = hcoords[list(
+            self.hcoord_to_pos_map.keys())]
         return self.positions  # TODO numba JIT compile
 
     ##########################################

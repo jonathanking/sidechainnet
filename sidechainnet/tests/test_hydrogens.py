@@ -153,7 +153,43 @@ def test_profile_training():
         stats.dump_stats('.prof_stats')
         stats.print_stats()
 
+def test_optimize_internal():
+    p = load_p(0, -1)
+    p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64)
+    p.add_hydrogens(from_angles=True)
+
+    to_optim = (p.angles).detach().clone().requires_grad_(True)
+    starting_angs = to_optim.detach().clone()
+
+    energy_loss = OpenMMEnergyH()
+    opt = torch.optim.SGD([to_optim], lr=1e-4)
+
+    losses = []
+
+    for i in tqdm(range(10)):
+        # SGD
+        opt.zero_grad()
+        # Re-add the angles to the protein object
+        p.angles = to_optim
+        with torch.no_grad():
+            p.angles[p.angles < -np.pi] = -np.pi
+            p.angles[p.angles > np.pi] = np.pi
+        # Rebuild the coordinates from the angles
+        p.add_hydrogens(from_angles=True)
+        # Compute the loss on the coordinates
+        loss = energy_loss.apply(p, p.hcoords)
+        # Backprop to angles
+        loss.backward()
+        losses.append(float(loss.detach().numpy()))
+        print(loss)
+
+        torch.nn.utils.clip_grad_norm_(to_optim, 1)
+
+        opt.step()
+
+
 
 if __name__ == "__main__":
     test_optimize_with_profiling()
     # pass
+    # test_optimize_internal()
