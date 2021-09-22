@@ -57,13 +57,13 @@ class OpenMMEnergyH(torch.autograd.Function):
     def forward(ctx, protein, hcoords, force_scaling=1):
         """Compute potential energy of the protein system and save atomic forces."""
         # Update protein's hcoords
-        protein.update_hydrogens(hcoords)
+        protein.update_hydrogens(hcoords / 10)
 
         # Compute potential energy and forces
         energy = torch.tensor(protein.get_energy()._value,
                               requires_grad=True,
                               dtype=torch.float64)
-        forces = protein.get_forces(output_rep="all")
+        forces = protein.get_forces() / 10
 
         # Save context
         ctx.forces = forces
@@ -77,7 +77,7 @@ class OpenMMEnergyH(torch.autograd.Function):
         """Return the negative force acting on each atom."""
         forces = ctx.forces
 
-        return None, -forces * grad_output * ctx.gradient_scale, None
+        return None, torch.tensor(-forces) * grad_output * ctx.gradient_scale, None
 
 
 def _get_alias(protein):

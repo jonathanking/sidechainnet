@@ -66,6 +66,7 @@ class SCNProtein(object):
         self.starting_energy = None
         self.positions = None
         self.forces = None
+        self._hcoord_mask = None
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -138,36 +139,28 @@ class SCNProtein(object):
         self.starting_energy = self.starting_state.getPotentialEnergy()
         return self.starting_energy
 
-    def get_forces(self, output_rep="heavy", pprint=False):
+    def get_forces(self, pprint=False):
         """Return tensor of forces as requested."""
-        if output_rep == "heavy":
-            outdim = NUM_COORDS_PER_RES  # 14
-        elif output_rep == "all":
-            outdim = hy.NUM_COORDS_PER_RES_W_HYDROGENS  # 26
-        else:
-            raise ValueError(f"{output_rep} is not a valid output representation. "
-                             "Choose either 'heavy' or 'all'.")
-
         # Initialize tensor and energy
         if self.forces is None:
-            self.forces = np.zeros((len(self.seq) * outdim, 3))
+            self.forces = np.zeros((len(self.seq) * hy.NUM_COORDS_PER_RES_W_HYDROGENS, 3))
         if not self.starting_energy:
             self.get_energy()
 
         # Compute forces with OpenMM
         self._forces_raw = self.starting_state.getForces()
 
+        # Assign forces from OpenMM to their places in the hydrogen coord representation
         for hcoord_idx, pos_or_force_idx in self.hcoord_to_pos_map.items():
             # For a hydrogen system, self.forces is 26L x 3, (hcoords shape)
             item = self._forces_raw[pos_or_force_idx]
             self.forces[hcoord_idx] = item.x, item.y, item.z
 
         if pprint:
-            atom_name_pprint(self.get_atom_names(heavy_only=output_rep == "heavy"),
-                             self.forces)
+            atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
             return
 
-        return torch.tensor(self.forces)
+        return self.forces
 
     def update_hydrogens(self, hcoords):
         """Take a set a hydrogen coordinates and use it to update this protein."""
@@ -188,8 +181,8 @@ class SCNProtein(object):
     ##########################################
 
     def _Vec3(self, single_coord):
-        return Vec3(single_coord[0], single_coord[1],
-                    single_coord[2])  # /10 if not scaled prior to running
+        return Vec3(single_coord[0], single_coord[1], single_coord[2])
+        # /10 if not scaled prior to running
 
     def get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
@@ -250,16 +243,18 @@ class SCNProtein(object):
 
     def get_hydrogen_coord_mask(self):
         """Return a torch tensor with 0s representing pad characters in self.hcoords."""
-        mask = torch.zeros_like(self.hcoords)
-        for i, (res3,
-                atom_names) in enumerate(zip(self.seq3.split(" "),
-                                             self.get_atom_names())):
-            n_heavy_atoms = sum([True if an != "PAD" else False for an in atom_names])
-            n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
-            mask[i *
-                 hy.NUM_COORDS_PER_RES_W_HYDROGENS:i * hy.NUM_COORDS_PER_RES_W_HYDROGENS +
-                 n_heavy_atoms + n_hydrogens, :] = 1.0
-        return mask
+        if self._hcoord_mask is not None:
+            return self._hcoord_mask
+        else:
+            self._hcoord_mask = torch.zeros_like(self.hcoords)
+            for i, (res3, atom_names) in enumerate(
+                    zip(self.seq3.split(" "), self.get_atom_names())):
+                n_heavy_atoms = sum([True if an != "PAD" else False for an in atom_names])
+                n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
+                self._hcoord_mask[i * hy.NUM_COORDS_PER_RES_W_HYDROGENS:i *
+                                  hy.NUM_COORDS_PER_RES_W_HYDROGENS + n_heavy_atoms +
+                                  n_hydrogens, :] = 1.0
+            return self._hcoord_mask
 
     ##########################################
     #         OTHER OPENMM FUNCTIONS         #
