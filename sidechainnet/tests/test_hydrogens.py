@@ -155,8 +155,7 @@ def test_profile_training():
 
 def test_optimize_internal():
     p = load_p(0, -1)
-    p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64)
-    p.add_hydrogens(from_angles=True)
+    p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64, device='cuda')
 
     to_optim = (p.angles).detach().clone().requires_grad_(True)
     starting_angs = to_optim.detach().clone()
@@ -180,7 +179,7 @@ def test_optimize_internal():
         loss = energy_loss.apply(p, p.hcoords)
         # Backprop to angles
         loss.backward()
-        losses.append(float(loss.detach().numpy()))
+        losses.append(float(loss.cpu().detach().numpy()))
         print(loss)
 
         torch.nn.utils.clip_grad_norm_(to_optim, 1)

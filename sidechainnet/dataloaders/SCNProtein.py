@@ -67,6 +67,7 @@ class SCNProtein(object):
         self.positions = None
         self.forces = None
         self._hcoord_mask = None
+        self.device = 'cpu'
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -110,12 +111,16 @@ class SCNProtein(object):
     def add_hydrogens(self, from_angles=False, coords=None):
         """Add hydrogens to the internal protein structure representation."""
         if from_angles:
-            self.sb = structure.StructureBuilder(self.seq, ang=self.angles)
+            self.sb = structure.StructureBuilder(self.seq,
+                                                 ang=self.angles,
+                                                 device=self.device)
             self.sb.build()
         elif coords is not None:
-            self.sb = structure.StructureBuilder(self.seq, crd=coords)
+            self.sb = structure.StructureBuilder(self.seq, crd=coords, device=self.device)
         else:
-            self.sb = structure.StructureBuilder(self.seq, crd=self.coords)
+            self.sb = structure.StructureBuilder(self.seq,
+                                                 crd=self.coords,
+                                                 device=self.device)
         self.sb.add_hydrogens()
         self.hcoords = self.sb.coords
         self.has_hydrogens = True
@@ -172,7 +177,7 @@ class SCNProtein(object):
 
     def update_positions(self):
         """Update the positions variable with hydrogen coordinate values."""
-        hcoords = self.hcoords.detach().numpy()
+        hcoords = self.hcoords.cpu().detach().numpy()
         self.positions[list(self.hcoord_to_pos_map.values())] = hcoords[list(
             self.hcoord_to_pos_map.keys())]
         return self.positions  # TODO numba JIT compile
@@ -189,7 +194,8 @@ class SCNProtein(object):
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        coord_gen = coord_generator(self.hcoords.detach().numpy(), self.atoms_per_res)
+        hcoords = self.hcoords.cpu().detach().numpy()
+        coord_gen = coord_generator(hcoords, self.atoms_per_res)
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
@@ -389,6 +395,38 @@ class SCNProtein(object):
                  torch.zeros(n_pad, 3, requires_grad=True)])
 
         return torch.cat(to_stack)
+
+    def cuda(self):
+        """Move coords, hcoords, and angles to the default CUDA torch device."""
+        if isinstance(self.coords, torch.Tensor):
+            self.coords = self.coords.cuda()
+        else:
+            self.coords = torch.tensor(self.coords, device='cuda')
+        if isinstance(self.hcoords, torch.Tensor):
+            self.hcoords = self.hcoords.cuda()
+        else:
+            self.hcoords = torch.tensor(self.hcoords, device='cuda')
+        if isinstance(self.angles, torch.Tensor):
+            self.angles = self.angles.cuda()
+        else:
+            self.angles = torch.tensor(self.angles, device='cuda')
+        self.device = 'cuda'
+
+    def cpu(self):
+        """Move coords, hcoords, and angles to the default CUDA torch device."""
+        if isinstance(self.coords, torch.Tensor):
+            self.coords = self.coords.cpu()
+        else:
+            self.coords = torch.tensor(self.coords, device='cpu')
+        if isinstance(self.hcoords, torch.Tensor):
+            self.hcoords = self.hcoords.cpu()
+        else:
+            self.hcoords = torch.tensor(self.hcoords, device='cpu')
+        if isinstance(self.angles, torch.Tensor):
+            self.angles = self.angles.cpu()
+        else:
+            self.angles = torch.tensor(self.angles, device='cpu')
+        self.device = 'cpu'
 
 
 def atom_name_pprint(atom_names, values):

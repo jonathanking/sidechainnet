@@ -23,7 +23,7 @@ class StructureBuilder(object):
                  seq,
                  ang=None,
                  crd=None,
-                 device=torch.device("cpu"),
+                 device='cpu',
                  nerf_method="standard"):
         """Initialize a StructureBuilder for a single protein. Does not build coordinates.
 
@@ -168,6 +168,7 @@ class StructureBuilder(object):
             prev_res = res
 
         if self.data_type == 'torch':
+            # self.coords = [x.cuda() for x in self.coords]
             self.coords = torch.stack(self.coords).double()
         else:
             self.coords = np.stack(self.coords)
@@ -195,7 +196,7 @@ class StructureBuilder(object):
         if self.coords is None or not len(self.coords):
             raise ValueError("Cannot add hydrogens to a structure whose heavy atoms have"
                              " not yet been built.")
-        self.hb = HydrogenBuilder(self.seq_as_str, self.coords)
+        self.hb = HydrogenBuilder(self.seq_as_str, self.coords, self.device)
         self.coords = self.hb.build_hydrogens()
         self.has_hydrogens = True
         self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS

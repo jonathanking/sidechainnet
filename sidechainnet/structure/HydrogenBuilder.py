@@ -10,7 +10,7 @@ from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
 NUM_COORDS_PER_RES_W_HYDROGENS = 26
 
-METHYL_ANGLE = 109.5
+METHYL_ANGLE = np.deg2rad(109.5)
 METHYL_LEN = 1.09
 
 METHYLENE_ANGLE = np.rad2deg(0.61656)  # Check - works
@@ -90,7 +90,7 @@ for resname in HYDROGEN_NAMES.keys():
 class HydrogenBuilder(object):
     """A class for adding Hydrogen positions to set of coordinates."""
 
-    def __init__(self, seq, coords):
+    def __init__(self, seq, coords, device='cpu'):
         """Create a Hydrogen builder for a protein.
 
         Args:
@@ -106,7 +106,9 @@ class HydrogenBuilder(object):
         self.is_numpy = self.mode == "numpy"
         self.atom_map = ATOM_MAP_14
         self.terminal_atoms = {"H2": None, "H3": None, "OXT": None}
-        self.empty_coord = np.zeros((3)) if self.is_numpy else torch.zeros(3)
+        self.empty_coord = np.zeros(
+            (3)) if self.is_numpy else torch.zeros(3, device=device)
+        self.device = device
 
         self.norm = np.linalg.norm if self.is_numpy else torch.norm
         self.cross = np.cross if self.is_numpy else torch.cross
@@ -145,7 +147,7 @@ class HydrogenBuilder(object):
                 prev_res_atoms,
                 n_terminal=i == 0,
                 c_terminal=i == len(self.seq) - 1)
-            # Append Hydrogens immediately after heavy atoms, followed by PADs to L=24
+            # Append Hydrogens immediately after heavy atoms, followed by PADs to L=26
             new_coords.append(self.concatenate((crd, hydrogen_positions)))
             prev_res_atoms = atoms
         self.reduced_coords = self.concatenate(new_coords)
@@ -167,7 +169,8 @@ class HydrogenBuilder(object):
             [0., 0., 0.],
             [0., 0., 0.],
         ],
-                                dtype=torch.float64)
+                                dtype=torch.float64,
+                                device=self.device)
         rot_matrix[0, 0] = aa + bb - cc - dd
         rot_matrix[0, 1] = 2 * (bc + ad)
         rot_matrix[0, 2] = 2 * (bd - ac)
@@ -208,15 +211,15 @@ class HydrogenBuilder(object):
 
         # Define perpendicular vector
         PV = self.cross(CB, N)
-        R109 = self.M(PV, np.deg2rad(METHYL_ANGLE))  # Rotate abt PV by 109.5 (tetrahed.)
+        R109 = self.M(PV, METHYL_ANGLE)  # Rotate abt PV by 109.5 (tetrahed.)
 
         # Define Hydrogen extending from carbon
         H1 = self.dot(R109, -CB)  # Place Hydrogen by rotating C along perpendicular axis
         H1 = self.scale(H1, length)
 
         R120 = self.M(CB, 2 * np.pi / 3)
-        H2 = self.dot(R120, H1.clone())  # Place 2nd Hydrogen by rotating previous H 120 deg
-        H3 = self.dot(R120, H2.clone())  # Place 3rd Hydrogen by rotating previous H 120 deg
+        H2 = self.dot(R120, H1.clone())  # Place 2nd Hydrogen by rotating prev H 120 deg
+        H3 = self.dot(R120, H2.clone())  # Place 3rd Hydrogen by rotating prev H 120 deg
 
         H1 += prev1 + CB
         H2 += prev1 + CB
@@ -699,7 +702,11 @@ class HydrogenBuilder(object):
             self.terminal_atoms.update({"OXT": oxt})
             hs.append(oxt)
 
-        return self.stack(self.pad_hydrogens(resname, hs), 0)
+        hs = self.pad_hydrogens(resname, hs)
+        if self.device == 'cuda':
+            hs = [h.cuda() for h in hs]
+
+        return self.stack(hs, 0)
 
 
 class AtomHolder(dict):
