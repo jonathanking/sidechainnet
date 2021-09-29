@@ -2,6 +2,7 @@
 import math
 
 import numpy as np
+from numba import njit
 import torch
 from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.structure.structure import coord_generator
@@ -115,6 +116,7 @@ class HydrogenBuilder(object):
         self.dot = np.dot if self.is_numpy else torch.matmul
         self.eye = np.eye if self.is_numpy else torch.eye
         self.ones = np.ones if self.is_numpy else torch.ones
+        self.zeros = np.zeros if self.is_numpy else torch.zeros
         self.sqrt = math.sqrt if self.is_numpy else torch.sqrt
         self.stack = np.stack if self.is_numpy else torch.stack
         self.array = np.asarray if self.is_numpy else torch.tensor
@@ -159,29 +161,8 @@ class HydrogenBuilder(object):
 
         From https://stackoverflow.com/questions/6802577/rotation-of-3d-vector.
         """
-        axis = axis / self.sqrt(self.dot(axis, axis))
-        a = np.cos(theta / 2.0)
-        b, c, d = -axis * np.sin(theta / 2.0)
-        aa, bb, cc, dd = a * a, b * b, c * c, d * d
-        bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
-        rot_matrix = self.array([
-            [0., 0., 0.],
-            [0., 0., 0.],
-            [0., 0., 0.],
-        ],
-                                dtype=torch.float64,
-                                device=self.device)
-        rot_matrix[0, 0] = aa + bb - cc - dd
-        rot_matrix[0, 1] = 2 * (bc + ad)
-        rot_matrix[0, 2] = 2 * (bd - ac)
-        rot_matrix[1, 0] = 2 * (bc - ad)
-        rot_matrix[1, 1] = aa + cc - bb - dd
-        rot_matrix[1, 2] = 2 * (cd + ab)
-        rot_matrix[2, 0] = 2 * (bd + ac)
-        rot_matrix[2, 1] = 2 * (cd - ab)
-        rot_matrix[2, 2] = aa + dd - bb - cc
-
-        return rot_matrix
+        rot_matrix = _M(axis.detach().numpy(), theta)
+        return torch.tensor(rot_matrix, device=self.device)
 
     def scale(self, vector, target_len, v_len=None):
         """Scale a vector to match a given target length."""
@@ -218,14 +199,21 @@ class HydrogenBuilder(object):
         H1 = self.scale(H1, length)
 
         R120 = self.M(CB, 2 * np.pi / 3)
-        H2 = self.dot(R120, H1.clone())  # Place 2nd Hydrogen by rotating prev H 120 deg
-        H3 = self.dot(R120, H2.clone())  # Place 3rd Hydrogen by rotating prev H 120 deg
+        H2 = self.dot(R120, self.clone(H1))  # Place 2nd Hydrogen by rotating prev H 120 deg
+        H3 = self.dot(R120, self.clone(H2))  # Place 3rd Hydrogen by rotating prev H 120 deg
 
         H1 += prev1 + CB
         H2 += prev1 + CB
         H3 += prev1 + CB
 
         return [H1, H2, H3]
+
+    def clone(self, x):
+        """Clone input iff input is a tensor."""
+        if self.is_numpy:
+            return x
+        else:
+            return x.clone()
 
     def get_methylene_hydrogens(self, r1, carbon, r2):
         """Place methylene hydrogens (R1-CH2-R2) on central Carbon.
@@ -316,7 +304,7 @@ class HydrogenBuilder(object):
         H1 = self.scale(vector=H1, target_len=AMINE_LEN, v_len=vector_len)
 
         # Rotate the previous vector around the same axis by another 120 degrees
-        H2 = self.dot(R, H1.clone())
+        H2 = self.dot(R, self.clone(H1))
         H2 = self.scale(vector=H2, target_len=AMINE_LEN, v_len=vector_len)
 
         H1 += prev1 + N
@@ -736,6 +724,21 @@ class AtomHolder(dict):
     def __setitem__(self, key, value):
         super(AtomHolder, self).__setitem__(key, value)
         self.__dict__.update({key: value})
+
+
+@njit
+def _M(axis, theta):
+    axis = axis / np.sqrt(np.dot(axis, axis))
+    a = np.cos(theta / 2.0)
+    b, c, d = -axis * np.sin(theta / 2.0)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    r = np.zeros((3,3))
+    r = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                   [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                   [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+
+    return r
 
 
 ATOM_MAP_H = {}

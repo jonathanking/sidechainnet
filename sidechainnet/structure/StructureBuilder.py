@@ -72,9 +72,9 @@ class StructureBuilder(object):
 
         # Validate input data
         if self.coords is not None:
-            self.data_type = "torch" if isinstance(self.coords, torch.Tensor) else "numpy"
+            self.is_numpy = False if isinstance(self.coords, torch.Tensor) else True
         else:
-            self.data_type = "torch" if isinstance(self.ang, torch.Tensor) else "numpy"
+            self.is_numpy = False if isinstance(self.ang, torch.Tensor) else True
 
         if self.ang is not None and self.ang.shape[-1] != NUM_ANGLES:
             raise ValueError(f"Angle matrix dimensions must match (L x {NUM_ANGLES}). "
@@ -167,7 +167,7 @@ class StructureBuilder(object):
             self.coords += res.build()
             prev_res = res
 
-        if self.data_type == 'torch':
+        if not self.is_numpy:
             # self.coords = [x.cuda() for x in self.coords]
             self.coords = torch.stack(self.coords).double()
         else:
@@ -181,7 +181,7 @@ class StructureBuilder(object):
 
         if not self.pdb_creator:
             from sidechainnet.structure.PdbBuilder import PdbBuilder
-            if self.data_type == 'numpy':
+            if self.is_numpy:
                 self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords,
                                               self.atoms_per_res,
                                               terminal_atoms=self.terminal_atoms)

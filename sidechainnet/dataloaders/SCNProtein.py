@@ -68,6 +68,7 @@ class SCNProtein(object):
         self.forces = None
         self._hcoord_mask = None
         self.device = 'cpu'
+        self.is_numpy = False
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -139,8 +140,7 @@ class SCNProtein(object):
             self.initialize_openmm()
         self.simulation.context.setPositions(self.positions)
         self.starting_state = self.simulation.context.getState(getEnergy=True,
-                                                               getForces=True,
-                                                               getPositions=True)
+                                                               getForces=True)
         self.starting_energy = self.starting_state.getPotentialEnergy()
         return self.starting_energy
 
@@ -156,10 +156,7 @@ class SCNProtein(object):
         self._forces_raw = self.starting_state.getForces(asNumpy=True)
 
         # Assign forces from OpenMM to their places in the hydrogen coord representation
-        self.forces[list(self.hcoord_to_pos_map.keys())] = self._forces_raw[list(
-            self.hcoord_to_pos_map.values())]
-        # TODO try vector assignment
-        # TODO change positions to be a numpy array instead of a list
+        self.forces[self.hcoord_to_pos_map_keys] = self._forces_raw[self.hcoord_to_pos_map_values]
 
         if pprint:
             atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
@@ -177,9 +174,8 @@ class SCNProtein(object):
 
     def update_positions(self):
         """Update the positions variable with hydrogen coordinate values."""
-        hcoords = self.hcoords.cpu().detach().numpy()
-        self.positions[list(self.hcoord_to_pos_map.values())] = hcoords[list(
-            self.hcoord_to_pos_map.keys())]
+        hcoords = self.hcoords.cpu().detach().numpy() if not self.is_numpy else self.hcoords
+        self.positions[self.hcoord_to_pos_map_values] = hcoords[self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
 
     ##########################################
@@ -188,13 +184,14 @@ class SCNProtein(object):
 
     def get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
-        self.hcoord_to_pos_map = {}
+        self.hcoord_to_pos_map_keys = []
+        self.hcoord_to_pos_map_values = []
         pos_idx = hcoord_idx = 0
         self.positions = []
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        hcoords = self.hcoords.cpu().detach().numpy()
+        hcoords = self.hcoords.cpu().detach().numpy() if not self.is_numpy else self.hcoords
         coord_gen = coord_generator(hcoords, self.atoms_per_res)
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
@@ -212,7 +209,8 @@ class SCNProtein(object):
                                       element=get_element_from_atomname(an),
                                       residue=residue)
                 self.positions.append(c)
-                self.hcoord_to_pos_map[hcoord_idx] = pos_idx
+                self.hcoord_to_pos_map_keys.append(hcoord_idx)
+                self.hcoord_to_pos_map_values.append(pos_idx)
                 hcoord_idx += 1
                 pos_idx += 1
 
@@ -411,6 +409,7 @@ class SCNProtein(object):
         else:
             self.angles = torch.tensor(self.angles, device='cuda')
         self.device = 'cuda'
+        self.is_numpy = False
 
     def cpu(self):
         """Move coords, hcoords, and angles to the default CUDA torch device."""
@@ -427,6 +426,17 @@ class SCNProtein(object):
         else:
             self.angles = torch.tensor(self.angles, device='cpu')
         self.device = 'cpu'
+        self.is_numpy = False
+
+    def numpy(self):
+        """Change coords, hcoords, and angles to numpy.ndarray objects."""
+        if not isinstance(self.coords, np.ndarray):
+            self.coords = self.coords.cpu().detach().numpy()
+        if not isinstance(self.hcoords, np.ndarray):
+            self.hcoords = self.hcoords.cpu().detach().numpy()
+        if not isinstance(self.angles, np.ndarray):
+            self.angles = self.angles.cpu().detach().numpy()
+        self.is_numpy = True
 
 
 def atom_name_pprint(atom_names, values):
