@@ -161,7 +161,7 @@ class HydrogenBuilder(object):
 
         From https://stackoverflow.com/questions/6802577/rotation-of-3d-vector.
         """
-        rot_matrix = _M(axis.detach().numpy(), theta)
+        rot_matrix = _M(axis.detach().cpu().numpy(), theta)
         return torch.tensor(rot_matrix, device=self.device)
 
     def scale(self, vector, target_len, v_len=None):

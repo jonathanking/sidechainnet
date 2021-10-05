@@ -19,12 +19,7 @@ class StructureBuilder(object):
     really a terminal atom because it's tail is masked out?).
     """
 
-    def __init__(self,
-                 seq,
-                 ang=None,
-                 crd=None,
-                 device='cpu',
-                 nerf_method="standard"):
+    def __init__(self, seq, ang=None, crd=None, device='cpu', nerf_method="sn_nerf"):
         """Initialize a StructureBuilder for a single protein. Does not build coordinates.
 
         To generate coordinates after initialization, see build().
@@ -122,11 +117,18 @@ class StructureBuilder(object):
         resname_ang_iter = self._iter_resname_angs()
         first_resname, first_ang = next(resname_ang_iter)
         second_resname, second_ang = next(resname_ang_iter)
-        first_res = ResidueBuilder(first_resname, first_ang, prev_res=None, next_res=None)
+        first_res = ResidueBuilder(first_resname,
+                                   first_ang,
+                                   prev_res=None,
+                                   next_res=None,
+                                   nerf_method=self.nerf_method,
+                                   device=self.device)
         second_res = ResidueBuilder(second_resname,
                                     second_ang,
                                     prev_res=first_res,
-                                    next_res=None)
+                                    next_res=None,
+                                    nerf_method=self.nerf_method,
+                                    device=self.device)
 
         # After building both backbones use the second residue's N to build the first's CB
         first_res.build_bb()
@@ -163,12 +165,13 @@ class StructureBuilder(object):
                                  ang,
                                  prev_res=prev_res,
                                  next_res=None,
-                                 is_last_res=i + 2 == len(self.seq_as_str) - 1)
+                                 is_last_res=i + 2 == len(self.seq_as_str) - 1,
+                                 nerf_method=self.nerf_method,
+                                 device=self.device)
             self.coords += res.build()
             prev_res = res
 
         if not self.is_numpy:
-            # self.coords = [x.cuda() for x in self.coords]
             self.coords = torch.stack(self.coords).double()
         else:
             self.coords = np.stack(self.coords)
@@ -182,12 +185,13 @@ class StructureBuilder(object):
         if not self.pdb_creator:
             from sidechainnet.structure.PdbBuilder import PdbBuilder
             if self.is_numpy:
-                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords,
+                self.pdb_creator = PdbBuilder(self.seq_as_str,
+                                              self.coords,
                                               self.atoms_per_res,
                                               terminal_atoms=self.terminal_atoms)
             else:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
-                                              self.coords.detach().numpy(),
+                                              self.coords.cpu().detach().numpy(),
                                               self.atoms_per_res,
                                               terminal_atoms=self.terminal_atoms)
 
@@ -286,7 +290,7 @@ class ResidueBuilder(object):
             raise ValueError("Expected integer AA code." + str(name.shape) +
                              str(type(name)))
         if isinstance(angles, np.ndarray):
-            angles = torch.tensor(angles, dtype=torch.float32)
+            angles = torch.tensor(angles, dtype=torch.float32, device=device)
         self.name = name
         self.ang = angles.squeeze()
         self.prev_res = prev_res
@@ -298,7 +302,7 @@ class ResidueBuilder(object):
         self.bb = []
         self.sc = []
         self.coords = []
-        self.coordinate_padding = torch.zeros(3, requires_grad=True)
+        self.coordinate_padding = torch.zeros(3, requires_grad=True, device=self.device)
 
     @property
     def AA(self):
@@ -338,7 +342,8 @@ class ResidueBuilder(object):
                     dihedral = self.ang[0]  # phi of current residue
                 else:
                     # Placing O (carbonyl)
-                    t = torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"])
+                    t = torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"],
+                                     device=self.device)
                     b = BB_BUILD_INFO["BONDLENS"]["c-o"]
                     pb = BB_BUILD_INFO["BONDLENS"]["ca-c"]
                     if self.is_last_res:
@@ -369,18 +374,21 @@ class ResidueBuilder(object):
         """
         n = torch.tensor([0, 0, 0.001], device=self.device, requires_grad=True)
         ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0, 0],
-                              device=self.device, requires_grad=True)
+                              device=self.device,
+                              requires_grad=True)
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
         cy = torch.sin(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]['ca-c']
-        c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32, requires_grad=True)
+        c = ca + torch.tensor(
+            [cx, cy, 0], device=self.device, dtype=torch.float32, requires_grad=True)
         o = nerf(
             n,
             ca,
             c,
-            torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"]),
-            torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"]),
+            torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"], device=self.device),
+            torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"], device=self.device),
             self.ang[1] - np.pi,  # opposite to current residue's psi
-            l_bc=torch.tensor(BB_BUILD_INFO["BONDLENS"]["ca-c"]),  # Previous bond length
+            l_bc=torch.tensor(BB_BUILD_INFO["BONDLENS"]["ca-c"],
+                              device=self.device),  # Previous bond length
             nerf_method=self.nerf_method)
         return [n, ca, c, o]
 
@@ -401,7 +409,7 @@ class ResidueBuilder(object):
 
         last_torsion = None
         for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
-                _get_residue_build_iter(self.name, SC_BUILD_INFO)):
+                _get_residue_build_iter(self.name, SC_BUILD_INFO, self.device)):
             # Select appropriate 3 points to build from
             if self.next_res and i == 0:
                 a, b, c = self.pts["N+"], self.pts["C"], self.pts["CA"]
@@ -451,7 +459,7 @@ class ResidueBuilder(object):
         return f"ResidueBuilder({self.AA})"
 
 
-def _get_residue_build_iter(res, build_dictionary):
+def _get_residue_build_iter(res, build_dictionary, device):
     """Return an iterator over (bond-lens, angles, torsions, atom names) for a residue.
 
     This function makes it easy to iterate over the huge amount of data contained in
@@ -474,12 +482,12 @@ def _get_residue_build_iter(res, build_dictionary):
         (sidechainnet.structure.structure.nerf).
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
-    bond_vals = [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]]
-    pbond_vals = [torch.tensor(BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32)
-                 ] + [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]][:-1]
-    angle_vals = [torch.tensor(a, dtype=torch.float32) for a in r["angles-vals"]]
+    bond_vals = [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]]
+    pbond_vals = [torch.tensor(BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32, device=device)
+                 ] + [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]][:-1]
+    angle_vals = [torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"]]
     torsion_vals = [
-        torch.tensor(t, dtype=torch.float32) if t not in ["p", "i"] else t
+        torch.tensor(t, dtype=torch.float32, device=device) if t not in ["p", "i"] else t
         for t in r["torsion-vals"]
     ]
     return iter(
