@@ -157,7 +157,7 @@ def test_profile_training():
 def test_optimize_internal():
     p = load_p(0, -1)
     p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64, device='cpu')
-
+    p.cuda()
     to_optim = (p.angles).detach().clone().requires_grad_(True)
 
     energy_loss = OpenMMEnergyH()
@@ -165,7 +165,7 @@ def test_optimize_internal():
 
     losses = []
 
-    for i in tqdm(range(10)):
+    for i in tqdm(range(20)):
         # SGD
         opt.zero_grad()
         # Re-add the angles to the protein object

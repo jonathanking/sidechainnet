@@ -23,7 +23,7 @@ import numpy as np
 import openmm
 import prody
 import torch
-from openmm import Vec3, Platform
+from openmm import Platform
 from openmm.app import Topology
 from openmm.app import element as elem
 from openmm.app.forcefield import ForceField, HBonds
@@ -437,6 +437,16 @@ class SCNProtein(object):
         if not isinstance(self.angles, np.ndarray):
             self.angles = self.angles.cpu().detach().numpy()
         self.is_numpy = True
+
+    def torch(self):
+        """Change coords, hcoords, and angles to torch.tensor objects."""
+        if not torch.is_tensor(self.coords):
+            self.coords = torch.tensor(self.coords)
+        if not torch.is_tensor(self.hcoords):
+            self.hcoords = torch.tensor(self.hcoords)
+        if not torch.is_tensor(self.angles):
+            self.angles = torch.tensor(self.angles)
+        self.is_numpy = False
 
 
 def atom_name_pprint(atom_names, values):
