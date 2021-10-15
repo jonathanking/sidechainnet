@@ -3,6 +3,7 @@
 import numpy as np
 import prody as pr
 import torch
+from numba import njit
 from sidechainnet.structure import StructureBuilder
 from sidechainnet.structure.build_info import NUM_ANGLES, SC_BUILD_INFO
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
@@ -115,7 +116,7 @@ def standard_nerf(a, b, c, l, theta, chi):
         torch.squeeze(-l * torch.cos(theta)),
         torch.squeeze(l * torch.sin(theta) * torch.cos(chi)),
         torch.squeeze(l * torch.sin(theta) * torch.sin(chi))
-        ])
+    ])
 
     # calculate with rotation as our final output
     d = d.unsqueeze(1).to(torch.float32)
@@ -123,6 +124,7 @@ def standard_nerf(a, b, c, l, theta, chi):
     return res.squeeze()
 
 
+@torch.jit.script
 def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
     """Return coordinates for point d given previous points & parameters. Optimized NeRF.
 
@@ -149,24 +151,67 @@ def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
         torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
         placement using points a, b, c, and several parameters.
     """
-    if not (-np.pi <= theta <= np.pi):
-        raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
+    return torch.mm(
+        torch.stack(
+            [(c - b) / l_bc,
+             torch.cross(
+                 torch.nn.functional.normalize(torch.cross(b - a, (c - b) / l_bc), dim=0),
+                 (c - b) / l_bc),
+             torch.nn.functional.normalize(torch.cross(b - a, (c - b) / l_bc), dim=0)],
+            dim=1),
+        l_cd * torch.stack([
+            -torch.cos(theta),
+            torch.sin(theta) * torch.cos(chi),
+            torch.sin(theta) * torch.sin(chi)
+        ]).to(torch.float32).unsqueeze(1)).squeeze() + c
+
+
+@njit
+def sn_nerf_numpy(a, b, c, l_cd, theta, chi, l_bc):
+    """Return coordinates for point d given previous points & parameters. Optimized NeRF.
+
+    This function has been optimized from the original nerf to be about 20% faster. It
+    contains fewer normalization steps and total calculations than the original
+    formulation. See https://doi.org/10.1002/jcc.20237 for details.
+
+    Args:
+        a (torch.float32 tensor): (3 x 1) tensor describing point a.
+        b (torch.float32 tensor): (3 x 1) tensor describing point b.
+        c (torch.float32 tensor): (3 x 1) tensor describing point c.
+        l_cd (torch.float32 tensor): (1) tensor describing the length between points
+            c & d.
+        theta (torch.float32 tensor): (1) tensor describing angle between points b, c,
+            and d.
+        chi (torch.float32 tensor): (1) tensor describing dihedral angle between points
+            a, b, c, and d.
+        l_bc (torch.float32 tensor): (1) tensor describing length between points b and c.
+
+    Raises:
+        ValueError: Raises ValueError when value of theta is not in [-pi, pi].
+
+    Returns:
+        torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
+        placement using points a, b, c, and several parameters.
+    """
     AB = b - a
     BC = c - b
     bc = BC / l_bc
-    n = torch.nn.functional.normalize(torch.cross(AB, bc), dim=0)
-    n_x_bc = torch.cross(n, bc)
+    AB_x_bc = np.cross(AB, bc)
+    n = AB_x_bc / np.linalg.norm(AB_x_bc)
+    n_x_bc = np.cross(n, bc)
 
-    M = torch.stack([bc, n_x_bc, n], dim=1)
+    M = np.stack((bc, n_x_bc, n), axis=1)
 
-    D2 = torch.stack([
-        -l_cd * torch.cos(theta), l_cd * torch.sin(theta) * torch.cos(chi),
-        l_cd * torch.sin(theta) * torch.sin(chi)
-    ]).to(torch.float32).unsqueeze(1)
+    sin_theta = np.sin(theta)
 
-    D = torch.mm(M, D2).squeeze()
+    D = np.dot(
+        M,
+        l_cd * np.expand_dims(
+            np.asarray(
+                (-np.cos(theta), sin_theta * np.cos(chi), sin_theta * np.sin(chi))),
+            1)).reshape((3,)) + c
 
-    return D + c
+    return D
 
 
 def determine_missing_positions(ang_or_coord_matrix):

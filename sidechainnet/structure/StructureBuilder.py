@@ -353,14 +353,13 @@ class ResidueBuilder(object):
                     else:
                         # the angle for placing oxygen is opposite to psi of current res
                         dihedral = self.ang[1] - np.pi
-
                 next_pt = nerf(pts[-3],
                                pts[-2],
                                pts[-1],
-                               b,
+                               torch.tensor(b, device=self.device),
                                t,
                                dihedral,
-                               l_bc=pb,
+                               l_bc=torch.tensor(pb, device=self.device),
                                nerf_method=self.nerf_method)
                 pts.append(next_pt)
             self.bb = pts[3:]
@@ -379,7 +378,7 @@ class ResidueBuilder(object):
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
         cy = torch.sin(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]['ca-c']
         c = ca + torch.tensor(
-            [cx, cy, 0], device=self.device, dtype=torch.float32, requires_grad=True)
+            [cx, cy, 0.0], device=self.device, dtype=torch.float32, requires_grad=True)
         o = nerf(
             n,
             ca,
@@ -512,6 +511,16 @@ def _convert_seq_to_str(seq):
         raise UnsupportedOperation(f"Seq shape {seq.shape} is not supported.")
 
     return seq_as_str
+
+
+@torch.jit.script
+def _init_bb_helper(BB_n_ca: float, ang3: torch.Tensor, BB_ca_c: float, device: str):
+    """Torchscript friendly helper for _init_bb. Currently unused."""
+    n = torch.tensor([0.0, 0.0, 0.001], requires_grad=True, device=device)
+    ca = n + torch.tensor([BB_n_ca, 0.0, 0.0], requires_grad=True, device=device)
+    pi_minus_ang3 = np.pi - ang3
+    c = ca + (torch.stack([torch.cos(np.pi - ang3), torch.sin(pi_minus_ang3), torch.tensor(0.0, device=device)])*BB_ca_c).float()
+    return n, ca, c
 
 
 if __name__ == '__main__':
