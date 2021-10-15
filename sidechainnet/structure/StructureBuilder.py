@@ -372,8 +372,8 @@ class ResidueBuilder(object):
 
         Placed in an arbitrary plane (z = .001).
         """
-        n = torch.tensor([0, 0, 0.001], device=self.device, requires_grad=True)
-        ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0, 0],
+        n = torch.tensor([0.0, 0.0, 0.001], device=self.device, requires_grad=True)
+        ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0.0, 0.0],
                               device=self.device,
                               requires_grad=True)
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
@@ -482,17 +482,15 @@ def _get_residue_build_iter(res, build_dictionary, device):
         (sidechainnet.structure.structure.nerf).
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
-    bond_vals = [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]]
+    bond_vals = (torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"])
     pbond_vals = [torch.tensor(BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32, device=device)
                  ] + [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]][:-1]
-    angle_vals = [torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"]]
-    torsion_vals = [
-        torch.tensor(t, dtype=torch.float32, device=device) if t not in ["p", "i"] else t
-        for t in r["torsion-vals"]
-    ]
+    angle_vals = (torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"])
+    torsion_vals = (torch.tensor(t, dtype=torch.float32, device=device)
+                    if t not in ["p", "i"] else t for t in r["torsion-vals"])
     return iter(
         zip(pbond_vals, bond_vals, angle_vals, torsion_vals,
-            [t.split("-") for t in r["torsion-names"]]))
+            (t.split("-") for t in r["torsion-names"])))
 
 
 def _convert_seq_to_str(seq):

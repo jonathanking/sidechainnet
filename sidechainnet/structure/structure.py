@@ -115,7 +115,7 @@ def standard_nerf(a, b, c, l, theta, chi):
         torch.squeeze(-l * torch.cos(theta)),
         torch.squeeze(l * torch.sin(theta) * torch.cos(chi)),
         torch.squeeze(l * torch.sin(theta) * torch.sin(chi))
-    ])
+        ])
 
     # calculate with rotation as our final output
     d = d.unsqueeze(1).to(torch.float32)
@@ -256,7 +256,7 @@ def coord_generator(coords, atoms_per_res=14, remove_padding=False, seq=""):
     while coord_idx < coords.shape[0]:
         _slice = coords[coord_idx:coord_idx + atoms_per_res]
         if remove_padding:
-            resname = ONE_TO_THREE_LETTER_MAP[seq[coord_idx//atoms_per_res]]
+            resname = ONE_TO_THREE_LETTER_MAP[seq[coord_idx // atoms_per_res]]
             n_atoms = len(["N", "CA", "C", "O"] + SC_BUILD_INFO[resname]["atom-names"])
             _slice = _slice[0:n_atoms]
         yield _slice
