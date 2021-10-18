@@ -57,7 +57,7 @@ class OpenMMEnergyH(torch.autograd.Function):
     def forward(ctx, protein, hcoords, force_scaling=1):
         """Compute potential energy of the protein system and save atomic forces."""
         # Update protein's hcoords
-        protein.update_hydrogens(hcoords / 10)
+        protein.update_hydrogens_for_openmm(hcoords / 10)
 
         # Compute potential energy and forces
         energy = torch.tensor(protein.get_energy()._value,

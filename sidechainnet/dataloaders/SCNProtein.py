@@ -69,6 +69,7 @@ class SCNProtein(object):
         self._hcoord_mask = None
         self.device = 'cpu'
         self.is_numpy = False
+        self._hcoords_for_openmm = None
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -165,16 +166,24 @@ class SCNProtein(object):
         return self.forces
 
     def update_hydrogens(self, hcoords):
-        """Take a set a hydrogen coordinates and use it to update this protein."""
+        """Take a set of hydrogen coordinates and use it to update this protein."""
         mask = self.get_hydrogen_coord_mask()
         self.hcoords = hcoords * mask
         self.has_hydrogens = True
         self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
         self.update_positions()
 
-    def update_positions(self):
+    def update_hydrogens_for_openmm(self, hcoords):
+        """Use a set of hydrogen coords to update OpenMM data for this protein."""
+        mask = self.get_hydrogen_coord_mask()
+        self._hcoords_for_openmm = hcoords * mask
+        self.update_positions(self._hcoords_for_openmm)
+
+    def update_positions(self, hcoords=None):
         """Update the positions variable with hydrogen coordinate values."""
-        hcoords = self.hcoords.cpu().detach().numpy() if not self.is_numpy else self.hcoords
+        if hcoords is None:
+            hcoords = self.hcoords
+        hcoords = hcoords.cpu().detach().numpy() if not self.is_numpy else hcoords
         self.positions[self.hcoord_to_pos_map_values] = hcoords[self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
 
