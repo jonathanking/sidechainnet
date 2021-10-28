@@ -201,7 +201,8 @@ def prepare_dataloaders(data,
                         seq_as_onehot=None,
                         dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
-                        train_eval_downsample=0.1):
+                        train_eval_downsample=0.1,
+                        shuffle=True):
     """Return dataloaders for model training according to user specifications.
 
     Using the pre-processed data, stored in a nested Python dictionary, this
@@ -234,6 +235,7 @@ def prepare_dataloaders(data,
             dynamic_batch=batch_size *
             data['settings']['lengths'].mean() if dynamic_batching else None,
             optimize_batch_for_cpus=optimize_for_cpu_parallelism,
+            shuffle=shuffle
         ))
 
     train_eval_loader = torch.utils.data.DataLoader(
@@ -245,7 +247,8 @@ def prepare_dataloaders(data,
             batch_size,
             dynamic_batch=None,
             optimize_batch_for_cpus=optimize_for_cpu_parallelism,
-            downsample=train_eval_downsample))
+            downsample=train_eval_downsample,
+            shuffle=shuffle))
 
     valid_loaders = {}
     for vsplit in VALID_SPLITS:

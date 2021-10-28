@@ -40,6 +40,7 @@ class ProteinDataset(torch.utils.data.Dataset):
             self.thinning = scn_data_settings['thinning']
         else:
             self.thinning = None
+        self.angle_means = scn_data_settings['angle_means']
 
         if sort_by_length:
             self._sort_by_length(reverse_sort)

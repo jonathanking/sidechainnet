@@ -103,7 +103,8 @@ def load(casp_version=12,
          filter_by_resolution=False,
          complete_structures_only=False,
          local_scn_path=None,
-         scn_dataset=False):
+         scn_dataset=False,
+         shuffle=True):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -184,6 +185,9 @@ def load(casp_version=12,
         scn_dataset (bool, optional): If True, return a sidechainnet.SCNDataset object
             for conveniently accessing properties of the data.
             (See sidechainnet.SCNDataset) for more information.
+        shuffle (bool, optional): Default True. If True, yields random batches from the
+            dataloader instead of in-order (length ascending). Does not apply when a
+            dataloader is not requested.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -281,7 +285,8 @@ def load(casp_version=12,
             seq_as_onehot=seq_as_onehot,
             dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
-            train_eval_downsample=train_eval_downsample)
+            train_eval_downsample=train_eval_downsample,
+            shuffle=shuffle)
 
     return
 

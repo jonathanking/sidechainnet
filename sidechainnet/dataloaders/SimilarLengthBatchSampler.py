@@ -29,7 +29,8 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                  bins='auto',
                  downsample=None,
                  use_largest_bin=False,
-                 repeat_train=None):
+                 repeat_train=None,
+                 shuffle=True):
         self.data_source = data_source
         self.batch_size = batch_size
         self.dynamic_batch = dynamic_batch
@@ -38,6 +39,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         self.downsample = downsample
         self.use_largest_bin = use_largest_bin
         self.repeat_train = repeat_train if repeat_train else 1
+        self.shuffle = shuffle
 
         self._init_histogram_bins(bins)
 
@@ -98,6 +100,13 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         def batch_generator():
             i = 0
             while i < len(self):
+                if not self.shuffle:
+                    yield np.arange(
+                        self.batch_size * i,
+                        max(self.batch_size * i + self.batch_size, len(self.data_source)))
+                    i += 1
+                    continue
+
                 if self.use_largest_bin:
                     bin = len(self.hist_bins) - 1
                 else:
