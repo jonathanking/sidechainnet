@@ -80,7 +80,6 @@ def _repair_1GJJ_1_A(datadict):
                 datadict[split][key].append(datadict[split][key][idx])
             elif key == 'ids':
                 datadict[split][key].append(datadict[split][key][idx] + "2")
-                print(datadict[split][key][-1])
                 datadict[split][key][idx] = datadict[split][key][idx] + "1"
             elif key == 'ums':
                 datadict[split][key].append(" ".join(
