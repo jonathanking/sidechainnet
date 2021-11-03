@@ -2,6 +2,7 @@
 
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.align import binary_mask_to_str
+import sidechainnet as scn
 
 
 def manually_correct_mask(pnid, pn_entry, mask):
@@ -56,3 +57,43 @@ def manually_adjust_data(pnid, sc_entry):
         sc_entry["crd"] = sc_entry["crd"][:-NUM_COORDS_PER_RES * 2]
 
     return sc_entry
+
+
+def _repair_1GJJ_1_A(datadict):
+    """Repair raw Sidechainnet data dictionary by splitting entry 1GJJ_1_A into two.
+
+    The file uploaded to RCSB PDB contains two overlapping domains so a manual adjustment
+    is required. See https://github.com/jonathanking/sidechainnet/issues/38 for more
+    details.
+    """
+    # Locate positions in data arrays
+    found_splits_indices = []
+    for split in scn.DATA_SPLITS:
+        for idx, cur_id in enumerate(datadict[split]["ids"]):
+            if cur_id == '1GJJ_1_A':
+                found_splits_indices.append((split, idx))
+
+    # Carefully split into two entries containing the appropriate data ranges
+    for split, idx in found_splits_indices:
+        for key in datadict[split].keys():
+            if key == 'res':
+                datadict[split][key].append(datadict[split][key][idx])
+            elif key == 'ids':
+                datadict[split][key].append(datadict[split][key][idx] + "2")
+                print(datadict[split][key][-1])
+                datadict[split][key][idx] = datadict[split][key][idx] + "1"
+            elif key == 'ums':
+                datadict[split][key].append(" ".join(
+                    datadict[split][key][idx].split()[110:153]))
+                datadict[split][key][idx] = " ".join(
+                    datadict[split][key][idx].split()[0:50])
+            elif key == 'crd':
+                datadict[split][key].append(
+                    datadict[split][key][idx][110 * NUM_COORDS_PER_RES:153 *
+                                              NUM_COORDS_PER_RES])
+                datadict[split][key][idx] = datadict[split][key][idx][
+                    0 * NUM_COORDS_PER_RES:50 * NUM_COORDS_PER_RES]
+            else:
+                datadict[split][key].append(datadict[split][key][idx][110:153])
+                datadict[split][key][idx] = datadict[split][key][idx][0:50]
+    return datadict
