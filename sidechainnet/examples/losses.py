@@ -4,7 +4,7 @@ import numpy as np
 import prody as pr
 import torch
 
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.structure.build_info import NUM_ANGLES, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
 
 
 def compute_batch_drmsd(true_coordinates, pred_coordinates, seq, verbose=False):
@@ -108,3 +108,30 @@ def _tile(a, dim, n_tile):
     order_index = torch.LongTensor(
         np.concatenate([init_dim * np.arange(n_tile) + i for i in range(init_dim)]))
     return torch.index_select(a, dim, order_index)
+
+
+def mse_over_angles(pred, true):
+    """Returns the mean squared error between two tensor batches.
+
+    Given a predicted angle tensor and a true angle tensor (batch-padded with
+    zeros, and missing-item-padded with nans), this function first removes
+    batch then item padding before using torch's built-in MSE loss function.
+
+    Args:
+        pred, true (np.ndarray): 4-dimensional tensors
+
+    Returns:
+        MSE loss between true and pred.
+    """
+    assert len(pred.shape) == 3, "This function must operate on a batch of angles."
+
+    return torch.nn.functional.mse_loss(pred, true)
+
+    # Remove batch padding
+    ang_non_zero = true.ne(0).any(dim=2)
+    tgt_ang_non_zero = true[ang_non_zero]
+
+    # Remove missing angles
+    ang_non_nans = torch.isnan(tgt_ang_non_zero).eq(0)
+    return torch.nn.functional.mse_loss(pred[ang_non_zero][ang_non_nans],
+                                        true[ang_non_zero][ang_non_nans])

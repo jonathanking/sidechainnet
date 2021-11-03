@@ -263,8 +263,11 @@ def load(casp_version=12,
     if not local_path or force_download:
         # Download SidechainNet if it does not exist locally, or if requested
         local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
-
-    scn_dict = _load_dict(local_path)
+    try:
+        scn_dict = _load_dict(local_path)
+    except pickle.UnpicklingError:
+        local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
+        scn_dict = _load_dict(local_path)
     scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
     if complete_structures_only:
         scn_dict = filter_dictionary_by_missing_residues(scn_dict)

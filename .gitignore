@@ -125,3 +125,4 @@ sidechainnet_data
 sidechainnet/resources/forcefield_info
 *runtime*html
 resources/dev/*
+*slurm*.out

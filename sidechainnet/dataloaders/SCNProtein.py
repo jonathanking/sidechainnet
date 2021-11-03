@@ -20,16 +20,16 @@ Other features:
 """
 
 import numpy as np
-import openmm
+# import openmm
 import prody
 import torch
-from openmm import Platform
-from openmm.app import Topology
-from openmm.app import element as elem
-from openmm.app.forcefield import ForceField, HBonds
-from openmm.app.modeller import Modeller
-from openmm.openmm import LangevinMiddleIntegrator
-from openmm.unit import kelvin, nanometer, picosecond, picoseconds
+# from openmm import Platform
+# from openmm.app import Topology
+# from openmm.app import element as elem
+# from openmm.app.forcefield import ForceField, HBonds
+# from openmm.app.modeller import Modeller
+# from openmm.openmm import LangevinMiddleIntegrator
+# from openmm.unit import kelvin, nanometer, picosecond, picoseconds
 
 import sidechainnet
 import sidechainnet.structure.HydrogenBuilder as hy
