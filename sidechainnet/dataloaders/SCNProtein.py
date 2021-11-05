@@ -75,14 +75,14 @@ class SCNProtein(object):
         """Return length of protein sequence."""
         return len(self.seq)
 
-    def to_3Dmol(self):
+    def to_3Dmol(self, style=None):
         """Return an interactive visualization of the protein with py3DMol."""
         if self.sb is None:
             if self.has_hydrogens:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
-        return self.sb.to_3Dmol()
+        return self.sb.to_3Dmol(style=style)
 
     def to_pdb(self, path, title=None):
         """Save structure to path as a PDB file."""
