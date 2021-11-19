@@ -438,7 +438,7 @@ class ResidueBuilder(object):
     def to_prody(self, res):
         import prody as pr
         ag = pr.AtomGroup()
-        ag.setCoords(torch.stack(self.bb + self.sc).numpy())
+        ag.setCoords(torch.stack(self.bb + self.sc).detach().numpy())
         ag.setNames(self.atom_names)
         ag.setResnames([ONE_TO_THREE_LETTER_MAP[VOCAB._int2char[self.name]]] *
                        len(self.atom_names))
