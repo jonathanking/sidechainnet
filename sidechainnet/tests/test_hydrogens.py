@@ -67,7 +67,8 @@ def get_alias(protein):
 
 def load_p(start=0, l=2):
     d = scn.load("debug", scn_dir="/home/jok120/openmm_loss/sidechainnet_data", scn_dataset=True)
-    p = d["1HD1_1_A"]
+    # p = d["1HD1_1_A"]
+    p = d["90#2LEM_1_A"]  # much longer, len 216
     if l > 0:
         p.seq = p.seq[start:start+l]
         p.coords = p.coords[start*14:start*14 + 14*l]
@@ -125,21 +126,29 @@ def test_openmm_energy_h():
 def test_optimize_with_profiling():
     p = load_p(0, -1)
     p.add_hydrogens()
+    p.cuda()
     to_optim = p.hcoords.detach().clone().requires_grad_(True)
     energy_loss = OpenMMEnergyH()
-    opt = torch.optim.LBFGS([to_optim], lr=1e-3)
+    # opt = torch.optim.LBFGS([to_optim], lr=1e-3)
+    opt = torch.optim.SGD([to_optim], lr=1e-4)
     losses = []
+    print(p, p.hcoords, to_optim)
 
-    for i in tqdm(range(50)):
-        def closure():
-            opt.zero_grad()
-            loss = energy_loss.apply(p, to_optim)
-            loss.backward()
-            losses.append(float(loss.detach().numpy()))
-            return loss
-
-        opt.step(closure)
-    print(losses[0], losses[-1])
+    for i in tqdm(range(500)):
+        # def closure():
+        #     opt.zero_grad()
+        #     loss = energy_loss.apply(p, to_optim)
+        #     loss.backward()
+        #     losses.append(float(loss.detach().numpy()))
+        #     return loss
+        # opt.step(closure)
+        opt.zero_grad()
+        loss = energy_loss.apply(p, to_optim)
+        loss.backward()
+        print(loss.cpu())
+        opt.step()
+        # losses.append(float(loss.cpu().detach().numpy()))
+    # print(losses[0], losses[-1])
 
 
 def test_profile_training():
@@ -159,13 +168,14 @@ def test_optimize_internal():
     p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64, device='cpu')
     p.cuda()
     to_optim = (p.angles).detach().clone().requires_grad_(True)
-
     energy_loss = OpenMMEnergyH()
     opt = torch.optim.SGD([to_optim], lr=1e-4)
 
+    print(p.angles)
+
     losses = []
 
-    for i in tqdm(range(20)):
+    for i in tqdm(range(20), smoothing=0):
         # SGD
         opt.zero_grad()
         # Re-add the angles to the protein object
@@ -179,7 +189,7 @@ def test_optimize_internal():
         losses.append(float(loss.cpu().detach().numpy()))
         print(loss)
 
-        torch.nn.utils.clip_grad_norm_(to_optim, 1)
+        # torch.nn.utils.clip_grad_norm_(to_optim, 1)
 
         opt.step()
 

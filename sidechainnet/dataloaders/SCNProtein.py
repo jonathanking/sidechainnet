@@ -177,13 +177,25 @@ class SCNProtein(object):
         """Use a set of hydrogen coords to update OpenMM data for this protein."""
         mask = self.get_hydrogen_coord_mask()
         self._hcoords_for_openmm = hcoords * mask
-        self.update_positions(self._hcoords_for_openmm)
+        self.update_positions(self._hcoords_for_openmm)  # Use our openmm only hcoords
+
+        # Below is experimental code that only passes hcoords from GPU to CPU once
+        # If this code is in use, then the coordinates do not update. If the above line
+        # of code is in use, the the coordinates will update, but must be passed from GPU
+        # to CPU each time.
+
+        # if not hasattr(self, "_hcoords_for_openmm_cpu"):
+        #     self._hcoords_for_openmm_cpu = self._hcoords_for_openmm.cpu().detach().numpy()
+        # self.update_positions(self._hcoords_for_openmm_cpu)
 
     def update_positions(self, hcoords=None):
         """Update the positions variable with hydrogen coordinate values."""
         if hcoords is None:
             hcoords = self.hcoords
-        hcoords = hcoords.cpu().detach().numpy() if not self.is_numpy else hcoords
+        # The below step takes a PyTorch CUDA representation of all-atom coordinates
+        # and passes it to the CPU as a numpy array so that OpenMM can read it
+        hcoords = hcoords.cpu().detach().numpy() if not isinstance(hcoords, np.ndarray) else hcoords
+        # A mapping is used to correct for small differences between the Torch/OpenMM pos
         self.positions[self.hcoord_to_pos_map_values] = hcoords[self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
 
@@ -250,6 +262,7 @@ class SCNProtein(object):
                                                 platform=self.platform,
                                                 platformProperties=properties)
         self.openmm_initialized = True
+        self.simulation.context.setPositions(self.positions)
 
     def get_hydrogen_coord_mask(self):
         """Return a torch tensor with 0s representing pad characters in self.hcoords."""
