@@ -773,7 +773,7 @@ def _M_posneg(axis: np.ndarray, theta):
     return r1, r2
 
 
-@torch.jit.script
+# @torch.jit.script
 def _Mt(axis, theta):
     """Torchscript compiled version of HB.M() for generating a rotation matrix."""
     axis = axis / torch.sqrt(torch.dot(axis, axis))
@@ -795,20 +795,20 @@ def _Mt(axis, theta):
     return r.double()
 
 
-@torch.jit.script
+# @torch.jit.script
 def _scale(vector, target_len):
     """Torchscript version of HydrogenBuilder._scale()."""
     v_len = torch.norm(vector)
     return vector / v_len * target_len
 
 
-@torch.jit.script
+# @torch.jit.script
 def _scale_l(vector, target_len, v_len):
     """Torchscript version of HydrogenBuilder._scale() with length provided."""
     return vector / v_len * target_len
 
 
-@torch.jit.script
+# @torch.jit.script
 def _get_methyl_hydrogens(carbon, prev1, prev2, length, met_angle, rad120):
     """Place methyl (H3) hydrogens on a Carbon atom. Also supports N-terminal amines.
 
@@ -833,13 +833,13 @@ def _get_methyl_hydrogens(carbon, prev1, prev2, length, met_angle, rad120):
     return [H1, H2, H3]
 
 
-@torch.jit.script
+# @torch.jit.script
 def _get_single_sp3_hydrogen_help(center, R1, R2, R3):
     """Torchscript helper for _get_single_sp3_hydrogen."""
     return -R1 - R2 - R3 + (3 * center)
 
 
-@torch.jit.script
+# @torch.jit.script
 def _get_amide_methine_hydrogen_help(R1, center, R2, length):
     """Torchscript helper for _get_amide_methine_hydrogen."""
     return _scale(-R1 - R2 + 2*center, length) + center

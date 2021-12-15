@@ -126,22 +126,22 @@ def test_openmm_energy_h():
 def test_optimize_with_profiling():
     p = load_p(0, -1)
     p.add_hydrogens()
-    p.cuda()
+    # p.cuda()
     to_optim = p.hcoords.detach().clone().requires_grad_(True)
     energy_loss = OpenMMEnergyH()
-    # opt = torch.optim.LBFGS([to_optim], lr=1e-3)
-    opt = torch.optim.SGD([to_optim], lr=1e-4)
+    opt = torch.optim.LBFGS([to_optim], lr=1e-3)
+    # opt = torch.optim.SGD([to_optim], lr=1e-4)
     losses = []
     print(p, p.hcoords, to_optim)
 
     for i in tqdm(range(500)):
-        # def closure():
-        #     opt.zero_grad()
-        #     loss = energy_loss.apply(p, to_optim)
-        #     loss.backward()
-        #     losses.append(float(loss.detach().numpy()))
-        #     return loss
-        # opt.step(closure)
+        def closure():
+            opt.zero_grad()
+            loss = energy_loss.apply(p, to_optim)
+            loss.backward()
+            losses.append(float(loss.detach().numpy()))
+            return loss
+        opt.step(closure)
         opt.zero_grad()
         loss = energy_loss.apply(p, to_optim)
         loss.backward()
@@ -164,12 +164,13 @@ def test_profile_training():
 
 
 def test_optimize_internal():
+    torch.cuda.set_device(0)
     p = load_p(0, -1)
-    p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64, device='cpu')
+    p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64, device='cuda')
     p.cuda()
     to_optim = (p.angles).detach().clone().requires_grad_(True)
     energy_loss = OpenMMEnergyH()
-    opt = torch.optim.SGD([to_optim], lr=1e-4)
+    opt = torch.optim.SGD([to_optim], lr=1e-10)
 
     print(p.angles)
 
@@ -179,7 +180,7 @@ def test_optimize_internal():
         # SGD
         opt.zero_grad()
         # Re-add the angles to the protein object
-        p.angles = to_optim
+        p.angles = to_optim.detach().clone().requires_grad_(True)
         # Rebuild the coordinates from the angles
         p.add_hydrogens(from_angles=True)
         # Compute the loss on the coordinates

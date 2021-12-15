@@ -126,3 +126,4 @@ sidechainnet/resources/forcefield_info
 *runtime*html
 resources/dev/*
 *slurm*.out
+*wandb*

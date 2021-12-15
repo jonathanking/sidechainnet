@@ -481,10 +481,15 @@ def _get_residue_build_iter(res, build_dictionary, device):
         (sidechainnet.structure.structure.nerf).
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
-    bond_vals = (torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"])
-    pbond_vals = [torch.tensor(BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32, device=device)
-                 ] + [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]][:-1]
-    angle_vals = (torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"])
+    bond_vals = (
+        torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"])
+    pbond_vals = [
+        torch.tensor(
+            BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32, device=device)
+    ] + [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]
+        ][:-1]
+    angle_vals = (
+        torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"])
     torsion_vals = (torch.tensor(t, dtype=torch.float32, device=device)
                     if t not in ["p", "i"] else t for t in r["torsion-vals"])
     return iter(
@@ -519,7 +524,11 @@ def _init_bb_helper(BB_n_ca: float, ang3: torch.Tensor, BB_ca_c: float, device: 
     n = torch.tensor([0.0, 0.0, 0.001], requires_grad=True, device=device)
     ca = n + torch.tensor([BB_n_ca, 0.0, 0.0], requires_grad=True, device=device)
     pi_minus_ang3 = np.pi - ang3
-    c = ca + (torch.stack([torch.cos(np.pi - ang3), torch.sin(pi_minus_ang3), torch.tensor(0.0, device=device)])*BB_ca_c).float()
+    c = ca + (torch.stack([
+        torch.cos(np.pi - ang3),
+        torch.sin(pi_minus_ang3),
+        torch.tensor(0.0, device=device)
+    ]) * BB_ca_c).float()
     return n, ca, c
 
 
