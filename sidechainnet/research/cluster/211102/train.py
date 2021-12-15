@@ -9,7 +9,6 @@ if CLUSTER:
     from functools import partialmethod
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
-
 import argparse
 import random
 import os
@@ -27,14 +26,13 @@ from sidechainnet.examples.losses import mse_over_angles
 from sidechainnet.examples.optim import ScheduledOptim
 
 
-
-
 def train_epoch(model, data, optimizer, device):
     """
     One complete training epoch.
     """
     model.train()
-    pbar = tqdm(data['train'], leave=False, unit="batch", dynamic_ncols=True) if not CLUSTER else data['train']
+    pbar = tqdm(data['train'], leave=False, unit="batch",
+                dynamic_ncols=True) if not CLUSTER else data['train']
 
     for step, p in enumerate(pbar):
         optimizer.zero_grad()
@@ -78,7 +76,8 @@ def eval_epoch(model, data, device, test_set=False):
     model.eval()
     data_splits = ['test'] if test_set else ['train', 'valid-10', 'valid-50', 'valid-90']
     for data_split in data_splits:
-        batch_iter = tqdm(data[data_split], leave=False, unit="batch", dynamic_ncols=True) if not CLUSTER else data[data_split]
+        batch_iter = tqdm(data[data_split], leave=False, unit="batch",
+                          dynamic_ncols=True) if not CLUSTER else data[data_split]
         with torch.no_grad():
             total_loss = 0
             for step, p in enumerate(batch_iter):
@@ -107,6 +106,9 @@ def eval_epoch(model, data, device, test_set=False):
             avg_loss = np.sqrt(total_loss / (step + 1))
             wandb.log({f"{data_split.capitalize()} Epoch RMSE": avg_loss})
             losses[data_split] = avg_loss
+    if not test_set:
+        avg_all_valid = np.nanmean([losses[ds] if "valid" in ds else np.nan for ds in losses.keys()])
+        wandb.log({"Avg Valid Epoch RMSE": avg_all_valid})
     return losses
 
 
@@ -377,9 +379,7 @@ def main():
     wandb_dir = "/scr/jok120/wandb"
     if wandb_dir:
         os.makedirs(wandb_dir, exist_ok=True)
-    wandb.init(project="sidechain-transformer",
-               entity="koes-group",
-               dir=wandb_dir)
+    wandb.init(project="sidechain-transformer", entity="koes-group", dir=wandb_dir)
     wandb.watch(model, "all")
     if not args.name:
         args.name = wandb.run.id
