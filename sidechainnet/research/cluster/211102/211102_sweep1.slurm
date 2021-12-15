@@ -12,7 +12,7 @@
 ##       Environment      ##
 ############################
 eval "$(conda shell.bash hook)"
-conda activate sidechainnet
+conda activate pytorch211208c
 
 
 ############################
@@ -26,11 +26,11 @@ then
     git clone git@github.com:jonathanking/sidechainnet.git
     
     cd sidechainnet
-    git checkout openmm_26atom
+    git checkout research_openmm
 else
     cd sidechainnet
     git pull
-    git checkout openmm_26atom
+    git checkout research_openmm
 fi
 mkdir -p sidechainnet_data
 rsync -ru /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet_data sidechainnet_data
@@ -41,7 +41,7 @@ echo "Updated repo."
 ############################
 export WANDB_DIR="/scr/jok120/wandb"
 mkdir -p /scr/jok120/wandb
-WANDB_DIR="/scr/jok120/wandb" wandb agent --count 1 koes-group/sidechain-transformer/y8yezn3l
+WANDB_DIR="/scr/jok120/wandb" wandb agent --count 1 jonathanking/sidechainnet-sidechainnet_research_cluster_211102/pxdrbwr4
 echo "Completed wandb agent."
 
 
