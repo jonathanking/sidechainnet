@@ -194,7 +194,7 @@ class SCNProtein(object):
             hcoords = self.hcoords
         # The below step takes a PyTorch CUDA representation of all-atom coordinates
         # and passes it to the CPU as a numpy array so that OpenMM can read it
-        hcoords = hcoords.cpu().detach().numpy() if not isinstance(hcoords, np.ndarray) else hcoords
+        hcoords = hcoords.detach().cpu().numpy() if not isinstance(hcoords, np.ndarray) else hcoords
         # A mapping is used to correct for small differences between the Torch/OpenMM pos
         self.positions[self.hcoord_to_pos_map_values] = hcoords[self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
