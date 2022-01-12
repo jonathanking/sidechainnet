@@ -358,7 +358,7 @@ def main():
 
     # Load dataset
     data = scn.load(12,
-                    30,
+                    100,
                     with_pytorch='dataloaders',
                     batch_size=args.batch_size,
                     dynamic_batching=False,

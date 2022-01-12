@@ -6,7 +6,7 @@
 #SBATCH --time=14-00:00:00
 #SBATCH --partition=dept_gpu
 #SBATCH --output="sidechainnet/research/cluster/220111/%A_%a.out"
-#SBATCH --mem=15GB
+#SBATCH --mem=32GB
 
 
 ############################
@@ -14,7 +14,7 @@
 ############################
 CONDA_ENV="sidechainnetv2"
 GIT_BRANCH="research_openmm"
-SWEEP_NAME="koes-group/sidechain-transformer/y8yezn3l"
+SWEEP_NAME="jonathanking/sidechainnet-sidechainnet_research_cluster_211102/pxdrbwr4"
 
 ############################
 ##       Environment      ##
