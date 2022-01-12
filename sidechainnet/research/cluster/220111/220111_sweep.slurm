@@ -39,7 +39,7 @@ else
 fi
 git checkout $GIT_BRANCH
 mkdir -p sidechainnet_data
-rsync -ru /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet_data sidechainnet_data
+rsync -ruv /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet_data sidechainnet_data
 echo "Updated repo."
 
 ############################
