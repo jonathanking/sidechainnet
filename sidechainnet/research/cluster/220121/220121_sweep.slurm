@@ -6,7 +6,7 @@
 #SBATCH --time=14-00:00:00
 #SBATCH --partition=dept_gpu
 #SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220121/%A_%a.out"
-#SBATCH --mem=32GB
+#SBATCH --mem=45GB
 
 
 ############################
