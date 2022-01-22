@@ -14,7 +14,7 @@
 ############################
 CONDA_ENV="sidechainnetv2"
 GIT_BRANCH="research_openmm"
-SWEEP_NAME="jonathanking/sidechainnet-sidechainnet_research_cluster/jsuiad62"
+SWEEP_NAME="jonathanking/sidechainnet-sidechainnet_research_cluster/ryd25t70"
 
 ############################
 ##       Environment      ##
