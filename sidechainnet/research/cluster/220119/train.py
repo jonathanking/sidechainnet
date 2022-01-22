@@ -221,7 +221,7 @@ def create_parser():
     # Training parameters
     training = parser.add_argument_group("Training Args")
     training.add_argument("-lr", "--learning_rate", type=float, default=1e-4)
-    training.add_argument('-e', '--epochs', type=int, default=10)
+    training.add_argument('-e', '--epochs', type=int, default=500)
     training.add_argument("-b", '--batch_size', type=int, default=8)
     training.add_argument('-es',
                           '--early_stopping',
