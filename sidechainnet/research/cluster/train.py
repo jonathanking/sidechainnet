@@ -60,7 +60,8 @@ def train_epoch(model, data, optimizer, device):
 
         # Record performance metrics
         cpu_loss = loss.item()
-        wandb.log({"Train Batch RMSE": np.sqrt(cpu_loss)})
+        if step % 100 == 0:
+            wandb.log({"Train Batch RMSE": np.sqrt(cpu_loss)})
         if not CLUSTER:
             pbar.set_description(
                 '\r  - (Train) rmse={rmse:.4f}'.format(rmse=np.sqrt(cpu_loss)))

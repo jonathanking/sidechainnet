@@ -1,7 +1,7 @@
 program: /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/train.py
 method: bayes
 metric:
-  name: Valid Epoch RMSE
+  name: Valid-50 Epoch RMSE
   goal: minimize
 parameters:
   name:
