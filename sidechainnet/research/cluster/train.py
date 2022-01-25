@@ -73,7 +73,9 @@ def eval_epoch(model, data, device, test_set=False):
     """
     losses = {}
     model.eval()
-    data_splits = ['test'] if test_set else ['train', 'valid-10', 'valid-50', 'valid-90']
+    data_splits = ['test'] if test_set else [
+        'train', 'valid-10', 'valid-50', 'valid-90', 'test'
+    ]
     for data_split in data_splits:
         batch_iter = tqdm(data[data_split], leave=False, unit="batch",
                           dynamic_ncols=True) if not CLUSTER else data[data_split]
