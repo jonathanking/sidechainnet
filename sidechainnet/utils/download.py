@@ -34,7 +34,6 @@ D_AMINO_ACID_CODES = [
 ASTRAL_ID_MAPPING = None
 PROTEIN_DSSP_DATA = None
 
-
 def _reinit_global_valid_splits(new_splits):
     """Reinitialize global validation split variables when customizing dataset splits."""
     global VALID_SPLITS
@@ -70,7 +69,8 @@ def download_sidechain_data(pnids,
                             limit,
                             proteinnet_in,
                             regenerate_scdata=False,
-                            output_name=None):
+                            output_name=None,
+                            num_cores=multiprocessing.cpu_count()):
     """Download the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
@@ -127,7 +127,7 @@ def download_sidechain_data(pnids,
               " processed.")
 
     # Download the sidechain data as a dictionary and report errors.
-    sc_data, pnids_errors = get_sidechain_data(new_pnids, limit)
+    sc_data, pnids_errors = get_sidechain_data(new_pnids, limit, num_cores)
     for p in already_parsed_ids:
         sc_data[p] = existing_data[p]
     save_data(sc_data, output_path)
@@ -140,7 +140,7 @@ def download_sidechain_data(pnids,
     return sc_data, output_path
 
 
-def get_sidechain_data(pnids, limit):
+def get_sidechain_data(pnids, limit, num_cores=multiprocessing.cpu_count()):
     """Acquires sidechain data for specified ProteinNet IDs.
 
     Args:
@@ -184,7 +184,7 @@ def get_sidechain_data(pnids, limit):
     pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
     while len(remaining_pnids) > multiprocessing.cpu_count():
         print(f"{len(pnids_ok_parallel)} IDs OK for parallel downloading.")
-        with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+        with multiprocessing.Pool(num_cores) as p:
             results.extend(
                 list(
                     tqdm.tqdm(p.imap(process_id, pnids_ok_parallel[:limit]),

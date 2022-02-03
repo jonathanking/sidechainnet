@@ -7,7 +7,7 @@ import sidechainnet as scn
 from sidechainnet.structure.build_info import NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError, NonStandardAminoAcidError, NoneStructureError, SequenceError
 
-GLOBAL_PAD_CHAR = 0
+GLOBAL_PAD_CHAR = np.nan
 ALLOWED_NONSTD_RESIDUES = {
     "ASX": "ASP",
     "GLX": "GLU",
@@ -30,7 +30,9 @@ ALLOWED_NONSTD_RESIDUES = {
 
 
 def angle_list_to_sin_cos(angs, reshape=True):
-    """Given a list of angles, returns a new list where those angles have been turned into
+    """Turn list of angles from radians into sin/cos values, increasing dimensionality.
+
+    Given a list of angles, returns a new list where those angles have been turned into
     their sines and cosines. If reshape is False, a new dim. is added that can hold the
     sine and cosine of each angle, i.e. (len x #angs)
 
@@ -50,7 +52,7 @@ def angle_list_to_sin_cos(angs, reshape=True):
 
 
 def check_standard_continuous(residue, prev_res_num):
-    """Asserts that the residue is standard and that the chain is continuous."""
+    """Assert that the residue is standard and that the chain is continuous."""
     if not residue.isstdaa:
         raise NonStandardAminoAcidError("Found a non-std AA.")
     if residue.getResnum() != prev_res_num:
@@ -68,7 +70,7 @@ def determine_sidechain_atomnames(_res):
 
 
 def compute_sidechain_dihedrals(residue, prev_residue, next_res):
-    """Computes all angles to predict for a given residue.
+    """Compute all angles to predict for a given residue.
 
     If the residue is the first in the protein chain, a fictitious C atom is
     placed before the first N. This is used to compute a [ C-1, N, CA, CB]
