@@ -40,6 +40,7 @@ from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
+OPENMM_PLATFORM = "CUDA"  # CUDA or CPU
 
 
 class SCNProtein(object):
@@ -271,8 +272,12 @@ class SCNProtein(object):
                                                    constraints=HBonds)
         self.integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond,
                                                    0.004 * picoseconds)
-        self.platform = Platform.getPlatformByName('CUDA')
-        properties = {'DeviceIndex': '0', 'Precision': 'double'}
+        if OPENMM_PLATFORM == "CUDA":
+            self.platform = Platform.getPlatformByName('CUDA')
+            properties = {'DeviceIndex': '0', 'Precision': 'double'}
+        else:
+            self.platform = Platform.getPlatformByName('CPU')
+            properties = {}
         self.simulation = openmm.app.Simulation(self.modeller.topology,
                                                 self.system,
                                                 self.integrator,

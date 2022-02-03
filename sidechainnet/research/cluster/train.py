@@ -5,6 +5,7 @@ Training models to predict sidechain conformations given backbone conformations.
 """
 CLUSTER = True
 from tqdm import tqdm
+
 if CLUSTER:
     from functools import partialmethod
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
@@ -24,9 +25,14 @@ from sidechainnet.examples.sidechain_only_models import SidechainTransformer
 import sidechainnet as scn
 from sidechainnet.examples.losses import mse_over_angles
 from sidechainnet.examples.optim import ScheduledOptim
+from sidechainnet.utils.openmm import OpenMMEnergyH
+from sidechainnet.structure import inverse_trig_transform
+from sidechainnet.dataloaders.SCNProtein import SCNProtein
+
+LOCAL_MODEL_DIR = "/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220121/"
 
 
-def train_epoch(model, data, optimizer, device):
+def train_epoch(model, data, optimizer, device, loss_name):
     """One complete training epoch."""
     model.train()
     pbar = tqdm(data['train'], leave=False, unit="batch",
@@ -36,9 +42,10 @@ def train_epoch(model, data, optimizer, device):
         optimizer.zero_grad()
         # Select out backbone and sidechaine angles
         bb_angs = p.angs[:, :, :6]
-        sc_angs_true = p.angs[:, :, 6:]
-        sc_angs_true = scn.structure.trig_transform(sc_angs_true).reshape(
-            sc_angs_true.shape[0], sc_angs_true.shape[1], 12)  # (B x L x 12)
+        sc_angs_true_untransformed = p.angs[:, :, 6:]
+        # Result after transform (6 angles, sin/cos): (B x L x 12)
+        sc_angs_true = scn.structure.trig_transform(sc_angs_true_untransformed).reshape(
+            sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
 
         # Stack model inputs into a single tensor
         model_in = torch.cat([bb_angs, p.secs, p.evos], dim=-1)
@@ -53,24 +60,55 @@ def train_epoch(model, data, optimizer, device):
         # print(torch.isnan(sc_angs_pred).any(), torch.isnan(sc_angs_true).any())
 
         # Compute loss and step
-        loss = mse_over_angles(sc_angs_true, sc_angs_pred)
+        loss = get_losses(loss_name, p, sc_angs_true, sc_angs_pred)
         loss.backward()
         torch.nn.utils.clip_grad_value_(model.parameters(), 1)
         optimizer.step()
 
+
+def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
+    mse_loss = mse_over_angles(sc_angs_true, sc_angs_pred)
+    if loss_name == "mse":
+        loss = mse_loss
+    if loss_name == "openmm" or loss_name == "mse_openmm":
+
+        proteins = []
+        for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids, batch.msks):
+            p = SCNProtein(angles=a.clone(),
+                           sequence=str(s),
+                           id=i,
+                           mask="".join(["+" if x else "-" for x in m]))
+            proteins.append(p)
+        loss_total = 0
+        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        loss_fn = OpenMMEnergyH()
+        for p, sca in zip(proteins, sc_angs_pred_untransformed):
+            # print(p.mask)
+            # print(p, end=" ")
+            # Fill in protein obj with predicted angles instead of true angles
+            # print("Set angles")
+            p.angles[:, 6:] = sca
+            # print("Build coords.")
+            p.add_hydrogens(from_angles=True)
+            # print("About to apply loss.")
+            eloss = loss_fn.apply(p, p.hcoords)
+            loss_total += eloss
+            print(eloss.item())
+            # del p
+        loss = openmm_loss = loss_total / len(proteins)
+
         # Record performance metrics
-        cpu_loss = loss.item()
-        if step % 100 == 0:
-            wandb.log({"Train Batch RMSE": np.sqrt(cpu_loss)})
-        if not CLUSTER:
-            pbar.set_description(
-                '\r  - (Train) rmse={rmse:.4f}'.format(rmse=np.sqrt(cpu_loss)))
+        wandb.log({"Train Batch E-Loss": openmm_loss.item()}) if do_log else True
+        wandb.log({"Train Batch RMSE": np.sqrt(mse_loss.item())}) if do_log else True
+        if loss_name == "mse_openmm":
+            loss = mse_loss * 0.8 + openmm_loss / 1e12 * .2
+            wandb.log({"Train Batch Combined": loss.item()}) if do_log else True
+
+    return loss
 
 
-def eval_epoch(model, data, device, test_set=False):
-    """
-    One complete evaluation epoch.
-    """
+def eval_epoch(model, data, device, loss_name, test_set=False):
+    """ One complete evaluation epoch."""
     losses = {}
     model.eval()
     data_splits = ['test'] if test_set else [
@@ -81,27 +119,43 @@ def eval_epoch(model, data, device, test_set=False):
                           dynamic_ncols=True) if not CLUSTER else data[data_split]
         with torch.no_grad():
             total_loss = 0
-            for step, p in enumerate(batch_iter):
+            for step, batch in enumerate(batch_iter):
                 # Select out backbone and sidechaine angles
-                bb_angs = p.angs[:, :, :6]
-                sc_angs_true = p.angs[:, :, 6:]
+                bb_angs = batch.angs[:, :, :6]
+                sc_angs_true = batch.angs[:, :, 6:]
                 sc_angs_true = scn.structure.trig_transform(sc_angs_true).reshape(
                     sc_angs_true.shape[0], sc_angs_true.shape[1], 12)  # (B x L x 12)
 
                 # Stack model inputs into a single tensor
-                model_in = torch.cat([bb_angs, p.secs, p.evos], dim=-1)
+                model_in = torch.cat([bb_angs, batch.secs, batch.evos], dim=-1)
 
                 # Move inputs to device
                 model_in = model_in.to(device)
-                int_seqs = p.int_seqs.to(device)
+                int_seqs = batch.int_seqs.to(device)
                 sc_angs_true = sc_angs_true.to(device)
 
                 # Predict sidechain angles given input and sequence
                 sc_angs_pred = model(model_in, int_seqs)
 
                 # Reshape prediction to match true sidechain angles
-                loss = mse_over_angles(sc_angs_true, sc_angs_pred)
+                loss = get_losses(loss_name, batch, sc_angs_true, sc_angs_pred)
                 total_loss += loss.item()
+
+                # Make structures for test set
+                # if data_split == 'test':
+                #     proteins = []
+                #     for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids,
+                #                             batch.msks):
+                #         p = SCNProtein(angles=a.clone(),
+                #                        sequence=str(s),
+                #                        id=i,
+                #                        mask="".join(["+" if x else "-" for x in m]))
+                #         proteins.append(p)
+                #     sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred,
+                #                                                         n_angles=6)
+                #     for p, sca in zip(proteins, sc_angs_pred_untransformed):
+                #         # Fill in protein obj with predicted angles instead of true angles
+                #         p.angles[:, 6:] = sca
 
             # Record performance metrics
             avg_loss = np.sqrt(total_loss / (step + 1))
@@ -110,18 +164,50 @@ def eval_epoch(model, data, device, test_set=False):
     return losses
 
 
-def train_loop(model, data, optimizer, device, args, scheduler):
+def train_loop(model, data, optimizer, device, args, scheduler, loss_name):
     """Model training control loop."""
+
+    best_loss_so_far = None
+
     for epoch_i in range(args.epochs):
         print(f'[ Epoch {epoch_i} ]')
-        train_epoch(model, data, optimizer, device)
-        losses = eval_epoch(model, data, device)
+        train_epoch(model, data, optimizer, device, loss_name)
+        losses = eval_epoch(model, data, device, loss_name)
 
         # Update LR
         if scheduler:
             scheduler.step(losses['valid-50'])
+
+        # Checkpointing
+        if best_loss_so_far is None or losses["valid-50"] < best_loss_so_far:
+            best_loss_so_far = losses["valid-50"]
+            checkpoint_model(args, model, optimizer, epoch_i, losses['valid-50'],
+                             scheduler)
+
     test_loss = eval_epoch(model, data, device, test_set=True)
     wandb.log({"Test Loss": test_loss})
+
+    # Save artifact
+    name = f"model_{wandb.run.id}"
+    trained_model_artifact = wandb.Artifact(name, type='model')
+    trained_model_artifact.add_dir(LOCAL_MODEL_DIR)
+
+
+def checkpoint_model(args, model, optimizer, epoch, loss, scheduler):
+    model_state_dict = model.state_dict()
+    name = f"model_{wandb.run.id}"
+    chkpt_path = LOCAL_MODEL_DIR + name + "_best.chkpt"
+    checkpoint = {
+        'model_state_dict': model_state_dict,
+        'settings': args,
+        'epoch': epoch,
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': scheduler.state_dict() if scheduler else None,
+        'loss': loss
+    }
+    torch.save(checkpoint, chkpt_path)
+    wandb.save(chkpt_path)
+    print(f"Model saved to {chkpt_path}.")
 
 
 def make_model(args, angle_means):
@@ -231,7 +317,7 @@ def create_parser():
     training.add_argument(
         '-l',
         '--loss',
-        choices=["mse", "drmsd", "lndrmsd", "combined"],
+        choices=["mse", "mse_openmm", "openmm"],
         default="mse",
         help="Loss used to train the model. Can be root mean squared error (RMSE), "
         "distance-based root mean squared distance (DRMSD), length-normalized DRMSD "
@@ -252,7 +338,7 @@ def create_parser():
     training.add_argument(
         '--early_stopping_threshold',
         type=float,
-        default=0.001,
+        default=0.01,
         help="Threshold for considering improvements during training/lr scheduling.")
     training.add_argument('-opt',
                           '--optimizer',
@@ -357,13 +443,15 @@ def main():
     seed_rngs(args)
 
     # Load dataset
-    data = scn.load(12,
-                    100,
-                    with_pytorch='dataloaders',
-                    batch_size=args.batch_size,
-                    dynamic_batching=False,
-                    filter_by_resolution=True,
-                    complete_structures_only=True)
+    data = scn.load(
+        # "debug",
+        12,
+        30,
+        with_pytorch='dataloaders',
+        batch_size=args.batch_size,
+        dynamic_batching=False,
+        filter_by_resolution=True,
+        complete_structures_only=True)
     angle_means = data['train'].dataset.angle_means[6:]
 
     # Prepare model
@@ -399,7 +487,7 @@ def main():
     print(args, "\n")
 
     # Start training
-    train_loop(model, data, optimizer, device, args, scheduler)
+    train_loop(model, data, optimizer, device, args, scheduler, loss_name=args.loss)
 
 
 if __name__ == '__main__':
