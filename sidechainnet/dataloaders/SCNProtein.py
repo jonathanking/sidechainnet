@@ -47,22 +47,22 @@ class SCNProtein(object):
 
     def __init__(self, **kwargs) -> None:
         super().__init__()
-        self.coords = kwargs['coordinates']
-        self.angles = kwargs['angles']
-        self.seq = kwargs['sequence']
-        self.unmodified_seq = kwargs['unmodified_seq']
-        self.mask = kwargs['mask']
-        self.evolutionary = kwargs['evolutionary']
-        self.secondary_structure = kwargs['secondary_structure']
-        self.resolution = kwargs['resolution']
-        self.is_modified = kwargs['is_modified']
-        self.id = kwargs['id']
-        self.split = kwargs['split']
+        self.coords = kwargs['coordinates'] if 'coordinates' in kwargs else None
+        self.angles = kwargs['angles'] if 'angles' in kwargs else None
+        self.seq = kwargs['sequence'] if 'sequence' in kwargs else None
+        self.unmodified_seq = kwargs['unmodified_seq'] if 'unmodified_seq' in kwargs else None
+        self.mask = kwargs['mask'] if 'mask' in kwargs else None
+        self.evolutionary = kwargs['evolutionary'] if 'evolutionary' in kwargs else None
+        self.secondary_structure = kwargs['secondary_structure'] if 'secondary_structure' in kwargs else None
+        self.resolution = kwargs['resolution'] if 'resolution' in kwargs else None
+        self.is_modified = kwargs['is_modified'] if 'is_modified' in kwargs else None
+        self.id = kwargs['id'] if 'id' in kwargs else None
+        self.split = kwargs['split'] if 'split' in kwargs else None
         self.sb = None
         self.atoms_per_res = NUM_COORDS_PER_RES
         self.has_hydrogens = False
         self.openmm_initialized = False
-        self.hcoords = self.coords.copy()
+        self.hcoords = self.coords.copy() if self.coords is not None else None
         self.starting_energy = None
         self.positions = None
         self.forces = None
@@ -75,21 +75,25 @@ class SCNProtein(object):
         """Return length of protein sequence."""
         return len(self.seq)
 
-    def to_3Dmol(self, style=None):
+    def to_3Dmol(self, from_angles=False, style=None):
         """Return an interactive visualization of the protein with py3DMol."""
         if self.sb is None:
-            if self.has_hydrogens:
+            if from_angles:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            elif self.has_hydrogens:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
         return self.sb.to_3Dmol(style=style)
 
-    def to_pdb(self, path, title=None):
+    def to_pdb(self, path, title=None, from_angles=False):
         """Save structure to path as a PDB file."""
         if not title:
             title = self.id
         if self.sb is None:
-            if self.has_hydrogens:
+            if from_angles:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            elif self.has_hydrogens:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
@@ -109,6 +113,19 @@ class SCNProtein(object):
         """Represent an SCNProtein as a string."""
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
+
+    def build_coords_from_angles(self, add_hydrogens=False):
+        """Build protein coordinates iff no StructureBuilder already exists."""
+        if self.sb is None:
+            self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            if add_hydrogens:
+                self.sb.add_hydrogens()
+                self.hcoords = self.sb.coords
+            else:
+                self.coords = self.sb.build()
+                self.hcoords = self.coords
+        else:
+            print("StructureBuilder already exists. Coords not rebuilt.")
 
     def add_hydrogens(self, from_angles=False, coords=None):
         """Add hydrogens to the internal protein structure representation."""

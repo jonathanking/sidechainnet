@@ -128,3 +128,4 @@ resources/dev/*
 *slurm*.out
 *_*.out
 *wandb*
+*.chkpt

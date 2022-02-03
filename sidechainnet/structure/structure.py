@@ -224,7 +224,7 @@ def deg2rad(angle):
     return angle * np.pi / 180.
 
 
-def inverse_trig_transform(t):
+def inverse_trig_transform(t, n_angles=NUM_ANGLES):
     """Compute the atan2 of the last 2 dimensions of a given tensor.
 
     Given a (BATCH x L X NUM_PREDICTED_ANGLES ) tensor, returns (BATCH X
@@ -238,7 +238,7 @@ def inverse_trig_transform(t):
         torch.tensor: Tensor of angles with the last two dimensions reduced
         via atan2.
     """
-    t = t.view(t.shape[0], -1, NUM_ANGLES, 2)
+    t = t.view(t.shape[0], -1, n_angles, 2)
     t_cos = t[:, :, :, 0]
     t_sin = t[:, :, :, 1]
     t = torch.atan2(t_sin, t_cos)
