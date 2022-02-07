@@ -152,7 +152,6 @@ def test_mse_trig():
         [1.6, 1.1, 0.9],
         [2.4, 2.8, 0.6],
     ]])
-    print(trig_transform(true).flatten(start_dim=-2))
     true = trig_transform(true).flatten(start_dim=-2)
     pred = trig_transform(pred).flatten(start_dim=-2)
     mask = ~true.isnan()
