@@ -25,7 +25,8 @@ ALLOWED_NONSTD_RESIDUES = {
     "4FB": "PRO",
     "MLY": "LYS",  # N-dimethyl-lysine
     "AIB": "ALA",  # alpha-methyl-alanine, not included during generation on 1/23/22
-    "MK8": "MET"   # 2-methyl-L-norleucine, added 3/16/21
+    "MK8": "MET",  # 2-methyl-L-norleucine, added 3/16/21
+    "CME": "CYS"   # S,S-(2-HYDROXYETHYL)THIOCYSTEINE, see PDB 1A1V, added 2/7/22
 }
 
 
