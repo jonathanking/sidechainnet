@@ -6,6 +6,7 @@ import pytest
 def test_get_proteinnet_ids():
     ids = scn.get_proteinnet_ids(12, "valid-10", 100)
 
+
 def test_make_unmodified_seq_entry():
     pn_seq = "CCCCC"
     unmod_seq = ["CYS", "CYS", "CYS", "CYS", "CYM"]
@@ -25,5 +26,11 @@ def test_make_unmodified_seq_entry():
     result = make_unmodified_seq_entry(pn_seq, unmod_seq, mask)
     assert result == "CYS CYS CYM CYS CYS"
 
+
 def test_modified_residues_are_reported_in_scn_entry_ums():
     pnids = ['20#2FZT_1_A', "70#2E87_1_A", "20#3S0X_1_A", '70#2E87_1_A']
+
+
+def test_generate_all():
+    from sidechainnet.create import generate_all
+    generate_all(num_cores=8, regenerate_scdata=True)

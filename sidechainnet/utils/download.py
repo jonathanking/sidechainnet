@@ -526,7 +526,7 @@ def get_sequence_from_pdbid(pdbid, chain):
     r = requests.get(query_string)
     if r.status_code != 200:
         res = None
-    while True:
+    while True and entity < 1000:
         query_string = (
             f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdbid}/{entity}")
         r = requests.get(query_string)

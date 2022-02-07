@@ -249,9 +249,12 @@ def _create(args):
     pnids = pnids[:args.limit]  # Limit the length of the list for debugging
 
     # Using the ProteinNet IDs as a guide, download the relevant sidechain data
-    sc_only_data, sc_filename = download_sidechain_data(pnids, args.sidechainnet_out,
-                                                        args.casp_version, args.thinning,
-                                                        args.limit, args.proteinnet_in,
+    sc_only_data, sc_filename = download_sidechain_data(pnids,
+                                                        args.sidechainnet_out,
+                                                        args.casp_version,
+                                                        args.thinning,
+                                                        args.limit,
+                                                        args.proteinnet_in,
                                                         args.regenerate_scdata,
                                                         num_cores=args.num_cores)
 
@@ -286,7 +289,10 @@ def _create_all(args):
     sidechainnet_raw_100 = combine_datasets(args.proteinnet_out, sc_only_data)
 
     # Generate debug dataset with 200 training examples
-    sc_outfile = os.path.join(args.sidechainnet_out, format_sidechainnet_path("debug", 0))
+    sc_outfile = os.path.join(
+        args.sidechainnet_out,
+        format_sidechainnet_path("debug", 0).replace("debug",
+                                                     f"debug{args.casp_version}"))
     debug = organize_data(sidechainnet_raw_100,
                           args.casp_version,
                           thinning=100,
@@ -452,7 +458,9 @@ def get_proteinnet_ids(casp_version, split, thinning=None):
         return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
 
 
-def generate_all(num_cores=multiprocessing.cpu_count()):
+def generate_all(num_cores=multiprocessing.cpu_count(),
+                 limit=None,
+                 regenerate_scdata=False):
     """Generate all SidechainNet datasets for curation and upload."""
     import time
     import sidechainnet as scn
@@ -462,7 +470,11 @@ def generate_all(num_cores=multiprocessing.cpu_count()):
     casps = list(range(7, 13))[::-1]
     for c in casps:
         print("CASP", c)
-        scn.create(c, "all", regenerate_scdata=False, num_cores=num_cores)
+        scn.create(c,
+                   "all",
+                   regenerate_scdata=regenerate_scdata,
+                   num_cores=num_cores,
+                   limit=limit)
 
 
 def main(args_tuple):
@@ -524,7 +536,8 @@ if __name__ == "__main__":
         help=('If True, then regenerate the sidechain-only data even if it already exists'
               ' locally.'))
     args = parser.parse_args()
-    if args.casp_version != "debug": args.casp_version = int(args.casp_version)
+    if args.casp_version != "debug":
+        args.casp_version = int(args.casp_version)
     args_tuple = ArgsTuple(args.casp_version, args.thinning, args.proteinnet_in,
                            args.proteinnet_out, args.sidechainnet_out,
                            args.regenerate_scdata, args.limit, args.num_cores)
