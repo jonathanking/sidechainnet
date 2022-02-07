@@ -205,7 +205,8 @@ def create(casp_version=12,
            thinning=30,
            sidechainnet_out="./sidechainnet_data",
            regenerate_scdata=False,
-           limit=None):
+           limit=None,
+           num_cores=multiprocessing.cpu_count()):
     """Generate the requested SidechainNet dataset and save pickled result files.
 
     This function replicates CLI behavior of calling `python sidechainnet/create.py`.
@@ -235,7 +236,7 @@ def create(casp_version=12,
     proteinnet_out = proteinnet_in
 
     args = ArgsTuple(casp_version, thinning, proteinnet_in, proteinnet_out,
-                     sidechainnet_out, regenerate_scdata, limit)
+                     sidechainnet_out, regenerate_scdata, limit, num_cores)
     main(args)
 
 
@@ -451,7 +452,7 @@ def get_proteinnet_ids(casp_version, split, thinning=None):
         return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
 
 
-def generate_all():
+def generate_all(num_cores=multiprocessing.cpu_count()):
     """Generate all SidechainNet datasets for curation and upload."""
     import time
     import sidechainnet as scn
@@ -461,7 +462,7 @@ def generate_all():
     casps = list(range(7, 13))[::-1]
     for c in casps:
         print("CASP", c)
-        scn.create(c, "all", regenerate_scdata=False)
+        scn.create(c, "all", regenerate_scdata=False, num_cores=num_cores)
 
 
 def main(args_tuple):
