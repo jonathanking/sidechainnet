@@ -60,6 +60,9 @@ class SCNDataset(object):
                 self.idx_to_SCNProtein[idx] = p
                 idx += 1
 
+        # Add metadata
+        self.angle_means = data['settings']['angle_means']
+
     def get_protein_list_by_split_name(self, split_name):
         """Return list of SCNProtein objects belonging to str split_name."""
         return [p for p in self if p.split == split_name]
