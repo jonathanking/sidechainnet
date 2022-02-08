@@ -195,6 +195,15 @@ def test_optimize_internal():
         opt.step()
 
 
+def test_nanh_01():
+    """Build hydrogens for a structure without gaps."""
+    d = scn.load("debug", scn_dir="/home/jok120/sidechainnet_data/", scn_dataset=True)
+    p = d["1BE3_d1be3k-"]
+    p.to_3Dmol()
+    p.torch()
+    p.add_hydrogens()
+    p.to_pdb("1be3.pdb")
+
 
 if __name__ == "__main__":
     # test_optimize_with_profiling()
