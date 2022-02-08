@@ -3,7 +3,7 @@ Training models to predict sidechain conformations given backbone conformations.
     Author: Jonathan King
     Date: 01/12/2022
 """
-CLUSTER = True
+CLUSTER = False
 from tqdm import tqdm
 
 if CLUSTER:
@@ -23,7 +23,7 @@ import torch
 
 from sidechainnet.examples.sidechain_only_models import SidechainTransformer
 import sidechainnet as scn
-from sidechainnet.examples.losses import mse_over_angles
+from sidechainnet.examples.losses import angle_mse
 from sidechainnet.examples.optim import ScheduledOptim
 from sidechainnet.utils.openmm import OpenMMEnergyH
 from sidechainnet.structure import inverse_trig_transform
@@ -40,9 +40,14 @@ def train_epoch(model, data, optimizer, device, loss_name):
 
     for step, p in enumerate(pbar):
         optimizer.zero_grad()
-        # Select out backbone and sidechaine angles
-        bb_angs = p.angs[:, :, :6]
+        # True values still have nans, replace with 0s so they can go into the network
+        # Also select out backbone and sidechaine angles
+        bb_angs = torch.nan_to_num(p.angs[:, :, :6], nan=0.0)
         sc_angs_true_untransformed = p.angs[:, :, 6:]
+
+        # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
+        sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(dim=-1)] = np.nan
+        
         # Result after transform (6 angles, sin/cos): (B x L x 12)
         sc_angs_true = scn.structure.trig_transform(sc_angs_true_untransformed).reshape(
             sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
@@ -67,8 +72,7 @@ def train_epoch(model, data, optimizer, device, loss_name):
 
 
 def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
-    angle_mask = ~sc_angs_true.isnan()
-    mse_loss = torch.nn.functional.mse_loss(sc_angs_true[angle_mask], sc_angs_pred[angle_mask])
+    mse_loss = angle_mse(sc_angs_true, sc_angs_pred)
     if loss_name == "mse":
         loss = mse_loss
     if loss_name == "openmm" or loss_name == "mse_openmm":
@@ -445,9 +449,9 @@ def main():
 
     # Load dataset
     data = scn.load(
-        # "debug",
-        12,
-        30,
+        "debug",
+        # 12,
+        # 30,
         with_pytorch='dataloaders',
         batch_size=args.batch_size,
         dynamic_batching=False,
@@ -489,7 +493,6 @@ def main():
 
     # Start training
     train_loop(model, data, optimizer, device, args, scheduler, loss_name=args.loss)
-
 
 if __name__ == '__main__':
     main()

@@ -99,6 +99,27 @@ def pairwise_internal_dist(x):
     return res
 
 
+def angle_mse(true, pred):
+    """Return the mean squared error between two tensor batches.
+
+    Given a predicted angle tensor and a true angle tensor (batch-padded with
+    nans, and missing-item-padded with nans), this function removes all nans before
+    using torch's built-in MSE loss function.
+
+    Args:
+        pred, true (np.ndarray, torch.tensor): 3 or more dimensional tensors
+    Returns:
+        MSE loss between true and pred.
+    """
+    # # Remove batch padding
+    # ang_non_zero = true.ne(0).any(dim=2)
+    # tgt_ang_non_zero = true[ang_non_zero]
+
+    # Remove missing angles
+    ang_non_nans = ~true.isnan()
+    return torch.nn.functional.mse_loss(pred[ang_non_nans], true[ang_non_nans])
+
+
 def _tile(a, dim, n_tile):
     # https://discuss.pytorch.org/t/how-to-tile-a-tensor/13853/4
     init_dim = a.size(dim)
