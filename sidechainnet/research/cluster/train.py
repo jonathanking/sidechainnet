@@ -47,7 +47,7 @@ def train_epoch(model, data, optimizer, device, loss_name):
 
         # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
         sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(dim=-1)] = np.nan
-        
+
         # Result after transform (6 angles, sin/cos): (B x L x 12)
         sc_angs_true = scn.structure.trig_transform(sc_angs_true_untransformed).reshape(
             sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
@@ -104,10 +104,10 @@ def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
 
         # Record performance metrics
         wandb.log({"Train Batch E-Loss": openmm_loss.item()}) if do_log else True
-        wandb.log({"Train Batch RMSE": np.sqrt(mse_loss.item())}) if do_log else True
         if loss_name == "mse_openmm":
             loss = mse_loss * 0.8 + openmm_loss / 1e12 * .2
             wandb.log({"Train Batch Combined": loss.item()}) if do_log else True
+    wandb.log({"Train Batch RMSE": np.sqrt(mse_loss.item())}) if do_log else True
 
     return loss
 
@@ -124,26 +124,32 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
                           dynamic_ncols=True) if not CLUSTER else data[data_split]
         with torch.no_grad():
             total_loss = 0
-            for step, batch in enumerate(batch_iter):
-                # Select out backbone and sidechaine angles
-                bb_angs = batch.angs[:, :, :6]
-                sc_angs_true = batch.angs[:, :, 6:]
-                sc_angs_true = scn.structure.trig_transform(sc_angs_true).reshape(
-                    sc_angs_true.shape[0], sc_angs_true.shape[1], 12)  # (B x L x 12)
+            for step, p in enumerate(batch_iter):
+                # True values still have nans, replace with 0s so they can go into the network
+                # Also select out backbone and sidechaine angles
+                bb_angs = torch.nan_to_num(p.angs[:, :, :6], nan=0.0)
+                sc_angs_true_untransformed = p.angs[:, :, 6:]
+
+                # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
+                sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(dim=-1)] = np.nan
+
+                # Result after transform (6 angles, sin/cos): (B x L x 12)
+                sc_angs_true = scn.structure.trig_transform(sc_angs_true_untransformed).reshape(
+                    sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
 
                 # Stack model inputs into a single tensor
-                model_in = torch.cat([bb_angs, batch.secs, batch.evos], dim=-1)
+                model_in = torch.cat([bb_angs, p.secs, p.evos], dim=-1)
 
                 # Move inputs to device
                 model_in = model_in.to(device)
-                int_seqs = batch.int_seqs.to(device)
+                int_seqs = p.int_seqs.to(device)
                 sc_angs_true = sc_angs_true.to(device)
 
                 # Predict sidechain angles given input and sequence
                 sc_angs_pred = model(model_in, int_seqs)
 
                 # Reshape prediction to match true sidechain angles
-                loss = get_losses(loss_name, batch, sc_angs_true, sc_angs_pred)
+                loss = get_losses(loss_name, p, sc_angs_true, sc_angs_pred)
                 total_loss += loss.item()
 
                 # Make structures for test set
@@ -467,7 +473,7 @@ def main():
     args.n_heads = model.n_heads
 
     # Prepare Weights and Biases logging
-    wandb_dir = "/scr/jok120/wandb"
+    wandb_dir = "./scr/jok120/wandb"
     if wandb_dir:
         os.makedirs(wandb_dir, exist_ok=True)
     wandb.init(project="sidechain-transformer", entity="koes-group", dir=wandb_dir)
