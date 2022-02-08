@@ -67,7 +67,8 @@ def train_epoch(model, data, optimizer, device, loss_name):
 
 
 def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
-    mse_loss = mse_over_angles(sc_angs_true, sc_angs_pred)
+    angle_mask = ~sc_angs_true.isnan()
+    mse_loss = torch.nn.functional.mse_loss(sc_angs_true[angle_mask], sc_angs_pred[angle_mask])
     if loss_name == "mse":
         loss = mse_loss
     if loss_name == "openmm" or loss_name == "mse_openmm":

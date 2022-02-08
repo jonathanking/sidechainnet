@@ -68,7 +68,7 @@ class IntegerSequenceProteinRNN(BaseProteinAngleRNN):
     def forward(self, sequence):
         """Run one forward step of the model."""
         # First, we compute the length of each sequence to use pack_padded_sequence
-        lengths = sequence.shape[-1] - (sequence == 20).sum(axis=1)
+        lengths = sequence.shape[-1] - (torch.isnan(sequence)).sum(axis=1)
         h, c = self.init_hidden(len(lengths))
         # Our inputs are sequences of integers, allowing us to use torch.nn.Embeddings
         sequence = self.input_embedding(sequence)
@@ -114,7 +114,7 @@ class PSSMProteinRNN(BaseProteinAngleRNN):
     def forward(self, sequence):
         """Run one forward step of the model."""
         # First, we compute the length of each sequence to use pack_padded_sequence
-        lengths = sequence.shape[1] - (sequence == 0).all(axis=2).sum(axis=1)
+        lengths = sequence.shape[1] - (torch.isnan(sequence)).all(axis=2).sum(axis=1)
         h, c = self.init_hidden(len(lengths))
         sequence = torch.nn.utils.rnn.pack_padded_sequence(sequence,
                                                            lengths.cpu(),

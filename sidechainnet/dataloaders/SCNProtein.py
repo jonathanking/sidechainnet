@@ -18,6 +18,7 @@ Other features:
     * visualize proteins with SCNProtein.to_3Dmol()
     * write PDB files for proteins with SCNProtein.to_PDB()
 """
+import warnings
 
 import numpy as np
 import openmm
@@ -51,10 +52,12 @@ class SCNProtein(object):
         self.coords = kwargs['coordinates'] if 'coordinates' in kwargs else None
         self.angles = kwargs['angles'] if 'angles' in kwargs else None
         self.seq = kwargs['sequence'] if 'sequence' in kwargs else None
-        self.unmodified_seq = kwargs['unmodified_seq'] if 'unmodified_seq' in kwargs else None
+        self.unmodified_seq = kwargs[
+            'unmodified_seq'] if 'unmodified_seq' in kwargs else None
         self.mask = kwargs['mask'] if 'mask' in kwargs else None
         self.evolutionary = kwargs['evolutionary'] if 'evolutionary' in kwargs else None
-        self.secondary_structure = kwargs['secondary_structure'] if 'secondary_structure' in kwargs else None
+        self.secondary_structure = kwargs[
+            'secondary_structure'] if 'secondary_structure' in kwargs else None
         self.resolution = kwargs['resolution'] if 'resolution' in kwargs else None
         self.is_modified = kwargs['is_modified'] if 'is_modified' in kwargs else None
         self.id = kwargs['id'] if 'id' in kwargs else None
@@ -69,7 +72,7 @@ class SCNProtein(object):
         self.forces = None
         self._hcoord_mask = None
         self.device = 'cpu'
-        self.is_numpy = False
+        self.is_numpy = isinstance(self.coords, np.ndarray)
         self._hcoords_for_openmm = None
 
     def __len__(self):
@@ -130,6 +133,11 @@ class SCNProtein(object):
 
     def add_hydrogens(self, from_angles=False, coords=None):
         """Add hydrogens to the internal protein structure representation."""
+        if (isinstance(self.angles, torch.Tensor) and torch.isnan(self.angles).all(
+                dim=1).any()) or isinstance(self.angles, np.ndarray) and np.isnan(
+                    self.angles).all(axis=1).any():
+            raise ValueError("Adding hydrogens to structures with missing residues is not"
+                             " supported.")
         if from_angles:
             self.sb = structure.StructureBuilder(self.seq,
                                                  ang=self.angles,
@@ -175,7 +183,8 @@ class SCNProtein(object):
         self._forces_raw = self.starting_state.getForces(asNumpy=True)
 
         # Assign forces from OpenMM to their places in the hydrogen coord representation
-        self.forces[self.hcoord_to_pos_map_keys] = self._forces_raw[self.hcoord_to_pos_map_values]
+        self.forces[self.hcoord_to_pos_map_keys] = self._forces_raw[
+            self.hcoord_to_pos_map_values]
 
         if pprint:
             atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
@@ -212,9 +221,11 @@ class SCNProtein(object):
             hcoords = self.hcoords
         # The below step takes a PyTorch CUDA representation of all-atom coordinates
         # and passes it to the CPU as a numpy array so that OpenMM can read it
-        hcoords = hcoords.detach().cpu().numpy() if not isinstance(hcoords, np.ndarray) else hcoords
+        hcoords = hcoords.detach().cpu().numpy() if not isinstance(
+            hcoords, np.ndarray) else hcoords
         # A mapping is used to correct for small differences between the Torch/OpenMM pos
-        self.positions[self.hcoord_to_pos_map_values] = hcoords[self.hcoord_to_pos_map_keys]
+        self.positions[self.hcoord_to_pos_map_values] = hcoords[
+            self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
 
     ##########################################
@@ -230,7 +241,8 @@ class SCNProtein(object):
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        hcoords = self.hcoords.cpu().detach().numpy() if not self.is_numpy else self.hcoords
+        hcoords = self.hcoords.cpu().detach().numpy(
+        ) if not self.is_numpy else self.hcoords
         coord_gen = coord_generator(hcoords, self.atoms_per_res)
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
@@ -491,6 +503,20 @@ class SCNProtein(object):
         if not torch.is_tensor(self.angles):
             self.angles = torch.tensor(self.angles)
         self.is_numpy = False
+
+    def fillna(self, value=0.0, warn=True):
+        """Replace nans in coordinate and angle matrices with the specified value.
+
+        Args:
+            value (float, optional): Replace nans with this value. Defaults to 0.0.
+        """
+        if warn:
+            warnings.warn(
+                "Doing this will remove all nans from the object and may cause missing"
+                " residue information to be lost. To proceed, call with warn=False.")
+            return
+        self.coords[np.isnan(self.coords)] = value
+        self.angles[np.isnan(self.angles)] = value
 
 
 def atom_name_pprint(atom_names, values):

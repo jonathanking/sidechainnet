@@ -70,6 +70,7 @@ class StructureBuilder(object):
             self.is_numpy = False if isinstance(self.coords, torch.Tensor) else True
         else:
             self.is_numpy = False if isinstance(self.ang, torch.Tensor) else True
+        self.array_lib = np if self.is_numpy else torch
 
         if self.ang is not None and self.ang.shape[-1] != NUM_ANGLES:
             raise ValueError(f"Angle matrix dimensions must match (L x {NUM_ANGLES}). "
@@ -83,8 +84,8 @@ class StructureBuilder(object):
                 f"The length of the coordinate matrix must match the sequence length "
                 f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
                 f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
-        if self.ang is not None and (self.ang == 0).all(axis=1).any():
-            missing_loc = np.where((self.ang == 0).all(axis=1))
+        if self.ang is not None and (self.array_lib.isnan(self.ang)).all(axis=1).any():
+            missing_loc = np.where((self.array_lib.isnan(self.ang)).all(axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "

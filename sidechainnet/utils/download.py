@@ -3,6 +3,8 @@
 import multiprocessing
 import os
 import pickle
+from time import sleep
+import numpy as np
 import pkg_resources
 from glob import glob
 import re
@@ -498,6 +500,7 @@ def get_resolution_from_pdbid(pdbid):
     Args:
         pdbid (string): RCSB PDB identifier.
     """
+    sleep(np.random.randint(0, 3))
     query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
                     "\"){pdbx_vrpt_summary{PDB_resolution}}}")
     r = requests.get(query_string, headers={"User-Agent": "Mozilla/5.0"})
