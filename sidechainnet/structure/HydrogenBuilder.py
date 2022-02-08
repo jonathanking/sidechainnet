@@ -203,13 +203,18 @@ class HydrogenBuilder(object):
 
         # Define Hydrogen extending from carbon
         H1 = self.dot(R109, -CB)  # Place Hydrogen by rotating C along perpendicular axis
-        H1 = _scale(H1, length) + carbon
+        H1 = self.scale(H1, length)
 
         R120 = self.M(CB, RAD120TORCH)
         # Place 2nd Hydrogen by rotating prev H 120 deg
         H2 = self.dot(R120, self.clone(H1))
         # Place 3rd Hydrogen by rotating prev H 120 deg
         H3 = self.dot(R120, self.clone(H2))
+
+        # Return to original position
+        H1 += carbon
+        H2 += carbon
+        H3 += carbon
 
         return [H1, H2, H3]
 
