@@ -182,7 +182,7 @@ def get_sidechain_data(pnids, limit, num_cores=multiprocessing.cpu_count()):
     results = []
     remaining_pnids = [_ for _ in pnids]
     pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
-    while len(remaining_pnids) > multiprocessing.cpu_count():
+    while len(remaining_pnids) > num_cores:
         print(f"{len(pnids_ok_parallel)} IDs OK for parallel downloading.")
         with multiprocessing.Pool(num_cores) as p:
             results.extend(
