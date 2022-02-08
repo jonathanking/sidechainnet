@@ -308,11 +308,6 @@ def create_parser():
     training.add_argument("-lr", "--learning_rate", type=float, default=1e-4)
     training.add_argument('-e', '--epochs', type=int, default=10)
     training.add_argument("-b", '--batch_size', type=int, default=8)
-    training.add_argument('-es',
-                          '--early_stopping',
-                          type=int,
-                          default=20,
-                          help="Stops if training hasn't improved in X epochs")
     training.add_argument(
         '-nws',
         '--n_warmup_steps',
@@ -344,7 +339,7 @@ def create_parser():
     training.add_argument(
         '--patience',
         type=int,
-        default=10,
+        default=5,
         help="Number of epochs to wait before reducing LR for plateau scheduler.")
     training.add_argument(
         '--early_stopping_threshold',
@@ -499,6 +494,7 @@ def main():
 
     # Start training
     train_loop(model, data, optimizer, device, args, scheduler, loss_name=args.loss)
+
 
 if __name__ == '__main__':
     main()
