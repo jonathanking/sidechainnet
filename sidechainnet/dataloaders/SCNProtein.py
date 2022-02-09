@@ -38,7 +38,7 @@ from sidechainnet import structure
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
-from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
 OPENMM_PLATFORM = "CUDA"  # CUDA or CPU
@@ -62,6 +62,15 @@ class SCNProtein(object):
         self.is_modified = kwargs['is_modified'] if 'is_modified' in kwargs else None
         self.id = kwargs['id'] if 'id' in kwargs else None
         self.split = kwargs['split'] if 'split' in kwargs else None
+        self.add_sos_eos = kwargs['add_sos_eos'] if 'add_sos_eos' in kwargs else False
+
+        # Prepare data for model training
+        self.int_seq = VOCAB.str2ints(self.seq, add_sos_eos=self.add_sos_eos)
+        self.int_mask = [1 if m == "+" else 0 for m in self.mask]
+        dssp_vocab = DSSPVocabulary()
+        self.int_secondary = dssp_vocab.str2ints(self.secondary_structure,
+                                                 add_sos_eos=self.add_sos_eos)
+
         self.sb = None
         self.atoms_per_res = NUM_COORDS_PER_RES
         self.has_hydrogens = False
@@ -133,9 +142,9 @@ class SCNProtein(object):
 
     def add_hydrogens(self, from_angles=False, coords=None):
         """Add hydrogens to the internal protein structure representation."""
-        if (isinstance(self.angles, torch.Tensor) and torch.isnan(self.angles).all(
-                dim=1).any()) or isinstance(self.angles, np.ndarray) and np.isnan(
-                    self.angles).all(axis=1).any():
+        if (isinstance(self.angles, torch.Tensor) and
+                torch.isnan(self.angles).all(dim=1).any()) or isinstance(
+                    self.angles, np.ndarray) and np.isnan(self.angles).all(axis=1).any():
             raise ValueError("Adding hydrogens to structures with missing residues is not"
                              " supported.")
         if from_angles:
@@ -526,26 +535,23 @@ class SCNProtein(object):
         mask_seq_no_right = self.mask.rstrip('-')
         n_removed_left = len(self.mask) - len(mask_seq_no_left)
         n_removed_right = len(self.mask) - len(mask_seq_no_right)
-        n_removed_right = None if n_removed_right == 0 else n_removed_right
+        n_removed_right = None if n_removed_right == 0 else -n_removed_right
         # Trim simple attributes
         for at in ["seq", "angles", "secondary_structure", "is_modified", "evolutionary"]:
             data = getattr(self, at)
             if data is not None:
-                setattr(self, at, data[n_removed_left:-n_removed_right])
+                setattr(self, at, data[n_removed_left:n_removed_right])
         # Trim coordinate data
+        end_point = n_removed_right * self.atoms_per_res if n_removed_right is not None else None
         if self.coords is not None:
-            self.coords = self.coords[n_removed_left *
-                                      self.atoms_per_res:-n_removed_right *
-                                      self.atoms_per_res]
+            self.coords = self.coords[n_removed_left * self.atoms_per_res:end_point]
         if self.hcoords is not None:
-            self.hcoords = self.hcoords[n_removed_left *
-                                        self.atoms_per_res:-n_removed_right *
-                                        self.atoms_per_res]
+            self.hcoords = self.hcoords[n_removed_left * self.atoms_per_res:end_point]
         # Trim unmodified seq
         if self.unmodified_seq is not None:
             assert isinstance(self.unmodified_seq, str)
             ums = self.unmodified_seq.split()
-            self.unmodified_seq = " ".join(ums[n_removed_left:-n_removed_right])
+            self.unmodified_seq = " ".join(ums[n_removed_left:n_removed_right])
         # Update mask
         self.mask = self.mask.strip("-")
         # Reset structure builders

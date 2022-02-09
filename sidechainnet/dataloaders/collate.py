@@ -4,9 +4,9 @@ import collections
 import numpy as np
 import torch
 import torch.utils.data
+from sidechainnet.dataloaders.SCNDataset import SCNDataset
 
 from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatchSampler
-from sidechainnet.dataloaders.ProteinDataset import ProteinDataset
 from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import MAX_SEQ_LEN
@@ -223,7 +223,7 @@ def prepare_dataloaders(data,
     if collate_fn is None:
         collate_fn = get_collate_fn(aggregate_model_input, seqs_as_onehot=seq_as_onehot)
 
-    train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
+    train_dataset = SCNDataset(data['train'], split_name='train')
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -252,16 +252,15 @@ def prepare_dataloaders(data,
 
     valid_loaders = {}
     for vsplit in VALID_SPLITS:
-        valid_loader = torch.utils.data.DataLoader(ProteinDataset(
-            data[vsplit], vsplit, data['settings'], data['date']),
+        valid_loader = torch.utils.data.DataLoader(SCNDataset(
+                                                   data[vsplit],
+                                                   split_name=vsplit),
                                                    num_workers=num_workers,
                                                    batch_size=batch_size,
                                                    collate_fn=collate_fn)
         valid_loaders[vsplit] = valid_loader
 
-    test_loader = torch.utils.data.DataLoader(ProteinDataset(data['test'], 'test',
-                                                             data['settings'],
-                                                             data['date']),
+    test_loader = torch.utils.data.DataLoader(SCNDataset(data['test'], split_name='test'),
                                               num_workers=num_workers,
                                               batch_size=batch_size,
                                               collate_fn=collate_fn)
@@ -279,7 +278,7 @@ def prepare_dataloaders(data,
 def get_dataloader_from_dataset_dict(dictionary):
     collate_fn = get_collate_fn(False, seqs_as_onehot=True)
 
-    train_dataset = ProteinDataset(data['train'], 'train', data['settings'], data['date'])
+    train_dataset = SCNDataset(data['train'], split_name='train')
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
