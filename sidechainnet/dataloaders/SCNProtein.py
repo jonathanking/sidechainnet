@@ -518,6 +518,39 @@ class SCNProtein(object):
         self.coords[np.isnan(self.coords)] = value
         self.angles[np.isnan(self.angles)] = value
 
+    def trim_edges(self):
+        """Trim edges of seq/ums, 2ndary, evo, mask, angles, and coords based on mask."""
+        assert isinstance(self.mask, str)
+
+        mask_seq_no_left = self.mask.lstrip('-')
+        mask_seq_no_right = self.mask.rstrip('-')
+        n_removed_left = len(self.mask) - len(mask_seq_no_left)
+        n_removed_right = len(self.mask) - len(mask_seq_no_right)
+        n_removed_right = None if n_removed_right == 0 else n_removed_right
+        # Trim simple attributes
+        for at in ["seq", "angles", "secondary_structure", "is_modified", "evolutionary"]:
+            data = getattr(self, at)
+            if data is not None:
+                setattr(self, at, data[n_removed_left:-n_removed_right])
+        # Trim coordinate data
+        if self.coords is not None:
+            self.coords = self.coords[n_removed_left *
+                                      self.atoms_per_res:-n_removed_right *
+                                      self.atoms_per_res]
+        if self.hcoords is not None:
+            self.hcoords = self.hcoords[n_removed_left *
+                                        self.atoms_per_res:-n_removed_right *
+                                        self.atoms_per_res]
+        # Trim unmodified seq
+        if self.unmodified_seq is not None:
+            assert isinstance(self.unmodified_seq, str)
+            ums = self.unmodified_seq.split()
+            self.unmodified_seq = " ".join(ums[n_removed_left:-n_removed_right])
+        # Update mask
+        self.mask = self.mask.strip("-")
+        # Reset structure builders
+        self.sb = None
+
 
 def atom_name_pprint(atom_names, values):
     """Nicely print atom names and values."""
