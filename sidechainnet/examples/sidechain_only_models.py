@@ -53,9 +53,9 @@ class SidechainTransformer(torch.nn.Module):
             if p.dim() > 1:
                 torch.nn.init.xavier_uniform_(p)
         angle_means = np.arctanh(self.angle_means)
-        angle_means[~torch.isfinite(angle_means)] = 0
         self.ff2.bias = torch.nn.Parameter(angle_means)
         torch.nn.init.zeros_(self.ff2.weight)
+        self.ff2.bias.requires_grad_ = False
 
     def forward(self, x, seq):
         """Run one forward step of the model."""
