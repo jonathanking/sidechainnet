@@ -38,9 +38,11 @@ class SCNDataset(torch.utils.data.Dataset):
             data = {
                 split_name: data,
                 "settings": {
-                    "angle_means": compute_angle_means(data['ang'])
+                    "angle_means": compute_angle_means(data['ang']) if data['ang'] else None
                 }
             }
+
+        # TODO: handle more cleverly the case when no angle/other data is provided
 
         self.split_to_ids = {}
         self.ids_to_SCNProtein = {}

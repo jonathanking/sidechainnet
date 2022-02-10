@@ -84,6 +84,10 @@ class SCNProtein(object):
         self.is_numpy = isinstance(self.coords, np.ndarray)
         self._hcoords_for_openmm = None
 
+    @property
+    def sequence(self):
+        return self.seq
+
     def __len__(self):
         """Return length of protein sequence."""
         return len(self.seq)

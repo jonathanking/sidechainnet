@@ -42,8 +42,8 @@ def train_epoch(model, data, optimizer, device, loss_name):
         optimizer.zero_grad()
         # True values still have nans, replace with 0s so they can go into the network
         # Also select out backbone and sidechaine angles
-        bb_angs = torch.nan_to_num(p.angs[:, :, :6], nan=0.0)
-        sc_angs_true_untransformed = p.angs[:, :, 6:]
+        bb_angs = torch.nan_to_num(p.angles[:, :, :6], nan=0.0)
+        sc_angs_true_untransformed = p.angles[:, :, 6:]
 
         # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
         sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(dim=-1)] = np.nan
@@ -53,11 +53,11 @@ def train_epoch(model, data, optimizer, device, loss_name):
             sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
 
         # Stack model inputs into a single tensor
-        model_in = torch.cat([bb_angs, p.secs, p.evos], dim=-1)
+        model_in = torch.cat([bb_angs, p.secondary, p.evolutionary], dim=-1)
 
         # Move inputs to device
         model_in = model_in.to(device)
-        int_seqs = p.int_seqs.to(device)
+        int_seqs = p.seqs_int.to(device)
         sc_angs_true = sc_angs_true.to(device)
 
         # Predict sidechain angles given input and sequence
@@ -127,8 +127,8 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
             for step, p in enumerate(batch_iter):
                 # True values still have nans, replace with 0s so they can go into the network
                 # Also select out backbone and sidechaine angles
-                bb_angs = torch.nan_to_num(p.angs[:, :, :6], nan=0.0)
-                sc_angs_true_untransformed = p.angs[:, :, 6:]
+                bb_angs = torch.nan_to_num(p.angles[:, :, :6], nan=0.0)
+                sc_angs_true_untransformed = p.angles[:, :, 6:]
 
                 # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
                 sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(dim=-1)] = np.nan
@@ -138,11 +138,11 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
                     sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
 
                 # Stack model inputs into a single tensor
-                model_in = torch.cat([bb_angs, p.secs, p.evos], dim=-1)
+                model_in = torch.cat([bb_angs, p.secondary, p.evolutionary], dim=-1)
 
                 # Move inputs to device
                 model_in = model_in.to(device)
-                int_seqs = p.int_seqs.to(device)
+                int_seqs = p.seqs_int.to(device)
                 sc_angs_true = sc_angs_true.to(device)
 
                 # Predict sidechain angles given input and sequence

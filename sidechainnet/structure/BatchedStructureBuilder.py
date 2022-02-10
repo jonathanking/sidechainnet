@@ -2,7 +2,6 @@
 
 import numpy as np
 import sidechainnet as scn
-from sidechainnet.dataloaders.collate import pad_for_batch
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.sequence import VOCAB
 

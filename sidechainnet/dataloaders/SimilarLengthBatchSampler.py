@@ -22,7 +22,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
     """
 
     def __init__(self,
-                 data_source,
+                 dataset,
                  batch_size,
                  dynamic_batch,
                  optimize_batch_for_cpus,
@@ -31,7 +31,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                  use_largest_bin=False,
                  repeat_train=None,
                  shuffle=True):
-        self.data_source = data_source
+        self.dataset = dataset
         self.batch_size = batch_size
         self.dynamic_batch = dynamic_batch
         self.optimize_batch_for_cpus = optimize_batch_for_cpus
@@ -46,7 +46,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
     def _init_histogram_bins(self, bins):
         # Compute length-based histogram bins and probabilities
         self.lens = []
-        for s in self.data_source.seqs:
+        for s in (p.seq for p in self.dataset):
             if len(s) <= MAX_SEQ_LEN:
                 self.lens.append(len(s))
             else:
@@ -68,7 +68,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         # proteins of similar length.
         seq_i = 0
         bin_j = 0
-        while seq_i < len(self.data_source.seqs):
+        while seq_i < len(self.dataset):
             if self.lens[seq_i] <= self.hist_bins[bin_j]:
                 try:
                     self.bin_map[bin_j].append(seq_i)
@@ -87,7 +87,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
             numerator = sum(self.lens) * self.repeat_train
             divisor = self.dynamic_batch
         else:
-            numerator = len(self.data_source) * self.repeat_train
+            numerator = len(self.dataset) * self.repeat_train
             divisor = self.batch_size
 
         if self.downsample:
@@ -103,7 +103,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                 if not self.shuffle:
                     yield np.arange(
                         self.batch_size * i,
-                        max(self.batch_size * i + self.batch_size, len(self.data_source)))
+                        max(self.batch_size * i + self.batch_size, len(self.dataset)))
                     i += 1
                     continue
 
