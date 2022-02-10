@@ -236,6 +236,20 @@ class StructureBuilder(object):
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_gltf(path, title)
 
+    def to_png(self, path):
+        """Save protein structure as PNG, showing sidechains if available. Requires pdb.
+
+        Args:
+            path (str): Path to save file. 
+        """
+        import pymol
+        assert ".png" in path, "requested filepath must end with '.png'."
+        pymol.cmd.load(path.replace(".png", ".pdb"))
+        pymol.cmd.select("sidechain")
+        pymol.cmd.show("lines")
+        pymol.cmd.png(path, width=800, height=800, quiet=0, dpi=200)
+        pymol.cmd.delete("all")
+
     def to_3Dmol(self, style=None, **kwargs):
         """Generate protein structure & return interactive py3Dmol.view for visualization.
 

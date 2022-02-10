@@ -38,12 +38,12 @@ def train_epoch(model, data, optimizer, device, loss_name):
     pbar = tqdm(data['train'], leave=False, unit="batch",
                 dynamic_ncols=True) if not CLUSTER else data['train']
 
-    for step, p in enumerate(pbar):
+    for step, pbatch in enumerate(pbar):
         optimizer.zero_grad()
         # True values still have nans, replace with 0s so they can go into the network
         # Also select out backbone and sidechaine angles
-        bb_angs = torch.nan_to_num(p.angles[:, :, :6], nan=0.0)
-        sc_angs_true_untransformed = p.angles[:, :, 6:]
+        bb_angs = torch.nan_to_num(pbatch.angles[:, :, :6], nan=0.0)
+        sc_angs_true_untransformed = pbatch.angles[:, :, 6:]
 
         # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
         sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(dim=-1)] = np.nan
@@ -53,11 +53,11 @@ def train_epoch(model, data, optimizer, device, loss_name):
             sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
 
         # Stack model inputs into a single tensor
-        model_in = torch.cat([bb_angs, p.secondary, p.evolutionary], dim=-1)
+        model_in = torch.cat([bb_angs, pbatch.secondary, pbatch.evolutionary], dim=-1)
 
         # Move inputs to device
         model_in = model_in.to(device)
-        int_seqs = p.seqs_int.to(device)
+        int_seqs = pbatch.seqs_int.to(device)
         sc_angs_true = sc_angs_true.to(device)
 
         # Predict sidechain angles given input and sequence
@@ -65,20 +65,20 @@ def train_epoch(model, data, optimizer, device, loss_name):
         # print(torch.isnan(sc_angs_pred).any(), torch.isnan(sc_angs_true).any())
 
         # Compute loss and step
-        loss = get_losses(loss_name, p, sc_angs_true, sc_angs_pred)
+        loss = get_losses(loss_name, pbatch, sc_angs_true, sc_angs_pred, do_struct=step==0)
         loss.backward()
         torch.nn.utils.clip_grad_value_(model.parameters(), 1)
         optimizer.step()
 
 
-def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
+def get_losses(loss_name, pbatch, sc_angs_true, sc_angs_pred, do_log=True, do_struct=False):
     mse_loss = angle_mse(sc_angs_true, sc_angs_pred)
     if loss_name == "mse":
         loss = mse_loss
     if loss_name == "openmm" or loss_name == "mse_openmm":
 
         proteins = []
-        for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids, batch.msks):
+        for (a, s, i, m) in zip(pbatch.angs, pbatch.str_seqs, pbatch.pids, pbatch.msks):
             p = SCNProtein(angles=a.clone(),
                            sequence=str(s),
                            id=i,
@@ -108,6 +108,18 @@ def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
             loss = mse_loss * 0.8 + openmm_loss / 1e12 * .2
             wandb.log({"Train Batch Combined": loss.item()}) if do_log else True
     wandb.log({"Train Batch RMSE": np.sqrt(mse_loss.item())}) if do_log else True
+
+    if do_struct:
+        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        p = pbatch[0]
+        p.angles[:, 6:] = sc_angs_pred_untransformed[0, 0:len(p)].detach().cpu().numpy()
+        pdbfile = f"{p.id}.pdb"
+        p.to_pdb(f"{p.id}.pdb")
+        # p.to_gltf(f"{p.id}.gltf") # gltf files for full proteins seem too large to use
+        p.to_png(f"{p.id}.png")
+        wandb.log({"structure": wandb.Molecule(pdbfile)})
+        # wandb.log({"gltf": wandb.Object3D(open(f"{p.id}.gltf"))})
+        wandb.log({"png": wandb.Image(f"{p.id}.png")})
 
     return loss
 

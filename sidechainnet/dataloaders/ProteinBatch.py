@@ -48,7 +48,7 @@ class ProteinBatch(object):
 
     @property
     def masks(self):
-        return self.pad_for_batch([p.mask for p in self], 'msk')
+        return self.pad_for_batch([p.int_mask for p in self], 'msk')
 
     @property
     def evolutionary(self):
@@ -142,3 +142,9 @@ class ProteinBatch(object):
             batch = torch.FloatTensor(batch)
 
         return batch
+    
+    def __len__(self):
+        return len(self.proteins)
+    
+    def __str__(self):
+        return f"ProteinBatch(n={len(self)}, max_len={self.max_len})"

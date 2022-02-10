@@ -116,6 +116,28 @@ class SCNProtein(object):
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
         return self.sb.to_pdb(path, title)
 
+    def to_gltf(self, path, title="test", from_angles=False):
+        """Save structure to path as a gltf (3D-object) file."""
+        if self.sb is None:
+            if from_angles:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            elif self.has_hydrogens:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+            else:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+        return self.sb.to_gltf(path, title)
+
+    def to_png(self, path, from_angles=False):
+        """Save structure to path as a PNG (image) file."""
+        if self.sb is None:
+            if from_angles:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            elif self.has_hydrogens:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+            else:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+        return self.sb.to_png(path)
+
     @property
     def num_missing(self):
         """Return number of missing residues."""

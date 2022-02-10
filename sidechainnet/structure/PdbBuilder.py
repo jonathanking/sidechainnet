@@ -206,6 +206,8 @@ class PdbBuilder(object):
             self.save_pdb(path.replace(".gltf", ".pdb"), title)
         pymol.cmd.load(path.replace(".gltf", ".pdb"), title)
         pymol.cmd.color("oxygen", title)
+        pymol.cmd.select("sidechain")
+        pymol.cmd.show("lines")
         pymol.cmd.save(path, quiet=True)
         pymol.cmd.delete("all")
 
