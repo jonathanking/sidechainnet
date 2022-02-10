@@ -29,7 +29,7 @@ from sidechainnet.utils.openmm import OpenMMEnergyH
 from sidechainnet.structure import inverse_trig_transform
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 
-LOCAL_MODEL_DIR = "/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220121/"
+LOCAL_MODEL_DIR = "./wandbmodel/" #"/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220121/"
 
 
 def train_epoch(model, data, optimizer, device, loss_name):
@@ -172,6 +172,7 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
             avg_loss = np.sqrt(total_loss / (step + 1))
             wandb.log({f"{data_split.capitalize()} Epoch RMSE": avg_loss})
             losses[data_split] = avg_loss
+    if 'train' in losses: print(losses['train'])
     return losses
 
 
@@ -195,7 +196,7 @@ def train_loop(model, data, optimizer, device, args, scheduler, loss_name):
             checkpoint_model(args, model, optimizer, epoch_i, losses['valid-50'],
                              scheduler)
 
-    test_loss = eval_epoch(model, data, device, test_set=True)
+    test_loss = eval_epoch(model, data, device, loss_name, test_set=True)
     wandb.log({"Test Loss": test_loss})
 
     # Save artifact
@@ -237,8 +238,6 @@ def make_model(args, angle_means):
                                      n_layers=args.n_layers,
                                      dropout=args.dropout,
                                      activation='relu',
-                                     batch_first=True,
-                                     device=args.device,
                                      angle_means=angle_means,
                                      embed_sequence=args.embed_sequence)
     else:
@@ -270,7 +269,7 @@ def setup_model_optimizer_scheduler(args, device, angle_means):
     # Prepare optimizer
     wd = 10e-3 if args.weight_decay else 0
     if args.optimizer == "adam":
-        optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
+        optimizer = optim.AdamW(filter(lambda x: x.requires_grad, model.parameters()),
                                lr=args.learning_rate,
                                weight_decay=wd)
     elif args.optimizer == "sgd":
@@ -476,14 +475,14 @@ def main():
     if not args.name:
         args.name = wandb.run.id
     wandb.config.update(args, allow_val_change=True)
-    wandb.config.update({"data_creation_date": data['train'].dataset.created_on})
+    # wandb.config.update({"data_creation_date": data['date']})
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     wandb.config.update({
         "n_params": n_params,
         "n_trainable_params": n_trainable_params,
-        "casp_version": data['train'].dataset.casp_version,
-        "casp_thinning": data['train'].dataset.thinning
+        # "casp_version": data['train'].dataset.casp_version,
+        # "casp_thinning": data['train'].dataset.thinning
     })
 
     local_base_dir = wandb.run.dir
