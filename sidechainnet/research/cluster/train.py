@@ -4,6 +4,7 @@ Training models to predict sidechain conformations given backbone conformations.
     Date: 01/12/2022
 """
 CLUSTER = False
+import copy
 from tqdm import tqdm
 
 if CLUSTER:
@@ -15,6 +16,7 @@ import random
 import os
 
 import numpy as np
+import pymol
 import torch.optim as optim
 import torch.utils.data
 
@@ -111,15 +113,37 @@ def get_losses(loss_name, pbatch, sc_angs_true, sc_angs_pred, do_log=True, do_st
 
     if do_struct:
         sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
-        p = pbatch[0]
+        p = copy.deepcopy(pbatch[0])
         p.angles[:, 6:] = sc_angs_pred_untransformed[0, 0:len(p)].detach().cpu().numpy()
-        pdbfile = f"{p.id}.pdb"
-        p.to_pdb(f"{p.id}.pdb")
-        # p.to_gltf(f"{p.id}.gltf") # gltf files for full proteins seem too large to use
-        p.to_png(f"{p.id}.png")
+        p.numpy()
+        p.build_coords_from_angles()  # Make sure the coordinates saved to PDB are updated
+        pdbfile = f"{p.id}_pred.pdb"
+        p.to_pdb(pdbfile)
+        p.to_png(f"{p.id}_pred.png")
         wandb.log({"structure": wandb.Molecule(pdbfile)})
-        # wandb.log({"gltf": wandb.Object3D(open(f"{p.id}.gltf"))})
-        wandb.log({"png": wandb.Image(f"{p.id}.png")})
+        wandb.log({"png": wandb.Image(f"{p.id}_pred.png")})
+
+        # Now to generate the files for the true structure
+        ptrue = pbatch[0]
+        ptrue_pdbfile = f"{p.id}_true.pdb"
+        ptrue.to_pdb(ptrue_pdbfile)
+
+        # Now, open the two files in pymol, align them, show sidechains, and save PNG
+        pymol.cmd.load(ptrue_pdbfile, "true")
+        pymol.cmd.load(pdbfile, "pred")
+        pymol.cmd.color("marine", "true")
+        pymol.cmd.color("oxygen", "pred")
+        rmsd, _, _, _, _, _, _ = pymol.cmd.align("true and name n+ca+c+o",
+                                                 "pred and name n+ca+c+o",
+                                                 quiet=False)
+        pymol.cmd.zoom()
+        pymol.cmd.show("lines", "not (name c,o,n and not pro/n)")
+        pymol.cmd.hide("cartoon", "pred")
+        pymol.cmd.png(f"{p.id}_both.png", width=1000, height=1000, quiet=0, dpi=300, ray=0)
+        pymol.cmd.save(f"{p.id}_both.pse")
+        wandb.save(f"{p.id}_both.pse")
+        pymol.cmd.delete("all")
+        wandb.log({"combined-png": wandb.Image(f"{p.id}_both.png")})
 
     return loss
 
@@ -279,8 +303,12 @@ def setup_model_optimizer_scheduler(args, device, angle_means):
     model = make_model(args, angle_means).to(device)
 
     # Prepare optimizer
-    wd = 10e-3 if args.weight_decay else 0
+    wd = 0.0001 if args.weight_decay else 0
     if args.optimizer == "adam":
+        optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
+                               lr=args.learning_rate,
+                               weight_decay=wd)
+    elif args.optimizer == "adamw":
         optimizer = optim.AdamW(filter(lambda x: x.requires_grad, model.parameters()),
                                lr=args.learning_rate,
                                weight_decay=wd)
@@ -360,7 +388,7 @@ def create_parser():
     training.add_argument('-opt',
                           '--optimizer',
                           type=str,
-                          choices=['adam', 'sgd'],
+                          choices=['adam', 'sgd', 'adamw'],
                           default='sgd',
                           help="Training optimizer.")
     training.add_argument("-s",

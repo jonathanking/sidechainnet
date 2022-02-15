@@ -175,7 +175,7 @@ class StructureBuilder(object):
         if not self.is_numpy:
             self.coords = torch.stack(self.coords).double()
         else:
-            self.coords = np.stack(self.coords)
+            self.coords = np.stack([c.detach().numpy() for c in self.coords])
 
         return self.coords
 
@@ -247,7 +247,7 @@ class StructureBuilder(object):
         pymol.cmd.load(path.replace(".png", ".pdb"))
         pymol.cmd.select("sidechain")
         pymol.cmd.show("lines")
-        pymol.cmd.png(path, width=800, height=800, quiet=0, dpi=200)
+        pymol.cmd.png(path, width=800, height=800, quiet=0, dpi=200, ray=0)
         pymol.cmd.delete("all")
 
     def to_3Dmol(self, style=None, **kwargs):
