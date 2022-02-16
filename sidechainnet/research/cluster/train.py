@@ -149,7 +149,7 @@ def get_losses(loss_name, pbatch, sc_angs_true, sc_angs_pred, do_log=True, do_st
 
 
 def eval_epoch(model, data, device, loss_name, test_set=False):
-    """ One complete evaluation epoch."""
+    """One complete evaluation epoch."""
     losses = {}
     model.eval()
     data_splits = ['test'] if test_set else [
@@ -160,9 +160,10 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
                           dynamic_ncols=True) if not CLUSTER else data[data_split]
         with torch.no_grad():
             total_loss = 0
+            step =  0
             for step, p in enumerate(batch_iter):
                 # True values still have nans, replace with 0s so they can go into the network
-                # Also select out backbone and sidechaine angles
+                # Also select out backbone and sidechain angles
                 bb_angs = torch.nan_to_num(p.angles[:, :, :6], nan=0.0)
                 sc_angs_true_untransformed = p.angles[:, :, 6:]
 
@@ -208,7 +209,8 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
             avg_loss = np.sqrt(total_loss / (step + 1))
             wandb.log({f"{data_split.capitalize()} Epoch RMSE": avg_loss})
             losses[data_split] = avg_loss
-    if 'train' in losses: print(losses['train'])
+    if 'train' in losses:
+        print(losses['train'])
     return losses
 
 
@@ -303,19 +305,18 @@ def setup_model_optimizer_scheduler(args, device, angle_means):
     model = make_model(args, angle_means).to(device)
 
     # Prepare optimizer
-    wd = 0.0001 if args.weight_decay else 0
     if args.optimizer == "adam":
         optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
                                lr=args.learning_rate,
-                               weight_decay=wd)
+                               weight_decay=args.weight_decay)
     elif args.optimizer == "adamw":
         optimizer = optim.AdamW(filter(lambda x: x.requires_grad, model.parameters()),
                                lr=args.learning_rate,
-                               weight_decay=wd)
+                               weight_decay=args.weight_decay)
     elif args.optimizer == "sgd":
         optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
                               lr=args.learning_rate,
-                              weight_decay=wd)
+                              weight_decay=args.weight_decay)
 
     # Prepare scheduler
     if args.lr_scheduling == "noam":
@@ -464,8 +465,8 @@ def create_parser():
                             default=0.1,
                             help="Dropout applied between layers.")
     model_args.add_argument("--weight_decay",
-                            type=my_bool,
-                            default="True",
+                            type=float,
+                            default=0.0,
                             help="Applies weight decay to model weights.")
     model_args.add_argument("--embed_sequence",
                             type=my_bool,
