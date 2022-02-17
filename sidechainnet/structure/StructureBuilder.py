@@ -70,6 +70,7 @@ class StructureBuilder(object):
             self.is_numpy = False if isinstance(self.coords, torch.Tensor) else True
         else:
             self.is_numpy = False if isinstance(self.ang, torch.Tensor) else True
+        self.array_lib = np if self.is_numpy else torch
 
         if self.ang is not None and self.ang.shape[-1] != NUM_ANGLES:
             raise ValueError(f"Angle matrix dimensions must match (L x {NUM_ANGLES}). "
@@ -83,8 +84,8 @@ class StructureBuilder(object):
                 f"The length of the coordinate matrix must match the sequence length "
                 f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
                 f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
-        if self.ang is not None and (self.ang == 0).all(axis=1).any():
-            missing_loc = np.where((self.ang == 0).all(axis=1))
+        if self.ang is not None and (self.array_lib.isnan(self.ang)).all(axis=1).any():
+            missing_loc = np.where((self.array_lib.isnan(self.ang)).all(axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "
@@ -174,7 +175,7 @@ class StructureBuilder(object):
         if not self.is_numpy:
             self.coords = torch.stack(self.coords).double()
         else:
-            self.coords = np.stack(self.coords)
+            self.coords = np.stack([c.detach().numpy() for c in self.coords])
 
         return self.coords
 
@@ -234,6 +235,20 @@ class StructureBuilder(object):
         """
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_gltf(path, title)
+
+    def to_png(self, path):
+        """Save protein structure as PNG, showing sidechains if available. Requires pdb.
+
+        Args:
+            path (str): Path to save file. 
+        """
+        import pymol
+        assert ".png" in path, "requested filepath must end with '.png'."
+        pymol.cmd.load(path.replace(".png", ".pdb"))
+        pymol.cmd.select("sidechain")
+        pymol.cmd.show("lines")
+        pymol.cmd.png(path, width=800, height=800, quiet=0, dpi=200, ray=0)
+        pymol.cmd.delete("all")
 
     def to_3Dmol(self, style=None, **kwargs):
         """Generate protein structure & return interactive py3Dmol.view for visualization.
@@ -446,7 +461,7 @@ class ResidueBuilder(object):
     def to_prody(self, res):
         import prody as pr
         ag = pr.AtomGroup()
-        ag.setCoords(torch.stack(self.bb + self.sc).numpy())
+        ag.setCoords(torch.stack(self.bb + self.sc).detach().numpy())
         ag.setNames(self.atom_names)
         ag.setResnames([ONE_TO_THREE_LETTER_MAP[VOCAB._int2char[self.name]]] *
                        len(self.atom_names))

@@ -95,8 +95,6 @@ def standard_nerf(a, b, c, l, theta, chi):
         torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
         placement using points a, b, c, and several parameters.
     """
-    if not (-np.pi <= theta <= np.pi):
-        raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
 
     # calculate unit vectors AB and BC
     W_hat = torch.nn.functional.normalize(b - a, dim=0)

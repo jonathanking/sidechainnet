@@ -30,7 +30,7 @@ def compute_batch_drmsd(true_coordinates, pred_coordinates, seq, verbose=False):
         # Remove batch_padding from true coords
         batch_padding = _tile((s != 20), 0, NUM_COORDS_PER_RES)
         tc = tc[batch_padding]
-        missing_atoms = (tc == 0).all(axis=-1)
+        missing_atoms = torch.isnan(tc).all(axis=-1)
         tc = tc[~missing_atoms]
         pc = pc[~missing_atoms]
 
@@ -99,6 +99,27 @@ def pairwise_internal_dist(x):
     return res
 
 
+def angle_mse(true, pred):
+    """Return the mean squared error between two tensor batches.
+
+    Given a predicted angle tensor and a true angle tensor (batch-padded with
+    nans, and missing-item-padded with nans), this function removes all nans before
+    using torch's built-in MSE loss function.
+
+    Args:
+        pred, true (np.ndarray, torch.tensor): 3 or more dimensional tensors
+    Returns:
+        MSE loss between true and pred.
+    """
+    # # Remove batch padding
+    # ang_non_zero = true.ne(0).any(dim=2)
+    # tgt_ang_non_zero = true[ang_non_zero]
+
+    # Remove missing angles
+    ang_non_nans = ~true.isnan()
+    return torch.nn.functional.mse_loss(pred[ang_non_nans], true[ang_non_nans])
+
+
 def _tile(a, dim, n_tile):
     # https://discuss.pytorch.org/t/how-to-tile-a-tensor/13853/4
     init_dim = a.size(dim)
@@ -108,30 +129,3 @@ def _tile(a, dim, n_tile):
     order_index = torch.LongTensor(
         np.concatenate([init_dim * np.arange(n_tile) + i for i in range(init_dim)]))
     return torch.index_select(a, dim, order_index)
-
-
-def mse_over_angles(pred, true):
-    """Returns the mean squared error between two tensor batches.
-
-    Given a predicted angle tensor and a true angle tensor (batch-padded with
-    zeros, and missing-item-padded with nans), this function first removes
-    batch then item padding before using torch's built-in MSE loss function.
-
-    Args:
-        pred, true (np.ndarray): 4-dimensional tensors
-
-    Returns:
-        MSE loss between true and pred.
-    """
-    assert len(pred.shape) == 3, "This function must operate on a batch of angles."
-
-    return torch.nn.functional.mse_loss(pred, true)
-
-    # Remove batch padding
-    ang_non_zero = true.ne(0).any(dim=2)
-    tgt_ang_non_zero = true[ang_non_zero]
-
-    # Remove missing angles
-    ang_non_nans = torch.isnan(tgt_ang_non_zero).eq(0)
-    return torch.nn.functional.mse_loss(pred[ang_non_zero][ang_non_nans],
-                                        true[ang_non_zero][ang_non_nans])

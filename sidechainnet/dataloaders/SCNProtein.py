@@ -18,6 +18,7 @@ Other features:
     * visualize proteins with SCNProtein.to_3Dmol()
     * write PDB files for proteins with SCNProtein.to_PDB()
 """
+import warnings
 
 import numpy as np
 import openmm
@@ -37,7 +38,7 @@ from sidechainnet import structure
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
-from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
 OPENMM_PLATFORM = "CUDA"  # CUDA or CPU
@@ -51,14 +52,25 @@ class SCNProtein(object):
         self.coords = kwargs['coordinates'] if 'coordinates' in kwargs else None
         self.angles = kwargs['angles'] if 'angles' in kwargs else None
         self.seq = kwargs['sequence'] if 'sequence' in kwargs else None
-        self.unmodified_seq = kwargs['unmodified_seq'] if 'unmodified_seq' in kwargs else None
+        self.unmodified_seq = kwargs[
+            'unmodified_seq'] if 'unmodified_seq' in kwargs else None
         self.mask = kwargs['mask'] if 'mask' in kwargs else None
         self.evolutionary = kwargs['evolutionary'] if 'evolutionary' in kwargs else None
-        self.secondary_structure = kwargs['secondary_structure'] if 'secondary_structure' in kwargs else None
+        self.secondary_structure = kwargs[
+            'secondary_structure'] if 'secondary_structure' in kwargs else None
         self.resolution = kwargs['resolution'] if 'resolution' in kwargs else None
         self.is_modified = kwargs['is_modified'] if 'is_modified' in kwargs else None
         self.id = kwargs['id'] if 'id' in kwargs else None
         self.split = kwargs['split'] if 'split' in kwargs else None
+        self.add_sos_eos = kwargs['add_sos_eos'] if 'add_sos_eos' in kwargs else False
+
+        # Prepare data for model training
+        self.int_seq = VOCAB.str2ints(self.seq, add_sos_eos=self.add_sos_eos)
+        self.int_mask = [1 if m == "+" else 0 for m in self.mask]
+        dssp_vocab = DSSPVocabulary()
+        self.int_secondary = dssp_vocab.str2ints(self.secondary_structure,
+                                                 add_sos_eos=self.add_sos_eos)
+
         self.sb = None
         self.atoms_per_res = NUM_COORDS_PER_RES
         self.has_hydrogens = False
@@ -69,8 +81,12 @@ class SCNProtein(object):
         self.forces = None
         self._hcoord_mask = None
         self.device = 'cpu'
-        self.is_numpy = False
+        self.is_numpy = isinstance(self.coords, np.ndarray)
         self._hcoords_for_openmm = None
+
+    @property
+    def sequence(self):
+        return self.seq
 
     def __len__(self):
         """Return length of protein sequence."""
@@ -99,6 +115,28 @@ class SCNProtein(object):
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
         return self.sb.to_pdb(path, title)
+
+    def to_gltf(self, path, title="test", from_angles=False):
+        """Save structure to path as a gltf (3D-object) file."""
+        if self.sb is None:
+            if from_angles:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            elif self.has_hydrogens:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+            else:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+        return self.sb.to_gltf(path, title)
+
+    def to_png(self, path, from_angles=False):
+        """Save structure to path as a PNG (image) file."""
+        if self.sb is None:
+            if from_angles:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            elif self.has_hydrogens:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+            else:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+        return self.sb.to_png(path)
 
     @property
     def num_missing(self):
@@ -130,6 +168,11 @@ class SCNProtein(object):
 
     def add_hydrogens(self, from_angles=False, coords=None):
         """Add hydrogens to the internal protein structure representation."""
+        if (isinstance(self.angles, torch.Tensor) and
+                torch.isnan(self.angles).all(dim=1).any()) or isinstance(
+                    self.angles, np.ndarray) and np.isnan(self.angles).all(axis=1).any():
+            raise ValueError("Adding hydrogens to structures with missing residues is not"
+                             " supported.")
         if from_angles:
             self.sb = structure.StructureBuilder(self.seq,
                                                  ang=self.angles,
@@ -175,7 +218,8 @@ class SCNProtein(object):
         self._forces_raw = self.starting_state.getForces(asNumpy=True)
 
         # Assign forces from OpenMM to their places in the hydrogen coord representation
-        self.forces[self.hcoord_to_pos_map_keys] = self._forces_raw[self.hcoord_to_pos_map_values]
+        self.forces[self.hcoord_to_pos_map_keys] = self._forces_raw[
+            self.hcoord_to_pos_map_values]
 
         if pprint:
             atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
@@ -212,9 +256,11 @@ class SCNProtein(object):
             hcoords = self.hcoords
         # The below step takes a PyTorch CUDA representation of all-atom coordinates
         # and passes it to the CPU as a numpy array so that OpenMM can read it
-        hcoords = hcoords.detach().cpu().numpy() if not isinstance(hcoords, np.ndarray) else hcoords
+        hcoords = hcoords.detach().cpu().numpy() if not isinstance(
+            hcoords, np.ndarray) else hcoords
         # A mapping is used to correct for small differences between the Torch/OpenMM pos
-        self.positions[self.hcoord_to_pos_map_values] = hcoords[self.hcoord_to_pos_map_keys]
+        self.positions[self.hcoord_to_pos_map_values] = hcoords[
+            self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
 
     ##########################################
@@ -230,7 +276,8 @@ class SCNProtein(object):
         self.topology = Topology()
         self.openmm_seq = ""
         chain = self.topology.addChain()
-        hcoords = self.hcoords.cpu().detach().numpy() if not self.is_numpy else self.hcoords
+        hcoords = self.hcoords.cpu().detach().numpy(
+        ) if not self.is_numpy else self.hcoords
         coord_gen = coord_generator(hcoords, self.atoms_per_res)
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
@@ -491,6 +538,50 @@ class SCNProtein(object):
         if not torch.is_tensor(self.angles):
             self.angles = torch.tensor(self.angles)
         self.is_numpy = False
+
+    def fillna(self, value=0.0, warn=True):
+        """Replace nans in coordinate and angle matrices with the specified value.
+
+        Args:
+            value (float, optional): Replace nans with this value. Defaults to 0.0.
+        """
+        if warn:
+            warnings.warn(
+                "Doing this will remove all nans from the object and may cause missing"
+                " residue information to be lost. To proceed, call with warn=False.")
+            return
+        self.coords[np.isnan(self.coords)] = value
+        self.angles[np.isnan(self.angles)] = value
+
+    def trim_edges(self):
+        """Trim edges of seq/ums, 2ndary, evo, mask, angles, and coords based on mask."""
+        assert isinstance(self.mask, str)
+
+        mask_seq_no_left = self.mask.lstrip('-')
+        mask_seq_no_right = self.mask.rstrip('-')
+        n_removed_left = len(self.mask) - len(mask_seq_no_left)
+        n_removed_right = len(self.mask) - len(mask_seq_no_right)
+        n_removed_right = None if n_removed_right == 0 else -n_removed_right
+        # Trim simple attributes
+        for at in ["seq", "angles", "secondary_structure", "is_modified", "evolutionary"]:
+            data = getattr(self, at)
+            if data is not None:
+                setattr(self, at, data[n_removed_left:n_removed_right])
+        # Trim coordinate data
+        end_point = n_removed_right * self.atoms_per_res if n_removed_right is not None else None
+        if self.coords is not None:
+            self.coords = self.coords[n_removed_left * self.atoms_per_res:end_point]
+        if self.hcoords is not None:
+            self.hcoords = self.hcoords[n_removed_left * self.atoms_per_res:end_point]
+        # Trim unmodified seq
+        if self.unmodified_seq is not None:
+            assert isinstance(self.unmodified_seq, str)
+            ums = self.unmodified_seq.split()
+            self.unmodified_seq = " ".join(ums[n_removed_left:n_removed_right])
+        # Update mask
+        self.mask = self.mask.strip("-")
+        # Reset structure builders
+        self.sb = None
 
 
 def atom_name_pprint(atom_names, values):

@@ -3,7 +3,8 @@ Training models to predict sidechain conformations given backbone conformations.
     Author: Jonathan King
     Date: 01/12/2022
 """
-CLUSTER = True
+CLUSTER = False
+import copy
 from tqdm import tqdm
 
 if CLUSTER:
@@ -15,6 +16,7 @@ import random
 import os
 
 import numpy as np
+import pymol
 import torch.optim as optim
 import torch.utils.data
 
@@ -23,13 +25,13 @@ import torch
 
 from sidechainnet.examples.sidechain_only_models import SidechainTransformer
 import sidechainnet as scn
-from sidechainnet.examples.losses import mse_over_angles
+from sidechainnet.examples.losses import angle_mse
 from sidechainnet.examples.optim import ScheduledOptim
 from sidechainnet.utils.openmm import OpenMMEnergyH
 from sidechainnet.structure import inverse_trig_transform
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 
-LOCAL_MODEL_DIR = "/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220121/"
+LOCAL_DIR = ""
 
 
 def train_epoch(model, data, optimizer, device, loss_name):
@@ -38,21 +40,26 @@ def train_epoch(model, data, optimizer, device, loss_name):
     pbar = tqdm(data['train'], leave=False, unit="batch",
                 dynamic_ncols=True) if not CLUSTER else data['train']
 
-    for step, p in enumerate(pbar):
+    for step, pbatch in enumerate(pbar):
         optimizer.zero_grad()
-        # Select out backbone and sidechaine angles
-        bb_angs = p.angs[:, :, :6]
-        sc_angs_true_untransformed = p.angs[:, :, 6:]
+        # True values still have nans, replace with 0s so they can go into the network
+        # Also select out backbone and sidechaine angles
+        bb_angs = torch.nan_to_num(pbatch.angles[:, :, :6], nan=0.0)
+        sc_angs_true_untransformed = pbatch.angles[:, :, 6:]
+
+        # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
+        sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(dim=-1)] = np.nan
+
         # Result after transform (6 angles, sin/cos): (B x L x 12)
         sc_angs_true = scn.structure.trig_transform(sc_angs_true_untransformed).reshape(
             sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
 
         # Stack model inputs into a single tensor
-        model_in = torch.cat([bb_angs, p.secs, p.evos], dim=-1)
+        model_in = torch.cat([bb_angs, pbatch.secondary, pbatch.evolutionary], dim=-1)
 
         # Move inputs to device
         model_in = model_in.to(device)
-        int_seqs = p.int_seqs.to(device)
+        int_seqs = pbatch.seqs_int.to(device)
         sc_angs_true = sc_angs_true.to(device)
 
         # Predict sidechain angles given input and sequence
@@ -60,20 +67,29 @@ def train_epoch(model, data, optimizer, device, loss_name):
         # print(torch.isnan(sc_angs_pred).any(), torch.isnan(sc_angs_true).any())
 
         # Compute loss and step
-        loss = get_losses(loss_name, p, sc_angs_true, sc_angs_pred)
+        loss = get_losses(loss_name,
+                          pbatch,
+                          sc_angs_true,
+                          sc_angs_pred,
+                          do_struct=step == 0)
         loss.backward()
         torch.nn.utils.clip_grad_value_(model.parameters(), 1)
         optimizer.step()
 
 
-def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
-    mse_loss = mse_over_angles(sc_angs_true, sc_angs_pred)
+def get_losses(loss_name,
+               pbatch,
+               sc_angs_true,
+               sc_angs_pred,
+               do_log=True,
+               do_struct=False):
+    mse_loss = angle_mse(sc_angs_true, sc_angs_pred)
     if loss_name == "mse":
         loss = mse_loss
     if loss_name == "openmm" or loss_name == "mse_openmm":
 
         proteins = []
-        for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids, batch.msks):
+        for (a, s, i, m) in zip(pbatch.angs, pbatch.str_seqs, pbatch.pids, pbatch.msks):
             p = SCNProtein(angles=a.clone(),
                            sequence=str(s),
                            id=i,
@@ -99,16 +115,50 @@ def get_losses(loss_name, batch, sc_angs_true, sc_angs_pred, do_log=True):
 
         # Record performance metrics
         wandb.log({"Train Batch E-Loss": openmm_loss.item()}) if do_log else True
-        wandb.log({"Train Batch RMSE": np.sqrt(mse_loss.item())}) if do_log else True
         if loss_name == "mse_openmm":
             loss = mse_loss * 0.8 + openmm_loss / 1e12 * .2
             wandb.log({"Train Batch Combined": loss.item()}) if do_log else True
+    wandb.log({"Train Batch RMSE": np.sqrt(mse_loss.item())}) if do_log else True
+
+    if do_struct:
+        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        p = copy.deepcopy(pbatch[0])
+        p.angles[:, 6:] = sc_angs_pred_untransformed[0, 0:len(p)].detach().cpu().numpy()
+        p.numpy()
+        p.build_coords_from_angles()  # Make sure the coordinates saved to PDB are updated
+        pdbfile = os.path.join(LOCAL_DIR, "pdbs", f"{p.id}_pred.pdb")
+        p.to_pdb(pdbfile)
+        wandb.log({"structure": wandb.Molecule(pdbfile)})
+
+        # Now to generate the files for the true structure
+        ptrue = pbatch[0]
+        ptrue_pdbfile = os.path.join(LOCAL_DIR, "pdbs", f"{p.id}_true.pdb")
+        ptrue.to_pdb(ptrue_pdbfile)
+
+        # Now, open the two files in pymol, align them, show sidechains, and save PNG
+        pymol.cmd.load(ptrue_pdbfile, "true")
+        pymol.cmd.load(pdbfile, "pred")
+        pymol.cmd.color("marine", "true")
+        pymol.cmd.color("oxygen", "pred")
+        rmsd, _, _, _, _, _, _ = pymol.cmd.align("true and name n+ca+c+o",
+                                                 "pred and name n+ca+c+o",
+                                                 quiet=False)
+        pymol.cmd.zoom()
+        pymol.cmd.show("lines", "not (name c,o,n and not pro/n)")
+        pymol.cmd.hide("cartoon", "pred")
+        both_png_path = os.path.join(LOCAL_DIR, "pngs", f"{p.id}_both.png")
+        pymol.cmd.png(both_png_path, width=1000, height=1000, quiet=0, dpi=300, ray=0)
+        both_pse_path = os.path.join(LOCAL_DIR, "pdbs", f"{p.id}_both.pse")
+        pymol.cmd.save(both_pse_path)
+        wandb.save(both_pse_path, base_path=LOCAL_DIR)
+        pymol.cmd.delete("all")
+        wandb.log({"combined-png": wandb.Image(both_png_path)})
 
     return loss
 
 
 def eval_epoch(model, data, device, loss_name, test_set=False):
-    """ One complete evaluation epoch."""
+    """One complete evaluation epoch."""
     losses = {}
     model.eval()
     data_splits = ['test'] if test_set else [
@@ -119,26 +169,36 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
                           dynamic_ncols=True) if not CLUSTER else data[data_split]
         with torch.no_grad():
             total_loss = 0
-            for step, batch in enumerate(batch_iter):
-                # Select out backbone and sidechaine angles
-                bb_angs = batch.angs[:, :, :6]
-                sc_angs_true = batch.angs[:, :, 6:]
-                sc_angs_true = scn.structure.trig_transform(sc_angs_true).reshape(
-                    sc_angs_true.shape[0], sc_angs_true.shape[1], 12)  # (B x L x 12)
+            step = 0
+            for step, p in enumerate(batch_iter):
+                # True values still have nans, replace with 0s so they can go into the network
+                # Also select out backbone and sidechain angles
+                bb_angs = torch.nan_to_num(p.angles[:, :, :6], nan=0.0)
+                sc_angs_true_untransformed = p.angles[:, :, 6:]
+
+                # Since *batches* are padded with 0s, we replace with nan for convenient loss fns
+                sc_angs_true_untransformed[sc_angs_true_untransformed.eq(0).all(
+                    dim=-1)] = np.nan
+
+                # Result after transform (6 angles, sin/cos): (B x L x 12)
+                sc_angs_true = scn.structure.trig_transform(
+                    sc_angs_true_untransformed).reshape(
+                        sc_angs_true_untransformed.shape[0],
+                        sc_angs_true_untransformed.shape[1], 12)
 
                 # Stack model inputs into a single tensor
-                model_in = torch.cat([bb_angs, batch.secs, batch.evos], dim=-1)
+                model_in = torch.cat([bb_angs, p.secondary, p.evolutionary], dim=-1)
 
                 # Move inputs to device
                 model_in = model_in.to(device)
-                int_seqs = batch.int_seqs.to(device)
+                int_seqs = p.seqs_int.to(device)
                 sc_angs_true = sc_angs_true.to(device)
 
                 # Predict sidechain angles given input and sequence
                 sc_angs_pred = model(model_in, int_seqs)
 
                 # Reshape prediction to match true sidechain angles
-                loss = get_losses(loss_name, batch, sc_angs_true, sc_angs_pred)
+                loss = get_losses(loss_name, p, sc_angs_true, sc_angs_pred)
                 total_loss += loss.item()
 
                 # Make structures for test set
@@ -161,6 +221,8 @@ def eval_epoch(model, data, device, loss_name, test_set=False):
             avg_loss = np.sqrt(total_loss / (step + 1))
             wandb.log({f"{data_split.capitalize()} Epoch RMSE": avg_loss})
             losses[data_split] = avg_loss
+    if 'train' in losses:
+        print(losses['train'])
     return losses
 
 
@@ -184,19 +246,19 @@ def train_loop(model, data, optimizer, device, args, scheduler, loss_name):
             checkpoint_model(args, model, optimizer, epoch_i, losses['valid-50'],
                              scheduler)
 
-    test_loss = eval_epoch(model, data, device, test_set=True)
+    test_loss = eval_epoch(model, data, device, loss_name, test_set=True)
     wandb.log({"Test Loss": test_loss})
 
     # Save artifact
     name = f"model_{wandb.run.id}"
     trained_model_artifact = wandb.Artifact(name, type='model')
-    trained_model_artifact.add_dir(LOCAL_MODEL_DIR)
+    trained_model_artifact.add_dir(LOCAL_DIR)
 
 
 def checkpoint_model(args, model, optimizer, epoch, loss, scheduler):
     model_state_dict = model.state_dict()
     name = f"model_{wandb.run.id}"
-    chkpt_path = LOCAL_MODEL_DIR + name + "_best.chkpt"
+    chkpt_path = os.path.join(LOCAL_DIR, "checkpoints", name + "_best.chkpt")
     checkpoint = {
         'model_state_dict': model_state_dict,
         'settings': args,
@@ -206,7 +268,7 @@ def checkpoint_model(args, model, optimizer, epoch, loss, scheduler):
         'loss': loss
     }
     torch.save(checkpoint, chkpt_path)
-    wandb.save(chkpt_path)
+    wandb.save(chkpt_path, base_path=LOCAL_DIR)
     print(f"Model saved to {chkpt_path}.")
 
 
@@ -226,8 +288,6 @@ def make_model(args, angle_means):
                                      n_layers=args.n_layers,
                                      dropout=args.dropout,
                                      activation='relu',
-                                     batch_first=True,
-                                     device=args.device,
                                      angle_means=angle_means,
                                      embed_sequence=args.embed_sequence)
     else:
@@ -257,15 +317,18 @@ def setup_model_optimizer_scheduler(args, device, angle_means):
     model = make_model(args, angle_means).to(device)
 
     # Prepare optimizer
-    wd = 10e-3 if args.weight_decay else 0
     if args.optimizer == "adam":
         optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
                                lr=args.learning_rate,
-                               weight_decay=wd)
+                               weight_decay=args.weight_decay)
+    elif args.optimizer == "adamw":
+        optimizer = optim.AdamW(filter(lambda x: x.requires_grad, model.parameters()),
+                                lr=args.learning_rate,
+                                weight_decay=args.weight_decay)
     elif args.optimizer == "sgd":
         optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()),
                               lr=args.learning_rate,
-                              weight_decay=wd)
+                              weight_decay=args.weight_decay)
 
     # Prepare scheduler
     if args.lr_scheduling == "noam":
@@ -297,11 +360,6 @@ def create_parser():
     training.add_argument("-lr", "--learning_rate", type=float, default=1e-4)
     training.add_argument('-e', '--epochs', type=int, default=10)
     training.add_argument("-b", '--batch_size', type=int, default=8)
-    training.add_argument('-es',
-                          '--early_stopping',
-                          type=int,
-                          default=20,
-                          help="Stops if training hasn't improved in X epochs")
     training.add_argument(
         '-nws',
         '--n_warmup_steps',
@@ -333,7 +391,7 @@ def create_parser():
     training.add_argument(
         '--patience',
         type=int,
-        default=10,
+        default=5,
         help="Number of epochs to wait before reducing LR for plateau scheduler.")
     training.add_argument(
         '--early_stopping_threshold',
@@ -343,7 +401,7 @@ def create_parser():
     training.add_argument('-opt',
                           '--optimizer',
                           type=str,
-                          choices=['adam', 'sgd'],
+                          choices=['adam', 'sgd', 'adamw'],
                           default='sgd',
                           help="Training optimizer.")
     training.add_argument("-s",
@@ -419,14 +477,23 @@ def create_parser():
                             default=0.1,
                             help="Dropout applied between layers.")
     model_args.add_argument("--weight_decay",
-                            type=my_bool,
-                            default="True",
+                            type=float,
+                            default=0.0,
                             help="Applies weight decay to model weights.")
     model_args.add_argument("--embed_sequence",
                             type=my_bool,
                             default="True",
                             help="Whether or not to use embedding "
                             "layer in the transformer model.")
+
+    # Saving args
+    saving_args = parser.add_argument_group("Saving Args")
+    saving_args.add_argument('-c',
+                             '--cluster',
+                             type=my_bool,
+                             default="False",
+                             help="Set of parameters to facilitate training on a remote" +
+                             " cluster. Limited I/O, etc.")
 
     return parser
 
@@ -444,9 +511,9 @@ def main():
 
     # Load dataset
     data = scn.load(
-        # "debug",
-        12,
-        30,
+        "debug",
+        # 12,
+        # 30,
         with_pytorch='dataloaders',
         batch_size=args.batch_size,
         dynamic_batching=False,
@@ -462,7 +529,7 @@ def main():
     args.n_heads = model.n_heads
 
     # Prepare Weights and Biases logging
-    wandb_dir = "/scr/jok120/wandb"
+    wandb_dir = "/scr/jok120/wandb" if args.cluster else os.path.expanduser("~/scr")
     if wandb_dir:
         os.makedirs(wandb_dir, exist_ok=True)
     wandb.init(project="sidechain-transformer", entity="koes-group", dir=wandb_dir)
@@ -470,18 +537,22 @@ def main():
     if not args.name:
         args.name = wandb.run.id
     wandb.config.update(args, allow_val_change=True)
-    wandb.config.update({"data_creation_date": data['train'].dataset.created_on})
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     wandb.config.update({
         "n_params": n_params,
         "n_trainable_params": n_trainable_params,
-        "casp_version": data['train'].dataset.casp_version,
-        "casp_thinning": data['train'].dataset.thinning
+        # "casp_version": data['train'].dataset.casp_version,
+        # "casp_thinning": data['train'].dataset.thinning
     })
 
-    local_base_dir = wandb.run.dir
-    with open(os.path.join(local_base_dir, "MODEL.txt"), "w") as f:
+    global LOCAL_DIR
+    LOCAL_DIR = os.path.join(wandb_dir, wandb.run.dir)
+    os.makedirs(LOCAL_DIR, exist_ok=True)
+    os.makedirs(os.path.join(LOCAL_DIR, "pdbs"), exist_ok=True)
+    os.makedirs(os.path.join(LOCAL_DIR, "pngs"), exist_ok=True)
+    os.makedirs(os.path.join(LOCAL_DIR, "checkpoints"), exist_ok=True)
+    with open(os.path.join(LOCAL_DIR, "MODEL.txt"), "w") as f:
         f.write(str(model) + "\n")
 
     print(args, "\n")
