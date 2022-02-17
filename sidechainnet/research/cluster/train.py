@@ -126,13 +126,13 @@ def get_losses(loss_name,
         p.angles[:, 6:] = sc_angs_pred_untransformed[0, 0:len(p)].detach().cpu().numpy()
         p.numpy()
         p.build_coords_from_angles()  # Make sure the coordinates saved to PDB are updated
-        pdbfile = os.path.join(LOCAL_DIR, "pbds", f"{p.id}_pred.pdb")
+        pdbfile = os.path.join(LOCAL_DIR, "pdbs", f"{p.id}_pred.pdb")
         p.to_pdb(pdbfile)
         wandb.log({"structure": wandb.Molecule(pdbfile)})
 
         # Now to generate the files for the true structure
         ptrue = pbatch[0]
-        ptrue_pdbfile = os.path.join(LOCAL_DIR, "pbds", f"{p.id}_true.pdb")
+        ptrue_pdbfile = os.path.join(LOCAL_DIR, "pdbs", f"{p.id}_true.pdb")
         ptrue.to_pdb(ptrue_pdbfile)
 
         # Now, open the two files in pymol, align them, show sidechains, and save PNG
@@ -148,9 +148,9 @@ def get_losses(loss_name,
         pymol.cmd.hide("cartoon", "pred")
         both_png_path = os.path.join(LOCAL_DIR, "pngs", f"{p.id}_both.png")
         pymol.cmd.png(both_png_path, width=1000, height=1000, quiet=0, dpi=300, ray=0)
-        both_pse_path = os.path.join(LOCAL_DIR, "pbds", f"{p.id}_both.pse")
+        both_pse_path = os.path.join(LOCAL_DIR, "pdbs", f"{p.id}_both.pse")
         pymol.cmd.save(both_pse_path)
-        wandb.save(both_pse_path)
+        wandb.save(both_pse_path, base_path=LOCAL_DIR)
         pymol.cmd.delete("all")
         wandb.log({"combined-png": wandb.Image(both_png_path)})
 
@@ -268,7 +268,7 @@ def checkpoint_model(args, model, optimizer, epoch, loss, scheduler):
         'loss': loss
     }
     torch.save(checkpoint, chkpt_path)
-    wandb.save(chkpt_path)
+    wandb.save(chkpt_path, base_path=LOCAL_DIR)
     print(f"Model saved to {chkpt_path}.")
 
 
@@ -529,7 +529,7 @@ def main():
     args.n_heads = model.n_heads
 
     # Prepare Weights and Biases logging
-    wandb_dir = "/scr/jok120/wandb"
+    wandb_dir = "/scr/jok120/wandb" if args.cluster else os.path.expanduser("~/scr")
     if wandb_dir:
         os.makedirs(wandb_dir, exist_ok=True)
     wandb.init(project="sidechain-transformer", entity="koes-group", dir=wandb_dir)
@@ -548,6 +548,10 @@ def main():
 
     global LOCAL_DIR
     LOCAL_DIR = os.path.join(wandb_dir, wandb.run.dir)
+    os.makedirs(LOCAL_DIR, exist_ok=True)
+    os.makedirs(os.path.join(LOCAL_DIR, "pdbs"), exist_ok=True)
+    os.makedirs(os.path.join(LOCAL_DIR, "pngs"), exist_ok=True)
+    os.makedirs(os.path.join(LOCAL_DIR, "checkpoints"), exist_ok=True)
     with open(os.path.join(LOCAL_DIR, "MODEL.txt"), "w") as f:
         f.write(str(model) + "\n")
 
