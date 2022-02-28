@@ -280,8 +280,8 @@ def make_model(args, angle_means):
 
     if args.model == "scn-trans-enc":
         model = SidechainTransformer(d_seq_embedding=args.d_seq_embedding,
-                                     d_nonseq_data=args.d_nonseq_data,
                                      d_feedforward=args.d_feedforward,
+                                     d_nonseq_data=args.d_nonseq_data,
                                      d_in=args.d_in,
                                      d_out=args.d_out,
                                      n_heads=args.n_heads,
