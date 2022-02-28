@@ -74,7 +74,7 @@ def prepare_dataloaders(data,
 
     if dynamic_batching:
         print(f"Approximating {batch_size * train_dataset.lengths.mean():.0f}"
-              "residues/batch.")
+              " residues/batch.")
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
