@@ -1,5 +1,6 @@
 """A class for generating protein sequence/structure batches of similar length."""
 
+import pprint
 import numpy as np
 import torch
 import torch.utils
@@ -44,13 +45,17 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         self._init_histogram_bins(bins)
 
     def _init_histogram_bins(self, bins):
+        # TODO Implement for data that is either ascending or desc. Or require one.
+        # TODO Currently requires a dataset sorted by length ascending
         # Compute length-based histogram bins and probabilities
         self.lens = []
         for s in (p.seq for p in self.dataset):
-            if len(s) <= MAX_SEQ_LEN:
-                self.lens.append(len(s))
-            else:
-                self.lens.append(MAX_SEQ_LEN)
+            self.lens.append(len(s))
+            # TODO Implement MAX_SEQ_LEN
+            # if len(s) <= MAX_SEQ_LEN:
+            #     self.lens.append(len(s))
+            # else:
+            #     self.lens.append(MAX_SEQ_LEN)
 
         self.hist_counts, self.hist_bins = np.histogram(self.lens, bins=bins)
         # Make each bin define the rightmost value in each bin, ie '( , ]'.

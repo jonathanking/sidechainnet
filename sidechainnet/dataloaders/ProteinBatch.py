@@ -17,13 +17,16 @@ class ProteinBatch(object):
     def __getitem__(self, idx):
         return self.proteins[idx]
 
+    def trim_ends(self):
+        self.proteins = [p.trim_edges() for p in self.proteins]
+
     @property
     def angles(self):
-        angles = [p.angles for p in self]
+        angles = (p.angles for p in self)
         return self.pad_for_batch(angles, dtype='ang')
 
     def _get_seqs(self, one_hot=True):
-        seqs = [p.int_seq for p in self]  # We request int representation rather than str
+        seqs = (p.int_seq for p in self)  # We request int representation rather than str
         return self.pad_for_batch(seqs, dtype='seq', seqs_as_onehot=one_hot, vocab=VOCAB)
 
     @property
@@ -40,7 +43,7 @@ class ProteinBatch(object):
 
     @property
     def secondary(self, one_hot=True):
-        secs = [p.int_secondary for p in self]
+        secs = (p.int_secondary for p in self)
         return self.pad_for_batch(secs,
                                   dtype='seq',
                                   seqs_as_onehot=one_hot,
@@ -48,19 +51,19 @@ class ProteinBatch(object):
 
     @property
     def masks(self):
-        return self.pad_for_batch([p.int_mask for p in self], 'msk')
+        return self.pad_for_batch((p.int_mask for p in self), 'msk')
 
     @property
     def evolutionary(self):
-        return self.pad_for_batch([p.evolutionary for p in self], 'pssm')
+        return self.pad_for_batch((p.evolutionary for p in self), 'pssm')
 
     @property
     def coords(self):
-        return self.pad_for_batch([p.coords for p in self], 'crd')
+        return self.pad_for_batch((p.coords for p in self), 'crd')
 
     @property
     def is_modified(self):
-        return self.pad_for_batch([p.is_modified for p in self], 'msk')
+        return self.pad_for_batch((p.is_modified for p in self), 'msk')
 
     @property
     def ids(self):

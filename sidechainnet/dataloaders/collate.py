@@ -39,7 +39,7 @@ def prepare_dataloaders(data,
                         aggregate_model_input,
                         collate_fn=None,
                         batch_size=32,
-                        num_workers=1,
+                        num_workers=None,
                         seq_as_onehot=None,
                         dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
@@ -65,7 +65,16 @@ def prepare_dataloaders(data,
     if collate_fn is None:
         collate_fn = protein_batch_collate_fn
 
-    train_dataset = SCNDataset(data['train'], split_name='train')
+    # TODO Default to descending to fail early
+
+    train_dataset = SCNDataset(data['train'],
+                               split_name='train',
+                               trim_edges=True,
+                               sort_by_length='ascending')
+
+    if dynamic_batching:
+        print(f"Approximating {batch_size * train_dataset.lengths.mean():.0f}"
+              "residues/batch.")
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -75,11 +84,9 @@ def prepare_dataloaders(data,
             train_dataset,
             batch_size,
             dynamic_batch=batch_size *
-            data['settings']['lengths'].mean() if dynamic_batching else None,
+            train_dataset.lengths.mean() if dynamic_batching else None,
             optimize_batch_for_cpus=optimize_for_cpu_parallelism,
-            shuffle=shuffle
-        ))
-
+            shuffle=shuffle))
     train_eval_loader = torch.utils.data.DataLoader(
         train_dataset,
         num_workers=num_workers,
@@ -94,15 +101,19 @@ def prepare_dataloaders(data,
 
     valid_loaders = {}
     for vsplit in VALID_SPLITS:
-        valid_loader = torch.utils.data.DataLoader(SCNDataset(
-                                                   data[vsplit],
-                                                   split_name=vsplit),
+        valid_loader = torch.utils.data.DataLoader(SCNDataset(data[vsplit],
+                                                              split_name=vsplit,
+                                                              trim_edges=True,
+                                                              sort_by_length='ascending'),
                                                    num_workers=num_workers,
                                                    batch_size=batch_size,
                                                    collate_fn=collate_fn)
         valid_loaders[vsplit] = valid_loader
 
-    test_loader = torch.utils.data.DataLoader(SCNDataset(data['test'], split_name='test'),
+    test_loader = torch.utils.data.DataLoader(SCNDataset(data['test'],
+                                                         split_name='test',
+                                                         trim_edges=True,
+                                                         sort_by_length='ascending'),
                                               num_workers=num_workers,
                                               batch_size=batch_size,
                                               collate_fn=collate_fn)
@@ -115,21 +126,3 @@ def prepare_dataloaders(data,
     dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in VALID_SPLITS})
 
     return dataloaders
-
-
-def get_dataloader_from_dataset_dict(dictionary):
-    collate_fn = get_collate_fn(False, seqs_as_onehot=True)
-
-    train_dataset = SCNDataset(data['train'], split_name='train')
-
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset,
-        num_workers=num_workers,
-        collate_fn=collate_fn,
-        batch_sampler=SimilarLengthBatchSampler(
-            train_dataset,
-            batch_size,
-            dynamic_batch=batch_size *
-            data['settings']['lengths'].mean() if dynamic_batching else None,
-            optimize_batch_for_cpus=optimize_for_cpu_parallelism,
-        ))

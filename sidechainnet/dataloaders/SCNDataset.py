@@ -12,6 +12,7 @@ SCNProteins may be iterated over or selected from the SCNDataset.
     >>> d["1HD1_1_A"]
     SCNProtein(1HD1_1_A, len=75, missing=0, split='train')
 """
+import numpy as np
 import torch
 
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
@@ -21,7 +22,11 @@ from sidechainnet.utils.organize import compute_angle_means
 class SCNDataset(torch.utils.data.Dataset):
     """A representation of a SidechainNet dataset."""
 
-    def __init__(self, data, split_name="", trim_edges=False) -> None:
+    def __init__(self,
+                 data,
+                 split_name="",
+                 trim_edges=False,
+                 sort_by_length=None) -> None:
         """Initialize a SCNDataset from underlying SidechainNet formatted dictionary."""
         super().__init__()
         # Determine available datasplits
@@ -38,7 +43,8 @@ class SCNDataset(torch.utils.data.Dataset):
             data = {
                 split_name: data,
                 "settings": {
-                    "angle_means": compute_angle_means(data['ang']) if data['ang'] else None
+                    "angle_means":
+                        compute_angle_means(data['ang']) if data['ang'] else None
                 }
             }
 
@@ -47,9 +53,9 @@ class SCNDataset(torch.utils.data.Dataset):
         self.split_to_ids = {}
         self.ids_to_SCNProtein = {}
         self.idx_to_SCNProtein = {}
+        _unsorted_proteins = []
 
         # Create SCNProtein objects and add to data structure
-        idx = 0
         for split in self.splits:
             d = data[split]
             for c, a, s, u, m, e, n, r, z, i in zip(d['crd'], d['ang'], d['seq'],
@@ -75,11 +81,21 @@ class SCNDataset(torch.utils.data.Dataset):
                 if trim_edges:
                     p.trim_edges()
                 self.ids_to_SCNProtein[i] = p
-                self.idx_to_SCNProtein[idx] = p
-                idx += 1
+                _unsorted_proteins.append(p)
+
+        if sort_by_length == 'ascending':
+            argsorted = np.argsort([len(p) for p in _unsorted_proteins])
+        elif sort_by_length == 'descending':
+            argsorted = np.argsort([len(p) for p in _unsorted_proteins])[::-1]
+        sorted_idx = 0
+        for unsorted_idx in argsorted:
+            self.idx_to_SCNProtein[sorted_idx] = _unsorted_proteins[unsorted_idx]
+            sorted_idx += 1
+        del _unsorted_proteins
 
         # Add metadata
         self.angle_means = data['settings']['angle_means']
+        self.lengths = np.array([len(p) for p in self])
 
     def get_protein_list_by_split_name(self, split_name):
         """Return list of SCNProtein objects belonging to str split_name."""
@@ -105,7 +121,8 @@ class SCNDataset(torch.utils.data.Dataset):
 
     def __iter__(self):
         """Iterate over SCNProtein objects."""
-        yield from self.ids_to_SCNProtein.values()
+        for i in range(len(self)):
+            yield self.idx_to_SCNProtein[i]
 
     def __repr__(self) -> str:
         """Represent SCNDataset as a string."""

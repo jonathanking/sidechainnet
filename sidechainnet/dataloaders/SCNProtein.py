@@ -563,7 +563,10 @@ class SCNProtein(object):
         n_removed_right = len(self.mask) - len(mask_seq_no_right)
         n_removed_right = None if n_removed_right == 0 else -n_removed_right
         # Trim simple attributes
-        for at in ["seq", "angles", "secondary_structure", "is_modified", "evolutionary"]:
+        for at in [
+                "seq", "int_seq", "angles", "secondary_structure", "int_secondary", "is_modified",
+                "evolutionary", "int_mask", "mask"
+        ]:
             data = getattr(self, at)
             if data is not None:
                 setattr(self, at, data[n_removed_left:n_removed_right])
@@ -578,8 +581,6 @@ class SCNProtein(object):
             assert isinstance(self.unmodified_seq, str)
             ums = self.unmodified_seq.split()
             self.unmodified_seq = " ".join(ums[n_removed_left:n_removed_right])
-        # Update mask
-        self.mask = self.mask.strip("-")
         # Reset structure builders
         self.sb = None
 
