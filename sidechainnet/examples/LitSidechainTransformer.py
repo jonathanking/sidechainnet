@@ -27,8 +27,70 @@ import wandb
 class LitSidechainTransformer(pl.LightningModule):
     """PyTorch Lightning module for SidechainTransformer."""
 
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        """Add model specific arguments to a global parser."""
+
+        def my_bool(s):
+            """Allow bools instead of using pos/neg flags."""
+            return s != 'False'
+
+        model_args = parent_parser.add_argument_group("LitSidechainTransformer")
+        model_args.add_argument('-dse',
+                                '--d_seq_embedding',
+                                type=int,
+                                default=512,
+                                help="Dimension of sequence embedding.")
+
+        model_args.add_argument('-dnsd',
+                                '--d_nonseq_data',
+                                type=int,
+                                default=35,
+                                help="Dimension of non-sequence input embedding.")
+        model_args.add_argument('-do',
+                                '--d_out',
+                                type=int,
+                                default=12,
+                                help="Dimension of desired model output.")
+        model_args.add_argument('-di',
+                                '--d_in',
+                                type=int,
+                                default=256,
+                                help="Dimension of desired transformer model input.")
+        model_args.add_argument(
+            '-dff',
+            '--d_feedforward',
+            type=int,
+            default=2048,
+            help="Dimmension of the inner layer of the feed-forward layer at the end of"
+            " every Transformer block.")
+        model_args.add_argument('-nh',
+                                '--n_heads',
+                                type=int,
+                                default=8,
+                                help="Number of attention heads.")
+        model_args.add_argument(
+            '-nl',
+            '--n_layers',
+            type=int,
+            default=6,
+            help="Number of layers in the model. If using encoder/decoder model, the "
+            "encoder and decoder both have this number of layers.")
+        model_args.add_argument("--embed_sequence",
+                                type=my_bool,
+                                default="True",
+                                help="Whether or not to use embedding "
+                                "layer in the transformer model.")
+        model_args.add_argument("--transformer_activation",
+                                type=str,
+                                default="relu",
+                                help="Activation for Transformer layers.")
+
+        return model_args
+
     def __init__(
             self,
+            # Model specific args from CLI
             d_seq_embedding=20,
             d_nonseq_data=35,  # 5 bb, 21 PSSM, 8 ss
             d_in=256,
@@ -36,45 +98,39 @@ class LitSidechainTransformer(pl.LightningModule):
             d_feedforward=1024,
             n_heads=8,
             n_layers=1,
-            dropout=0,
-            activation='relu',
-            angle_means=None,
             embed_sequence=True,
-            loss_name=None,
+            transformer_activation='relu',
+            # Shared arguments from CLI
+            loss_name='mse',
             opt_name='adam',
             opt_lr=1e-2,
             opt_lr_scheduling='plateau',
             opt_lr_scheduling_metric='val_loss',
             opt_patience=5,
-            opt_early_stopping_threshold=0.01,
+            opt_min_delta=0.01,
             opt_weight_decay=1e-5,
             opt_n_warmup_steps=5_000,
-            dataloader_name_mapping=None):
+            dropout=0.1,
+            # Other
+            dataloader_name_mapping=None,
+            angle_means=None,
+            **kwargs):
         """Create a LitSidechainTransformer module."""
         super().__init__()
-        assert loss_name is not None, "Please provide a loss for optimization."
-        self.embed_sequence = embed_sequence
-        if self.embed_sequence:
+        self.save_hyperparameters()
+
+        # Initialize layers
+        if embed_sequence:
             self.input_embedding = torch.nn.Embedding(len(VOCAB),
                                                       d_seq_embedding,
                                                       padding_idx=VOCAB.pad_id)
-        self.angle_means = angle_means
-        if dataloader_name_mapping is None:
-            self.dataloader_name_mapping = {0: ""}
-        else:
-            self.dataloader_name_mapping = dataloader_name_mapping
-        # Initialize layers
-        self._d_model = d_nonseq_data + d_seq_embedding
-        while d_in % n_heads != 0:
-            n_heads -= 1
-        self.n_heads = n_heads
         self.ff1 = torch.nn.Linear(d_nonseq_data + d_seq_embedding, d_in)
         self.encoder_layer = torch.nn.TransformerEncoderLayer(
             d_model=d_in,
-            nhead=self.n_heads,
+            nhead=n_heads,
             dim_feedforward=d_feedforward,
             dropout=dropout,
-            activation=activation,
+            activation=transformer_activation,
             batch_first=True,
             norm_first=True)
         self.transformer_encoder = torch.nn.TransformerEncoder(self.encoder_layer,
@@ -82,30 +138,14 @@ class LitSidechainTransformer(pl.LightningModule):
         self.ff2 = torch.nn.Linear(d_in, d_out)
         self.output_activation = torch.nn.Tanh()
 
-        self.loss_name = loss_name
-
-        if self.angle_means is not None:
+        if angle_means is not None:
             self._init_parameters()
-
-        # Optimizer options
-        self.opt_name = opt_name
-        self.opt_lr = opt_lr
-        self.opt_lr_scheduling = opt_lr_scheduling
-        self.opt_lr_scheduling_metric = opt_lr_scheduling_metric
-        self.opt_patience = opt_patience
-        self.opt_early_stopping_threshold = opt_early_stopping_threshold
-        self.opt_weight_decay = opt_weight_decay
-        self.opt_n_warmup_steps = opt_n_warmup_steps
-
-        self.save_dir = ""
-
-        self.save_hyperparameters()
 
     def _init_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
                 torch.nn.init.xavier_uniform_(p)
-        angle_means = np.arctanh(self.angle_means)
+        angle_means = np.arctanh(self.hparams.angle_means)
         self.ff2.bias = torch.nn.Parameter(angle_means)
         torch.nn.init.zeros_(self.ff2.weight)
         self.ff2.bias.requires_grad_ = False
@@ -119,7 +159,7 @@ class LitSidechainTransformer(pl.LightningModule):
         """Run one forward step of the model."""
         seq = seq.to(self.device)
         padding_mask = self._get_seq_pad_mask(seq)
-        if self.embed_sequence:
+        if self.hparams.embed_sequence:
             seq = self.input_embedding(seq)
         x = torch.cat([x, seq], dim=-1)
         x = self.ff1(x)
@@ -142,30 +182,30 @@ class LitSidechainTransformer(pl.LightningModule):
             dict: Pytorch Lightning dictionary with keys "optimizer" and "lr_scheduler".
         """
         # Prepare optimizer
-        if self.opt_name == "adam":
+        if self.hparams.opt_name == "adam":
             opt = torch.optim.Adam(filter(lambda x: x.requires_grad, self.parameters()),
-                                   lr=self.opt_lr,
-                                   weight_decay=self.opt_weight_decay)
-        elif self.opt_name == "adamw":
+                                   lr=self.hparams.opt_lr,
+                                   weight_decay=self.hparams.opt_weight_decay)
+        elif self.hparams.opt_name == "adamw":
             opt = torch.optim.AdamW(filter(lambda x: x.requires_grad, self.parameters()),
-                                    lr=self.opt_lr,
-                                    weight_decay=self.opt_weight_decay)
-        elif self.opt_name == "sgd":
+                                    lr=self.hparams.opt_lr,
+                                    weight_decay=self.hparams.opt_weight_decay)
+        elif self.hparams.opt_name == "sgd":
             opt = torch.optim.SGD(filter(lambda x: x.requires_grad, self.parameters()),
-                                  lr=self.opt_lr,
-                                  weight_decay=self.opt_weight_decay)
+                                  lr=self.hparams.opt_lr,
+                                  weight_decay=self.hparams.opt_weight_decay)
 
         # Prepare scheduler
-        if self.opt_lr_scheduling == "noam":
-            opt = ScheduledOptim(opt, self.d_in, self.n_warmup_steps)
+        if self.hparams.opt_lr_scheduling == "noam":
+            opt = ScheduledOptim(opt, self.hparams.d_in, self.hparams.opt_n_warmup_steps)
             sch = None
             # TODO: Use better warm up scheduler
         else:
             sch = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 opt,
-                patience=self.opt_patience,
+                patience=self.hparams.opt_patience,
                 verbose=True,
-                threshold=self.opt_early_stopping_threshold)
+                threshold=self.hparams.opt_min_delta)
 
         d = {
             "optimizer": opt,
@@ -173,7 +213,7 @@ class LitSidechainTransformer(pl.LightningModule):
                 "scheduler": sch,
                 "interval": "epoch",
                 "frequency": 1,
-                "monitor": self.opt_lr_scheduling_metric,
+                "monitor": self.hparams.opt_lr_scheduling_metric,
                 "strict": True,
                 "name": None,
             }
@@ -198,7 +238,7 @@ class LitSidechainTransformer(pl.LightningModule):
         model_in = torch.cat([bb_angs, batch.secondary, batch.evolutionary], dim=-1)
         # print("prepare", model_in.device, sc_angs_true.device)
 
-        return model_in.cuda(), sc_angs_true.cuda()
+        return model_in.to(self.device), sc_angs_true.to(self.device)
 
     def training_step(self, batch, batch_idx):
         """Perform a single step of training (model in, model out, log loss).
@@ -219,7 +259,7 @@ class LitSidechainTransformer(pl.LightningModule):
                                      do_struct=batch_idx == 0,
                                      split='train')
         self.log(
-            'train/rmse',
+            'losses/train/rmse',
             torch.sqrt(loss_dict['mse']),
             on_step=True,
             on_epoch=True,
@@ -246,12 +286,12 @@ class LitSidechainTransformer(pl.LightningModule):
                                      split='valid',
                                      dataloader_idx=dataloader_idx)
 
-        name = f"valid/{self.dataloader_name_mapping[dataloader_idx]}_rmse"
+        name = f"losses/valid/{self.hparams.dataloader_name_mapping[dataloader_idx]}_rmse"
         self.log(name,
                  torch.sqrt(loss_dict['mse']),
                  on_step=False,
                  on_epoch=True,
-                 prog_bar=name == self.opt_lr_scheduling_metric,
+                 prog_bar=name == self.hparams.opt_lr_scheduling_metric,
                  add_dataloader_idx=False)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
@@ -267,8 +307,10 @@ class LitSidechainTransformer(pl.LightningModule):
                                      sc_angs_pred,
                                      do_struct=batch_idx == 0,
                                      split='test')
-
-        self.log("test/rmse", torch.sqrt(loss_dict['mse']), on_step=True, on_epoch=True)
+        self.log("losses/test/rmse",
+                 torch.sqrt(loss_dict['mse']),
+                 on_step=False,
+                 on_epoch=True)
 
     def _get_losses(self,
                     batch,
@@ -279,11 +321,10 @@ class LitSidechainTransformer(pl.LightningModule):
                     dataloader_idx=None):
         loss_dict = {}
         mse_loss = angle_mse(sc_angs_true, sc_angs_pred)
-        if self.loss_name == "mse":
-            # loss = mse_loss
+        if self.hparams.loss_name == "mse":
             loss_dict['loss'] = mse_loss
-            loss_dict[self.loss_name] = mse_loss.detach()
-        if self.loss_name == "openmm" or self.loss_name == "mse_openmm":
+            loss_dict[self.hparams.loss_name] = mse_loss.detach()
+        if self.hparams.loss_name == "openmm" or self.hparams.loss_name == "mse_openmm":
 
             proteins = []
             for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids, batch.msks):
@@ -311,7 +352,7 @@ class LitSidechainTransformer(pl.LightningModule):
             loss = openmm_loss = loss_total / len(proteins)
 
             loss_dict['loss'] = loss
-            loss_dict[self.loss_name] = loss.detach()
+            loss_dict[self.hparams.loss_name] = loss.detach()
 
             # Record performance metrics
             self.log(
@@ -321,7 +362,7 @@ class LitSidechainTransformer(pl.LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-            if self.loss_name == "mse_openmm":
+            if self.hparams.loss_name == "mse_openmm":
                 loss = mse_loss * 0.8 + openmm_loss / 1e12 * .2
                 self.log(split + "/mse_openmm",
                          loss.detach(),
@@ -339,7 +380,7 @@ class LitSidechainTransformer(pl.LightningModule):
             )  # Make sure the coordinates saved to PDB are updated
             pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_pred.pdb")
             p.to_pdb(pdbfile)
-            wandb.log({"structures/molecule": wandb.Molecule(pdbfile)})
+            wandb.log({f"structures/{split}/molecule": wandb.Molecule(pdbfile)})
 
             # Now to generate the files for the true structure
             ptrue = batch[0]
@@ -370,10 +411,15 @@ class LitSidechainTransformer(pl.LightningModule):
             pymol.cmd.save(both_pse_path)
             wandb.save(both_pse_path, base_path=self.save_dir)
             pymol.cmd.delete("all")
-            self.logger.log_image(key="structures/png",
-                                  images=[wandb.Image(both_png_path)])
+            wandb.log({f"structures/{split}/png": wandb.Image(both_png_path)})
 
         return loss_dict
+
+    def make_example_input_array(self, data_module):
+        """Prepare an example input array for batch size determination callback."""
+        example_batch = data_module.get_example_input_array()
+        non_seq_data = self._prepare_model_input(example_batch)[0]
+        self.example_input_array = non_seq_data, example_batch.seqs_int
 
 
 class LitSCNDataModule(pl.LightningDataModule):
@@ -383,6 +429,12 @@ class LitSCNDataModule(pl.LightningDataModule):
         self.scn_data_dict = scn_data_dict
         self.val_dataloader_idx_to_name = {}
         self.val_dataloader_target = val_dataloader_target
+
+    def get_train_angle_means(self, start_angle=0, end_angle=-1):
+        means = self.scn_data_dict['train'].dataset.angle_means[start_angle:end_angle]
+        n_angles = means.shape[-1]
+        means = torch.tensor(means).view(1, 1, len(means))
+        means = scn.structure.trig_transform(means).view(1, 1, n_angles * 2)
 
     def train_dataloader(self):
         return self.scn_data_dict['train']

@@ -105,7 +105,8 @@ def load(casp_version=12,
          complete_structures_only=False,
          local_scn_path=None,
          scn_dataset=False,
-         shuffle=True):
+         shuffle=True,
+         **kwargs):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
