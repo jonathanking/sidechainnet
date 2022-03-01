@@ -27,7 +27,6 @@ def create_parser():
         """Allow bools instead of pos/neg flags."""
         return s != 'False'
 
-    # yapf: disable
     parser = argparse.ArgumentParser()
 
     # Pytorch Lightning Trainer args (e.g. gpus, accumulate_grad_batches etc.)
@@ -42,10 +41,10 @@ def create_parser():
                               help="Set of parameters to facilitate training on a remote"
                               " cluster. Limited I/O, etc.")
     program_args.add_argument('--model',
-        '-m',
-        type=str,
-        default="scn-trans-enc",
-        help="Model architecture name. Currenlt only supports 'scn-trans-enc'.")
+                              '-m',
+                              choices=["scn-trans-enc"],
+                              default="scn-trans-enc",
+                              help="Model architecture name.")
     program_args.add_argument("--seed",
                               "-s",
                               type=int,
@@ -60,10 +59,10 @@ def create_parser():
                            help="CASP Version for SidechainNet {7-12, 'debug'}.",
                            default=12)
     data_args.add_argument("--casp_thinning",
-        "--thinning",
-        choices=['30', '50', '70', '90', '100', 'debug'],
-        help="CASP thinning for SidechainNet.",
-        default='30')
+                           "--thinning",
+                           choices=['30', '50', '70', '90', '100', 'debug'],
+                           help="CASP thinning for SidechainNet.",
+                           default='30')
     data_args.add_argument("--scn_data_file",
                            type=str,
                            help="Direct path to SCN data file.")
@@ -86,7 +85,7 @@ def create_parser():
     data_args.add_argument("--num_workers",
                            type=int,
                            help="Number of workers for each DataLoader.",
-                           default=mp.cpu_count()//2)
+                           default=mp.cpu_count() // 2)
     # Model-specific args
     model_args = LitSidechainTransformer.add_model_specific_args(parser)
 
@@ -98,12 +97,13 @@ def create_parser():
     # Optimization args
     training = parser.add_argument_group("Optimization")
     training.add_argument('--loss_name',
-        '-l',
-        choices=["mse", "mse_openmm", "openmm"],
-        default="mse",
-        help="Loss used to train the model. Can be root mean squared error (RMSE), "
-        "distance-based root mean squared distance (DRMSD), length-normalized DRMSD "
-        "(ln-DRMSD) or a combination of RMSE and ln-DRMSD.")
+                          '-l',
+                          choices=["mse", "mse_openmm", "openmm"],
+                          default="mse",
+                          help="Loss used to train the model. Can be root mean squared "
+                          "error (RMSE), distance-based root mean squared distance "
+                          "(DRMSD), length-normalized DRMSD (ln-DRMSD) or a combination "
+                          "of RMSE and ln-DRMSD.")
     training.add_argument('--opt_name',
                           '-opt',
                           type=str,
@@ -112,43 +112,43 @@ def create_parser():
                           help="Training optimizer.")
     training.add_argument("--opt_lr", "-lr", type=float, default=1e-4)
     training.add_argument('--opt_lr_scheduling',
-        type=str,
-        choices=['noam', 'plateau'],
-        default='plateau',
-        help='noam: Use learning rate scheduling as described in Transformer paper, '
-        'plateau: Decrease '
-        'learning rate after Validation loss plateaus.')
+                          type=str,
+                          choices=['noam', 'plateau'],
+                          default='plateau',
+                          help="noam: Use LR as described in Transformer paper, plateau:"
+                          " Decrease learning rate after Validation loss plateaus.")
     training.add_argument('--opt_patience',
-        type=int,
-        default=5,
-        help="Number of epochs to wait before reducing LR for plateau scheduler.")
+                          type=int,
+                          default=5,
+                          help="Patience for LR or chkpt routines.")
     training.add_argument('--opt_min_delta',
-        type=float,
-        default=0.01,
-        help="Threshold for considering improvements during training/lr scheduling.")
+                          type=float,
+                          default=0.01,
+                          help="Threshold for considering improvements during training/lr"
+                          " scheduling.")
     training.add_argument("--opt_weight_decay",
                           type=float,
                           default=0.0,
                           help="Applies weight decay to model weights.")
     training.add_argument('--opt_n_warmup_steps',
-        '-nws',
-        type=int,
-        default=10_000,
-        help="Number of warmup training steps when using lr-scheduling as proposed in the"
-        "original Transformer paper.")
+                          '-nws',
+                          type=int,
+                          default=10_000,
+                          help="Number of warmup train steps when using lr-scheduling.")
     # TODO add opt_lr_scheduling_metric
     training.add_argument("--loss_combination_weight",
-        type=float,
-        default=0.5,
-        help="When combining losses, use weight w for loss = w * LossA + (1-w) * LossB.")
+                          type=float,
+                          default=0.5,
+                          help="When combining losses, use weight w where "
+                          "loss = w * LossA + (1-w) * LossB.")
 
     # Callbacks
     callback_args = parser.add_argument_group("Callbacks")
     callback_args.add_argument("--use_swa", type=my_bool, default="False")
     callback_args.add_argument("--swa_epoch_start", type=float, default=None)
     callback_args.add_argument("--use_batch_gradient_verification",
-                               type=my_bool, default="False")
-    # yapf: enable
+                               type=my_bool,
+                               default="False")
 
     return parser
 
@@ -245,7 +245,10 @@ def main():
                                               entity="koes-group",
                                               model=model,
                                               dict_args=dict_args)
-    dict_args.update(logger=wandb_logger, default_root_dir=model.save_dir,)
+    dict_args.update(
+        logger=wandb_logger,
+        default_root_dir=model.save_dir,
+    )
     print(args, "\n")
 
     # Make callbacks
