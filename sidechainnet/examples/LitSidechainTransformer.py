@@ -36,57 +36,54 @@ class LitSidechainTransformer(pl.LightningModule):
             return s != 'False'
 
         model_args = parent_parser.add_argument_group("LitSidechainTransformer")
-        model_args.add_argument('-dse',
-                                '--d_seq_embedding',
+        model_args.add_argument('--d_seq_embedding',
+                                '-dse',
                                 type=int,
                                 default=512,
                                 help="Dimension of sequence embedding.")
-
-        model_args.add_argument('-dnsd',
-                                '--d_nonseq_data',
+        model_args.add_argument('--d_nonseq_data',
+                                '-dnsd',
                                 type=int,
                                 default=35,
                                 help="Dimension of non-sequence input embedding.")
-        model_args.add_argument('-do',
-                                '--d_out',
+        model_args.add_argument('--d_out',
+                                '-do',
                                 type=int,
                                 default=12,
                                 help="Dimension of desired model output.")
-        model_args.add_argument('-di',
-                                '--d_in',
+        model_args.add_argument('--d_in',
+                                '-di',
                                 type=int,
                                 default=256,
                                 help="Dimension of desired transformer model input.")
-        model_args.add_argument(
-            '-dff',
-            '--d_feedforward',
-            type=int,
-            default=2048,
-            help="Dimmension of the inner layer of the feed-forward layer at the end of"
-            " every Transformer block.")
-        model_args.add_argument('-nh',
-                                '--n_heads',
+        model_args.add_argument('--d_feedforward',
+                                '-dff',
+                                type=int,
+                                default=2048,
+                                help="Dimmension of the inner layer of the feed-forward "
+                                "layer at the end of every Transformer block.")
+        model_args.add_argument('--n_heads',
+                                '-nh',
                                 type=int,
                                 default=8,
                                 help="Number of attention heads.")
-        model_args.add_argument(
-            '-nl',
-            '--n_layers',
-            type=int,
-            default=6,
-            help="Number of layers in the model. If using encoder/decoder model, the "
-            "encoder and decoder both have this number of layers.")
+        model_args.add_argument('--n_layers',
+                                '-nl',
+                                type=int,
+                                default=6,
+                                help="Number of layers in each the encoder/decoder "
+                                "(if present).")
         model_args.add_argument("--embed_sequence",
                                 type=my_bool,
                                 default="True",
-                                help="Whether or not to use embedding "
-                                "layer in the transformer model.")
+                                help="Whether or not to use embedding layer in the "
+                                "transformer model.")
         model_args.add_argument("--transformer_activation",
                                 type=str,
                                 default="relu",
                                 help="Activation for Transformer layers.")
 
-        return model_args
+        return parent_parser
 
     def __init__(
             self,

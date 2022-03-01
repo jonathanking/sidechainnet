@@ -55,8 +55,9 @@ def create_parser():
     # Data arguments
     data_args = parser.add_argument_group("Data")
     data_args.add_argument("--casp_version",
+                           choices=[7, 8, 9, 10, 11, 12],
                            type=int,
-                           help="CASP Version for SidechainNet {7-12, 'debug'}.",
+                           help="CASP Version for SidechainNet {7-12}.",
                            default=12)
     data_args.add_argument("--casp_thinning",
                            "--thinning",
@@ -87,7 +88,7 @@ def create_parser():
                            help="Number of workers for each DataLoader.",
                            default=mp.cpu_count() // 2)
     # Model-specific args
-    model_args = LitSidechainTransformer.add_model_specific_args(parser)
+    parser = LitSidechainTransformer.add_model_specific_args(parser)
 
     # General args that may apply to multiple models
     training = parser.add_argument_group("Shared")
@@ -135,6 +136,11 @@ def create_parser():
                           type=int,
                           default=10_000,
                           help="Number of warmup train steps when using lr-scheduling.")
+    training.add_argument('--opt_lr_scheduling_metric',
+                          type=str,
+                          default=None,
+                          help="Metric to use for early stopping, chkpts, etc. Def: "
+                          "'losses/valid/valid-10/{loss_name}'.")
     # TODO add opt_lr_scheduling_metric
     training.add_argument("--loss_combination_weight",
                           type=float,
@@ -225,9 +231,10 @@ def main():
     # Update args with dataset information
     dict_args['angle_means'] = data_module.get_train_angle_means(6, None)
     dict_args['dataloader_name_mapping'] = data_module.val_dataloader_idx_to_name
-    target = 'rmse' if args.loss_name == 'mse' else args.loss_name
-    target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{target}'
-    dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
+    if dict_args['opt_lr_scheduling_metric'] is None:
+        target = 'rmse' if args.loss_name == 'mse' else args.loss_name
+        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{target}'
+        dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
 
     # Prepare model
     if args.model == "scn-trans-enc":
