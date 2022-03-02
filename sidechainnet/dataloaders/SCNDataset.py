@@ -26,7 +26,7 @@ class SCNDataset(torch.utils.data.Dataset):
                  data,
                  split_name="",
                  trim_edges=False,
-                 sort_by_length=None) -> None:
+                 sort_by_length='ascending') -> None:
         """Initialize a SCNDataset from underlying SidechainNet formatted dictionary."""
         super().__init__()
         # Determine available datasplits
