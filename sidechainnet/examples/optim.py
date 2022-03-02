@@ -52,6 +52,10 @@ class ScheduledOptim():
         """
         return (self._optimizer.state_dict(), self.n_warmup_steps, self.n_current_steps, self.init_lr)
 
+    @property
+    def state(self):
+        return self._optimizer.state_dict()
+
     def load_state_dict(self, d):
         """
         Loads the state information for a saved version of this optimizer.

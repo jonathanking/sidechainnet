@@ -6,7 +6,8 @@ import os
 import numpy as np
 import torch
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
-from sidechainnet.examples.losses import angle_mse
+from sidechainnet.examples.losses import angle_mae, angle_mse, angle_acc
+from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
 from sidechainnet.structure.structure import inverse_trig_transform
 from sidechainnet.utils.openmm import OpenMMEnergyH
 from sidechainnet.examples.optim import ScheduledOptim
@@ -17,11 +18,6 @@ from sidechainnet.utils.sequence import VOCAB
 import sidechainnet as scn
 
 import wandb
-
-# pymol.finish_launching(['pymol', '-qc'])
-
-# TODO move model-specific argparse arges to lightning module
-# https://pytorch-lightning.readthedocs.io/en/stable/common/hyperparameters.html
 
 
 class LitSidechainTransformer(pl.LightningModule):
@@ -204,9 +200,9 @@ class LitSidechainTransformer(pl.LightningModule):
                 verbose=True,
                 threshold=self.hparams.opt_min_delta)
 
-        d = {
-            "optimizer": opt,
-            "lr_scheduler": {
+        d = {"optimizer": opt}
+        if sch is not None:
+            d["lr_scheduler"] = {
                 "scheduler": sch,
                 "interval": "epoch",
                 "frequency": 1,
@@ -214,7 +210,6 @@ class LitSidechainTransformer(pl.LightningModule):
                 "strict": True,
                 "name": None,
             }
-        }
 
         return d
 
@@ -263,6 +258,9 @@ class LitSidechainTransformer(pl.LightningModule):
             prog_bar=True,
         )
 
+        self.log("trainer/batch_size", len(batch), on_step=True, on_epoch=False)
+        self._log_angle_metrics(loss_dict, 'train')
+
         return loss_dict
 
     def validation_step(self,
@@ -279,17 +277,18 @@ class LitSidechainTransformer(pl.LightningModule):
         loss_dict = self._get_losses(batch,
                                      sc_angs_true,
                                      sc_angs_pred,
-                                     do_struct=batch_idx == 0 and dataloader_idx == 0,
-                                     split='valid',
-                                     dataloader_idx=dataloader_idx)
+                                     do_struct=batch_idx == 1 and dataloader_idx == 0,
+                                     split='valid')
 
-        name = f"losses/valid/{self.hparams.dataloader_name_mapping[dataloader_idx]}_rmse"
+        name = f"losses/valid/{self.hparams.dataloader_name_mapping[dataloader_idx]}/rmse"
         self.log(name,
                  torch.sqrt(loss_dict['mse']),
                  on_step=False,
                  on_epoch=True,
                  prog_bar=name == self.hparams.opt_lr_scheduling_metric,
                  add_dataloader_idx=False)
+        self._log_angle_metrics(loss_dict, 'valid',
+                                self.hparams.dataloader_name_mapping[dataloader_idx])
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         """Single test step with multiple possible DataLoaders. Same as validation."""
@@ -308,107 +307,149 @@ class LitSidechainTransformer(pl.LightningModule):
                  torch.sqrt(loss_dict['mse']),
                  on_step=False,
                  on_epoch=True)
+        self._log_angle_metrics(loss_dict, 'test')
+
+    def _compute_angle_metrics(self, sc_angs_true, sc_angs_pred, loss_dict):
+        """Compute MAE(X1-5) and accuracy (correct within 20 deg).
+
+        Args:
+            sc_angs_true (torch.Tensor): True sidechain angles, padded with nans.
+            sc_angs_pred (torch.Tensor): Predicted sidechain angles.
+            loss_dict (dict): Dictionary for loss and metric record keeping.
+
+        Returns:
+            loss_dict (dict): Updated dictionary containing new keys MAE_X1...ACC.
+        """
+        # Conver sin/cos values into radians
+        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        sc_angs_true_untransformed = inverse_trig_transform(sc_angs_true, n_angles=6)
+        # TODO completely vectorize?
+        for angle_idx in range(6, 12):
+            angle_name = ANGLE_IDX_TO_NAME_MAP[angle_idx]
+            angle_idx -= 6  # Now we look at the local index, which is shifted (sc-only)
+            mae = angle_mae(sc_angs_true_untransformed[:, :, angle_idx],
+                            sc_angs_pred_untransformed[:, :, angle_idx]).detach()
+            loss_dict[f"{angle_name}_mae_rad"] = mae
+            loss_dict[f"{angle_name}_mae_deg"] = torch.rad2deg(mae)
+            loss_dict[f"{angle_name}_acc"] = angle_acc(
+                sc_angs_true_untransformed[:, :, angle_idx],
+                sc_angs_pred_untransformed[:, :, angle_idx]).detach()
+        return loss_dict
+
+    def _log_angle_metrics(self, loss_dict, split, dataloader_name=""):
+        dl_name_str = dataloader_name + "/" if dataloader_name else ""
+        keys = []
+        for angle_idx in range(6, 12):
+            keys.append(ANGLE_IDX_TO_NAME_MAP[angle_idx] + "_mae_rad")
+            keys.append(ANGLE_IDX_TO_NAME_MAP[angle_idx] + "_mae_deg")
+            keys.append(ANGLE_IDX_TO_NAME_MAP[angle_idx] + "_acc")
+        angle_metrics_dict = {
+            f"metrics/{split}/{dl_name_str}{k}": loss_dict[k] for k in keys
+        }
+        self.log_dict(angle_metrics_dict,
+                      on_epoch=True,
+                      on_step=False,
+                      add_dataloader_idx=False)
+
+    def _generate_structure_viz(self, batch, sc_angs_pred, split):
+        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        p = copy.deepcopy(batch[0])
+        p.angles[:, 6:] = sc_angs_pred_untransformed[0, 0:len(p)].detach().cpu().numpy()
+        p.numpy()
+        p.build_coords_from_angles()  # Make sure the coordinates saved to PDB are updated
+        pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_pred.pdb")
+        p.to_pdb(pdbfile)
+        wandb.log({f"structures/{split}/molecule": wandb.Molecule(pdbfile)})
+
+        # Now to generate the files for the true structure
+        ptrue = batch[0]
+        ptrue_pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_true.pdb")
+        ptrue.to_pdb(ptrue_pdbfile)
+
+        # Now, open the two files in pymol, align them, show sidechains, and save PNG
+        pymol.cmd.load(ptrue_pdbfile, "true")
+        pymol.cmd.load(pdbfile, "pred")
+        pymol.cmd.color("marine", "true")
+        pymol.cmd.color("oxygen", "pred")
+        rmsd, _, _, _, _, _, _ = pymol.cmd.align("true and name n+ca+c+o",
+                                                 "pred and name n+ca+c+o",
+                                                 quiet=True)
+        pymol.cmd.zoom()
+        pymol.cmd.show("lines", "not (name c,o,n and not pro/n)")
+        pymol.cmd.hide("cartoon", "pred")
+        both_png_path = os.path.join(self.save_dir, "pngs", f"{p.id}_both.png")
+        # TODO: Ray tracing occurs despit ray=0
+        with Suppressor():
+            pymol.cmd.png(both_png_path, width=1000, height=1000, quiet=1, dpi=300, ray=0)
+        both_pse_path = os.path.join(self.save_dir, "pdbs", f"{p.id}_both.pse")
+        pymol.cmd.save(both_pse_path)
+        wandb.save(both_pse_path, base_path=self.save_dir)
+        pymol.cmd.delete("all")
+        wandb.log({f"structures/{split}/png": wandb.Image(both_png_path)})
+
+    def _compute_openmm_loss(self, batch, sc_angs_pred, loss_dict, split):
+        proteins = []
+        for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids, batch.msks):
+            p = SCNProtein(angles=a.clone(),
+                           sequence=str(s),
+                           id=i,
+                           mask="".join(["+" if x else "-" for x in m]))
+            proteins.append(p)
+        loss_total = 0
+        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        loss_fn = OpenMMEnergyH()
+        for p, sca in zip(proteins, sc_angs_pred_untransformed):
+            # print(p.mask)
+            # print(p, end=" ")
+            # Fill in protein obj with predicted angles instead of true angles
+            # print("Set angles")
+            p.angles[:, 6:] = sca
+            # print("Build coords.")
+            p.add_hydrogens(from_angles=True)
+            # print("About to apply loss.")
+            eloss = loss_fn.apply(p, p.hcoords)
+            loss_total += eloss
+            # print(eloss.item())
+            # del p
+        loss = openmm_loss = loss_total / len(proteins)
+
+        loss_dict['loss'] = loss
+        loss_dict[self.hparams.loss_name] = loss.detach()
+
+        # Record performance metrics
+        self.log(
+            split + "/openmm",
+            openmm_loss.detach(),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+        )
+        if self.hparams.loss_name == "mse_openmm":
+            loss = loss_dict['mse'] * 0.8 + openmm_loss / 1e12 * .2
+            self.log(split + "/mse_openmm",
+                     loss.detach(),
+                     on_step=True,
+                     on_epoch=True,
+                     prog_bar=True)
+        return loss_dict
 
     def _get_losses(self,
                     batch,
                     sc_angs_true,
                     sc_angs_pred,
                     do_struct=False,
-                    split='train',
-                    dataloader_idx=None):
+                    split='train'):
         loss_dict = {}
         mse_loss = angle_mse(sc_angs_true, sc_angs_pred)
         if self.hparams.loss_name == "mse":
             loss_dict['loss'] = mse_loss
-            loss_dict[self.hparams.loss_name] = mse_loss.detach()
+            loss_dict['mse'] = mse_loss.detach()
         if self.hparams.loss_name == "openmm" or self.hparams.loss_name == "mse_openmm":
-
-            proteins = []
-            for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids, batch.msks):
-                p = SCNProtein(angles=a.clone(),
-                               sequence=str(s),
-                               id=i,
-                               mask="".join(["+" if x else "-" for x in m]))
-                proteins.append(p)
-            loss_total = 0
-            sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
-            loss_fn = OpenMMEnergyH()
-            for p, sca in zip(proteins, sc_angs_pred_untransformed):
-                # print(p.mask)
-                # print(p, end=" ")
-                # Fill in protein obj with predicted angles instead of true angles
-                # print("Set angles")
-                p.angles[:, 6:] = sca
-                # print("Build coords.")
-                p.add_hydrogens(from_angles=True)
-                # print("About to apply loss.")
-                eloss = loss_fn.apply(p, p.hcoords)
-                loss_total += eloss
-                # print(eloss.item())
-                # del p
-            loss = openmm_loss = loss_total / len(proteins)
-
-            loss_dict['loss'] = loss
-            loss_dict[self.hparams.loss_name] = loss.detach()
-
-            # Record performance metrics
-            self.log(
-                split + "/openmm",
-                openmm_loss.detach(),
-                on_step=True,
-                on_epoch=True,
-                prog_bar=True,
-            )
-            if self.hparams.loss_name == "mse_openmm":
-                loss = mse_loss * 0.8 + openmm_loss / 1e12 * .2
-                self.log(split + "/mse_openmm",
-                         loss.detach(),
-                         on_step=True,
-                         on_epoch=True,
-                         prog_bar=True)
-
+            loss_dict = self._compute_openmm_loss(batch, sc_angs_pred, loss_dict, split)
         if do_struct:
-            sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
-            p = copy.deepcopy(batch[0])
-            p.angles[:, 6:] = sc_angs_pred_untransformed[0,
-                                                         0:len(p)].detach().cpu().numpy()
-            p.numpy()
-            p.build_coords_from_angles(
-            )  # Make sure the coordinates saved to PDB are updated
-            pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_pred.pdb")
-            p.to_pdb(pdbfile)
-            wandb.log({f"structures/{split}/molecule": wandb.Molecule(pdbfile)})
+            self._generate_structure_viz(batch, sc_angs_pred, split)
 
-            # Now to generate the files for the true structure
-            ptrue = batch[0]
-            ptrue_pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_true.pdb")
-            ptrue.to_pdb(ptrue_pdbfile)
-
-            # Now, open the two files in pymol, align them, show sidechains, and save PNG
-            pymol.cmd.load(ptrue_pdbfile, "true")
-            pymol.cmd.load(pdbfile, "pred")
-            pymol.cmd.color("marine", "true")
-            pymol.cmd.color("oxygen", "pred")
-            rmsd, _, _, _, _, _, _ = pymol.cmd.align("true and name n+ca+c+o",
-                                                     "pred and name n+ca+c+o",
-                                                     quiet=True)
-            pymol.cmd.zoom()
-            pymol.cmd.show("lines", "not (name c,o,n and not pro/n)")
-            pymol.cmd.hide("cartoon", "pred")
-            both_png_path = os.path.join(self.save_dir, "pngs", f"{p.id}_both.png")
-            # TODO: Ray tracing occurs despit ray=0
-            with Suppressor():
-                pymol.cmd.png(both_png_path,
-                              width=1000,
-                              height=1000,
-                              quiet=1,
-                              dpi=300,
-                              ray=0)
-            both_pse_path = os.path.join(self.save_dir, "pdbs", f"{p.id}_both.pse")
-            pymol.cmd.save(both_pse_path)
-            wandb.save(both_pse_path, base_path=self.save_dir)
-            pymol.cmd.delete("all")
-            wandb.log({f"structures/{split}/png": wandb.Image(both_png_path)})
+        loss_dict = self._compute_angle_metrics(sc_angs_true, sc_angs_pred, loss_dict)
 
         return loss_dict
 

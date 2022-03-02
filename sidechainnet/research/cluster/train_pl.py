@@ -233,7 +233,7 @@ def main():
     dict_args['dataloader_name_mapping'] = data_module.val_dataloader_idx_to_name
     if dict_args['opt_lr_scheduling_metric'] is None:
         target = 'rmse' if args.loss_name == 'mse' else args.loss_name
-        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{target}'
+        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}/{target}'
         dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
 
     # Prepare model

@@ -120,6 +120,33 @@ def angle_mse(true, pred):
     return torch.nn.functional.mse_loss(pred[ang_non_nans], true[ang_non_nans])
 
 
+def angle_mae(true, pred):
+    """Compute Mean Absolute Error between two angle tensors (radians) padded with nan."""
+    ang_non_nans = ~true.isnan()
+    error = true[ang_non_nans] - pred[ang_non_nans]
+    # Correct for out of bounds
+    error[error > torch.pi] -= 2 * torch.pi
+    error[error < -torch.pi] += 2 * torch.pi
+    return torch.mean(torch.abs(error))
+
+# TODO Compute ae vector completely and use this to compute mae and acc
+# TODO Fix definition to be all angles for a residue
+def angle_acc(true, pred, tol=np.deg2rad(20)):
+    """Compute Mean Absolute Error between two angle tensors (radians) padded with nan."""
+    ang_non_nans = ~true.isnan()
+    error = true[ang_non_nans] - pred[ang_non_nans]
+    # Correct for out of bounds
+    error[error > torch.pi] -= 2 * torch.pi
+    error[error < -torch.pi] += 2 * torch.pi
+
+    error = torch.abs(error)
+
+    correct = torch.sum(error < tol)
+    total = len(error)
+
+    return correct / total
+
+
 def _tile(a, dim, n_tile):
     # https://discuss.pytorch.org/t/how-to-tile-a-tensor/13853/4
     init_dim = a.size(dim)
