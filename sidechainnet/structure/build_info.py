@@ -2,6 +2,27 @@
 
 Bond lengths and angles are programmatically parsed from AMBER forcefields.
 'p' and 'i' for 'torsion-vals' stand for predicted and inferred, respectively.
+
+SIDECHAIN DATA FORMAT
+
+    Angle vectors (NUM_ANGLES) are:
+        [phi, psi, omega, n-ca-c, ca-c-n, c-n-ca, x0, x1, x2, x3, x4, x5]
+        [   bb torsion  |    bb 3-atom angles   |   sidechain torsion   ]
+
+        Notes:
+            - x0 is defined as the torsional angle used to place CB using
+            (Ci-1, N, CA, CB) or (Ni+1, Ci+1, CA, CB) depending on whether or not the
+            previous or following residue is available for measurement.
+            - x5 is used to place NH1 or NH2 of Arginine.
+            - if a given angle is not present, it is recorded with a GLOBAL_PAD_CHAR.
+
+    Coordinate vectors (NUM_COORDS_PER_RES x 3) for resname RES are:
+        [N, CA, C, O, *SC_BUILD_INFO[RES]['atom_names'], <PAD> * (N_PAD)]
+        [ backbone  |          sidechain atoms         |     padding*   ]
+        where each vector is padded with GLOBAL_PAD_CHAR to maximum length.
+
+        for example, the atoms for an ASN residue are:
+            [N, CA, C, O, CB, CG, OD1, ND2, PAD, PAD, PAD, PAD, PAD, PAD]
 """
 
 NUM_ANGLES = 12
@@ -12,6 +33,24 @@ SC_ANGLES_START_POS = NUM_BB_OTHER_ANGLES + NUM_BB_TORSION_ANGLES
 
 NUM_COORDS_PER_RES = 14
 PRODY_CA_DIST = 4.1
+
+ANGLE_NAME_TO_IDX_MAP = {
+    # see notes for x0 and x5
+    'phi': 0,
+    'psi': 1,
+    'omega': 2,
+    'n-ca-c': 3,
+    'ca-c-n': 4,
+    'c-n-ca': 5,
+    'x0': 6,
+    'x1': 7,
+    'x2': 8,
+    'x3': 9,
+    'x4': 10,
+    'x5': 11
+}
+
+ANGLE_IDX_TO_NAME_MAP = {idx: name for name, idx in ANGLE_NAME_TO_IDX_MAP.items()}
 
 SC_BUILD_INFO = {
     'ALA': {
