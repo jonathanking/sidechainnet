@@ -89,7 +89,7 @@ def _load_dict(local_path):
 
 
 def load(casp_version=12,
-         thinning=30,
+         casp_thinning=30,
          scn_dir="./sidechainnet_data",
          force_download=False,
          with_pytorch=None,
@@ -121,11 +121,11 @@ def load(casp_version=12,
 
     Args:
         casp_version (int, optional): CASP version to load (7-12). Defaults to 12.
-        thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A thinning
-            represents the minimum sequence similarity each protein sequence must have to
-            all other sequences in the same thinning. The 100 thinning contains all of the
-            protein entries in SidechainNet, while the 30 thinning has a much smaller
-            amount. Defaults to 30.
+        casp_thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A
+            thinning represents the minimum sequence similarity each protein sequence must
+            have to all other sequences in the same thinning. The 100 thinning contains
+            all of the protein entries in SidechainNet, while the 30 thinning has a much
+            smaller amount. Defaults to 30.
         scn_dir (str, optional): Path where SidechainNet data will be stored locally.
             Defaults to "./sidechainnet_data".
         force_download (bool, optional): If true, download SidechainNet data from the web
@@ -259,18 +259,19 @@ def load(casp_version=12,
     if local_scn_path:
         local_path = local_scn_path
     else:
-        local_path = _get_local_sidechainnet_path(casp_version, thinning, scn_dir)
+        local_path = _get_local_sidechainnet_path(casp_version, casp_thinning, scn_dir)
         if not local_path:
-            print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
+            print(f"SidechainNet{(casp_version, casp_thinning)} was not found in "
+                  "{scn_dir}.")
     if not local_path or force_download:
         # Download SidechainNet if it does not exist locally, or if requested
-        local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
+        local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
 
     try:
         scn_dict = _load_dict(local_path)
     except pickle.UnpicklingError:
         print("Redownloading due to Pickle file error.")
-        local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
+        local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
         scn_dict = _load_dict(local_path)
 
     # Patch for removing 1GJJ_1_A, see Issue #38
