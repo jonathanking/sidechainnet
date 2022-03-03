@@ -3,6 +3,10 @@ from torch.nn.functional import mse_loss
 import numpy as np
 import torch
 
+from pytest import approx
+
+from sidechainnet.examples.losses import angle_diff
+
 # There are two ways of thinking about angle loss. 1) Value agnostic, 2) Value-aware
 # The simplest way to handle this would be to treat the loss function as an
 # agnostic tool that only needs to know the appropriate mask. It the zeros out
@@ -70,6 +74,36 @@ def test_mse_radians():
     mask = ~true.isnan()
     result = mse_loss(pred[mask], true[mask])
     assert result == 0
+
+
+def test_angle_ae():
+
+    def T(n):
+        return torch.tensor([n])
+
+    pi = np.pi
+
+    # Test that angle diff understands signed differences
+    assert angle_diff(T(-pi / 2), T(pi / 2)) == approx(-pi)
+    assert angle_diff(T(pi / 2), T(-pi / 2)) == approx(pi)
+
+    assert angle_diff(T(11 * pi / 6), T(7 * pi / 6)) == approx(4 * pi / 6)
+    assert angle_diff(T(7 * pi / 6), T(11 * pi / 6)) == approx(-4 * pi / 6)
+
+    # Test that full 2pi rotations don't matter for 2nd argument
+    assert angle_diff(T(.1), T(.2)) == approx(T(-.1))
+    assert angle_diff(T(.1), T(.2 + np.pi * 2)) == approx(T(-.1), rel=1e-5)
+    assert angle_diff(T(.1), T(.2 - np.pi * 2)) == approx(T(-.1), rel=1e-5)
+
+    assert angle_diff(T(.2), T(.1)) == approx(T(.1))
+    assert angle_diff(T(.2), T(.1 - np.pi * 2)) == approx(T(.1), rel=1e-5)
+    assert angle_diff(T(.2), T(.1 + np.pi * 2)) == approx(T(.1), rel=1e-5)
+
+    # Test that full 2pi rotations don't matter for 1st argument
+    assert angle_diff(T(.1 + np.pi * 2), T(.2)) == approx(T(-.1), rel=1e-5)
+    assert angle_diff(T(.1 - np.pi * 2), T(.2)) == approx(T(-.1), rel=1e-5)
+    assert angle_diff(T(.2 + np.pi * 2), T(.1)) == approx(T(.1), rel=1e-5)
+    assert angle_diff(T(.2 - np.pi * 2), T(.1)) == approx(T(.1), rel=1e-5)
 
 
 def test_mse_trig():

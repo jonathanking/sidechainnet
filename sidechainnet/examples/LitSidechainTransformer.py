@@ -6,7 +6,7 @@ import os
 import numpy as np
 import torch
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
-from sidechainnet.examples.losses import angle_mae, angle_mse, angle_acc
+from sidechainnet.examples.losses import angle_mse, angle_diff
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
 from sidechainnet.structure.structure import inverse_trig_transform
 from sidechainnet.utils.openmm import OpenMMEnergyH
@@ -131,6 +131,7 @@ class LitSidechainTransformer(pl.LightningModule):
         self.ff2 = torch.nn.Linear(d_in, d_out)
         self.output_activation = torch.nn.Tanh()
 
+        # Initialize last projection bias s.t. model starts out predicting the mean
         if angle_means is not None:
             self._init_parameters()
 
@@ -198,7 +199,9 @@ class LitSidechainTransformer(pl.LightningModule):
                 opt,
                 patience=self.hparams.opt_patience,
                 verbose=True,
-                threshold=self.hparams.opt_min_delta)
+                threshold=self.hparams.opt_min_delta,
+                mode='min'
+                if 'acc' not in self.hparams.opt_lr_scheduling_metric else 'max')
 
         d = {"optimizer": opt}
         if sch is not None:
@@ -277,10 +280,10 @@ class LitSidechainTransformer(pl.LightningModule):
         loss_dict = self._get_losses(batch,
                                      sc_angs_true,
                                      sc_angs_pred,
-                                     do_struct=batch_idx == 1 and dataloader_idx == 0,
+                                     do_struct=batch_idx == 0 and dataloader_idx == 0,
                                      split='valid')
 
-        name = f"losses/valid/{self.hparams.dataloader_name_mapping[dataloader_idx]}/rmse"
+        name = f"losses/valid/{self.hparams.dataloader_name_mapping[dataloader_idx]}_rmse"
         self.log(name,
                  torch.sqrt(loss_dict['mse']),
                  on_step=False,
@@ -309,7 +312,11 @@ class LitSidechainTransformer(pl.LightningModule):
                  on_epoch=True)
         self._log_angle_metrics(loss_dict, 'test')
 
-    def _compute_angle_metrics(self, sc_angs_true, sc_angs_pred, loss_dict):
+    def _compute_angle_metrics(self,
+                               sc_angs_true,
+                               sc_angs_pred,
+                               loss_dict,
+                               acc_tol=np.deg2rad(20)):
         """Compute MAE(X1-5) and accuracy (correct within 20 deg).
 
         Args:
@@ -321,30 +328,52 @@ class LitSidechainTransformer(pl.LightningModule):
             loss_dict (dict): Updated dictionary containing new keys MAE_X1...ACC.
         """
         # Conver sin/cos values into radians
-        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
-        sc_angs_true_untransformed = inverse_trig_transform(sc_angs_true, n_angles=6)
-        # TODO completely vectorize?
-        for angle_idx in range(6, 12):
-            angle_name = ANGLE_IDX_TO_NAME_MAP[angle_idx]
-            angle_idx -= 6  # Now we look at the local index, which is shifted (sc-only)
-            mae = angle_mae(sc_angs_true_untransformed[:, :, angle_idx],
-                            sc_angs_pred_untransformed[:, :, angle_idx]).detach()
-            loss_dict[f"{angle_name}_mae_rad"] = mae
-            loss_dict[f"{angle_name}_mae_deg"] = torch.rad2deg(mae)
-            loss_dict[f"{angle_name}_acc"] = angle_acc(
-                sc_angs_true_untransformed[:, :, angle_idx],
-                sc_angs_pred_untransformed[:, :, angle_idx]).detach()
+        sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred.detach(), n_angles=6)
+        sc_angs_true_rad = inverse_trig_transform(sc_angs_true.detach(), n_angles=6)
+
+        # Absolue Error Only (contains nans)
+        abs_error = torch.abs(angle_diff(sc_angs_true_rad, sc_angs_pred_rad))
+
+        loss_dict['angle_metrics'] = {}
+
+        # Compute MAE by angle; Collapse sequence dimension and batch dimension
+        mae_by_angle = torch.nanmean(abs_error, dim=1).mean(dim=0)
+        assert len(mae_by_angle) == 6, "MAE by angle should have length 6."
+        for i in range(6):
+            angle_name_idx = i + 6
+            angle_name = ANGLE_IDX_TO_NAME_MAP[angle_name_idx]
+            cur_mae = mae_by_angle[i]
+            if torch.isnan(cur_mae):
+                continue
+            loss_dict["angle_metrics"][f"{angle_name}_mae_rad"] = cur_mae
+            loss_dict["angle_metrics"][f"{angle_name}_mae_deg"] = torch.rad2deg(cur_mae)
+
+        # Compute angles within tolerance (contains nans)
+        correct_angle_preds = abs_error < acc_tol
+
+        # An entire residue is correct if the residue has >= 1 predicted angles
+        # and all of those angles are correct. When computing correctness, we allow nans.
+        res_is_predicted = ~torch.isnan(abs_error).all(dim=-1)  # Avoids all-nan rows
+        res_is_correct = torch.logical_or(correct_angle_preds,
+                                          torch.isnan(abs_error)).all(dim=-1)
+        res_is_predicted_and_correct = torch.logical_and(res_is_predicted, res_is_correct)
+        accuracy = res_is_predicted_and_correct.sum() / res_is_predicted.sum()
+
+        loss_dict["angle_metrics"]["acc"] = accuracy
+
+        # Compute Residue-Independent Accuracy (RIA) which evaluates each angle indp.
+        ria = torch.nansum(correct_angle_preds) / torch.isfinite(
+            correct_angle_preds).sum()
+        loss_dict['angle_metrics']['ria'] = ria
+
         return loss_dict
 
     def _log_angle_metrics(self, loss_dict, split, dataloader_name=""):
-        dl_name_str = dataloader_name + "/" if dataloader_name else ""
-        keys = []
-        for angle_idx in range(6, 12):
-            keys.append(ANGLE_IDX_TO_NAME_MAP[angle_idx] + "_mae_rad")
-            keys.append(ANGLE_IDX_TO_NAME_MAP[angle_idx] + "_mae_deg")
-            keys.append(ANGLE_IDX_TO_NAME_MAP[angle_idx] + "_acc")
+        dl_name_str = dataloader_name + "_" if dataloader_name else ""
+
         angle_metrics_dict = {
-            f"metrics/{split}/{dl_name_str}{k}": loss_dict[k] for k in keys
+            f"metrics/{split}/{dl_name_str}{k}": loss_dict['angle_metrics'][k]
+            for k in loss_dict['angle_metrics'].keys()
         }
         self.log_dict(angle_metrics_dict,
                       on_epoch=True,
@@ -352,9 +381,9 @@ class LitSidechainTransformer(pl.LightningModule):
                       add_dataloader_idx=False)
 
     def _generate_structure_viz(self, batch, sc_angs_pred, split):
-        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred, n_angles=6)
         p = copy.deepcopy(batch[0])
-        p.angles[:, 6:] = sc_angs_pred_untransformed[0, 0:len(p)].detach().cpu().numpy()
+        p.angles[:, 6:] = sc_angs_pred_rad[0, 0:len(p)].detach().cpu().numpy()
         p.numpy()
         p.build_coords_from_angles()  # Make sure the coordinates saved to PDB are updated
         pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_pred.pdb")
@@ -396,9 +425,9 @@ class LitSidechainTransformer(pl.LightningModule):
                            mask="".join(["+" if x else "-" for x in m]))
             proteins.append(p)
         loss_total = 0
-        sc_angs_pred_untransformed = inverse_trig_transform(sc_angs_pred, n_angles=6)
+        sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred, n_angles=6)
         loss_fn = OpenMMEnergyH()
-        for p, sca in zip(proteins, sc_angs_pred_untransformed):
+        for p, sca in zip(proteins, sc_angs_pred_rad):
             # print(p.mask)
             # print(p, end=" ")
             # Fill in protein obj with predicted angles instead of true angles
@@ -462,7 +491,7 @@ class LitSidechainTransformer(pl.LightningModule):
 
 class LitSCNDataModule(pl.LightningDataModule):
 
-    def __init__(self, scn_data_dict, val_dataloader_target='valid-10'):
+    def __init__(self, scn_data_dict, val_dataloader_target='V50'):
         super().__init__()
         self.scn_data_dict = scn_data_dict
         self.val_dataloader_idx_to_name = {}
@@ -482,8 +511,9 @@ class LitSCNDataModule(pl.LightningDataModule):
         i = 0
         for key in self.scn_data_dict.keys():
             if "valid" in key:
+                renamed_key = key.replace('valid-', 'V')
                 vkeys.append(key)
-                self.val_dataloader_idx_to_name[i] = key
+                self.val_dataloader_idx_to_name[i] = renamed_key
                 i += 1
 
         # Set target validation set

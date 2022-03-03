@@ -120,7 +120,7 @@ def create_parser():
                           " Decrease learning rate after Validation loss plateaus.")
     training.add_argument('--opt_patience',
                           type=int,
-                          default=5,
+                          default=10,
                           help="Patience for LR or chkpt routines.")
     training.add_argument('--opt_min_delta',
                           type=float,
@@ -137,11 +137,10 @@ def create_parser():
                           default=10_000,
                           help="Number of warmup train steps when using lr-scheduling.")
     training.add_argument('--opt_lr_scheduling_metric',
-                          type=str,
-                          default=None,
-                          help="Metric to use for early stopping, chkpts, etc. Def: "
-                          "'losses/valid/valid-10/{loss_name}'.")
-    # TODO add opt_lr_scheduling_metric
+                          choices=['val_loss', 'val_acc'],
+                          default='val_acc',
+                          help="Metric to use for early stopping, chkpts, etc. Choose "
+                          "validation loss or accuracy.")
     training.add_argument("--loss_combination_weight",
                           type=float,
                           default=0.5,
@@ -231,10 +230,13 @@ def main():
     # Update args with dataset information
     dict_args['angle_means'] = data_module.get_train_angle_means(6, None)
     dict_args['dataloader_name_mapping'] = data_module.val_dataloader_idx_to_name
-    if dict_args['opt_lr_scheduling_metric'] is None:
+    if dict_args['opt_lr_scheduling_metric'] == 'val_acc':
+        target = 'acc'
+        target_monitor_loss = f'metrics/valid/{data_module.val_dataloader_target}_{target}'
+    else:
         target = 'rmse' if args.loss_name == 'mse' else args.loss_name
-        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}/{target}'
-        dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
+        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{target}'
+    dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
 
     # Prepare model
     if args.model == "scn-trans-enc":
@@ -266,7 +268,7 @@ def main():
                                 patience=args.opt_patience,
                                 verbose=True,
                                 check_finite=True,
-                                mode='min'))
+                                mode='min' if 'acc' not in target_monitor_loss else 'max'))
     my_callbacks.append(callbacks.LearningRateMonitor(logging_interval='step'))
     my_callbacks.append(
         callbacks.ModelCheckpoint(dirpath=checkpoint_dir,

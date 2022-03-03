@@ -27,10 +27,6 @@ def test_make_unmodified_seq_entry():
     assert result == "CYS CYS CYM CYS CYS"
 
 
-def test_modified_residues_are_reported_in_scn_entry_ums():
-    pnids = ['20#2FZT_1_A', "70#2E87_1_A", "20#3S0X_1_A", '70#2E87_1_A']
-
-
 def test_generate_all():
     from sidechainnet.create import generate_all
     generate_all(num_cores=8, regenerate_scdata=True)

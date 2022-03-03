@@ -121,30 +121,18 @@ def angle_mse(true, pred):
 
 
 def angle_mae(true, pred):
-    """Compute Mean Absolute Error between two angle tensors (radians) padded with nan."""
-    ang_non_nans = ~true.isnan()
-    error = true[ang_non_nans] - pred[ang_non_nans]
+    """Compute flattenned MeanAbsoluteError between 2 angle(Rad) tensors with nan pads."""
+    absolute_error = torch.abs(angle_diff(true, pred))
+    return torch.nanmean(absolute_error)
+
+
+def angle_diff(true, pred):
+    """Compute signed distance between two angle tensors (does not change shape)."""
+    error = true - pred
     # Correct for out of bounds
     error[error > torch.pi] -= 2 * torch.pi
     error[error < -torch.pi] += 2 * torch.pi
-    return torch.mean(torch.abs(error))
-
-# TODO Compute ae vector completely and use this to compute mae and acc
-# TODO Fix definition to be all angles for a residue
-def angle_acc(true, pred, tol=np.deg2rad(20)):
-    """Compute Mean Absolute Error between two angle tensors (radians) padded with nan."""
-    ang_non_nans = ~true.isnan()
-    error = true[ang_non_nans] - pred[ang_non_nans]
-    # Correct for out of bounds
-    error[error > torch.pi] -= 2 * torch.pi
-    error[error < -torch.pi] += 2 * torch.pi
-
-    error = torch.abs(error)
-
-    correct = torch.sum(error < tol)
-    total = len(error)
-
-    return correct / total
+    return error
 
 
 def _tile(a, dim, n_tile):
