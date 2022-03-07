@@ -22,6 +22,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
     When downsample is a float, the dataset is effectively downsampled by that fraction.
     i.e. if downsample = 0.3, then about 30% of the dataset is used.
     """
+
     # TODO add support to automatically yield largest batch first for debugging/alloc
 
     def __init__(self,
@@ -46,7 +47,6 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
 
         self._init_histogram_bins(n_bins, equalization_method)
 
-
     def _init_histogram_bins(self, n_bins, equalize='n_res'):
         assert equalize in [
             'n_res', 'n_proteins'
@@ -56,6 +56,8 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         # TODO Implement MAX_SEQ_LEN somewhere
         # Compute length-based histogram bins and probabilities
         self.lens = [len(p) for p in self.dataset]  # Assumes max seq len already applied
+        assert all(x <= y for x, y in zip(self.lens, self.lens[1:])), (
+            "Data must be in ascending order.")
         total_res_len = sum(self.lens)
         self.bin_map = {}
         self.bin_avg_len = {}
