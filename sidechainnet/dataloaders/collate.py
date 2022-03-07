@@ -72,10 +72,6 @@ def prepare_dataloaders(data,
                                trim_edges=True,
                                sort_by_length='ascending')
 
-    if dynamic_batching:
-        print(f"Approximating {batch_size * train_dataset.lengths.mean():.0f}"
-              " residues/batch.")
-
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         num_workers=num_workers,
@@ -83,8 +79,7 @@ def prepare_dataloaders(data,
         batch_sampler=SimilarLengthBatchSampler(
             train_dataset,
             batch_size,
-            dynamic_batch=batch_size *
-            train_dataset.lengths.mean() if dynamic_batching else None,
+            dynamic_batching=dynamic_batching,
             optimize_batch_for_cpus=optimize_for_cpu_parallelism,
             shuffle=shuffle))
     train_eval_loader = torch.utils.data.DataLoader(
@@ -94,10 +89,14 @@ def prepare_dataloaders(data,
         batch_sampler=SimilarLengthBatchSampler(
             train_dataset,
             batch_size,
-            dynamic_batch=None,
+            dynamic_batching=dynamic_batching,
             optimize_batch_for_cpus=optimize_for_cpu_parallelism,
             downsample=train_eval_downsample,
             shuffle=shuffle))
+
+    if dynamic_batching:
+        print(f"Approximating {batch_size * train_dataset.lengths.median():.0f}"
+              " residues/batch.")
 
     valid_loaders = {}
     for vsplit in VALID_SPLITS:

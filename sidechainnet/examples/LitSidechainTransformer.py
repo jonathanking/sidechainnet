@@ -231,7 +231,6 @@ class LitSidechainTransformer(pl.LightningModule):
 
         # Stack model inputs into a single tensor
         model_in = torch.cat([bb_angs, batch.secondary, batch.evolutionary], dim=-1)
-        # print("prepare", model_in.device, sc_angs_true.device)
 
         return model_in.to(self.device), sc_angs_true.to(self.device)
 

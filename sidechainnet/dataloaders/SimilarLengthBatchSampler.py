@@ -1,14 +1,15 @@
 """A class for generating protein sequence/structure batches of similar length."""
 
-import pprint
+import random
 import numpy as np
+import scipy
 import torch
 import torch.utils
-from sidechainnet.utils.download import MAX_SEQ_LEN
 
 
 class SimilarLengthBatchSampler(torch.utils.data.Sampler):
-    """
+    """Samples a protein dataset by length.
+
     When turned into an iterator, this Sampler is designed to yield batches
     of indices at a time. The indices correspond to sequences in the dataset,
     grouped by sequence length. This has the effect of yielding batches where
@@ -21,114 +22,153 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
     When downsample is a float, the dataset is effectively downsampled by that fraction.
     i.e. if downsample = 0.3, then about 30% of the dataset is used.
     """
+    # TODO add support to automatically yield largest batch first for debugging/alloc
 
     def __init__(self,
                  dataset,
                  batch_size,
-                 dynamic_batch,
+                 dynamic_batching,
                  optimize_batch_for_cpus,
-                 bins='auto',
+                 n_bins=30,
                  downsample=None,
                  use_largest_bin=False,
-                 repeat_train=None,
                  shuffle=True):
         self.dataset = dataset
         self.batch_size = batch_size
-        self.dynamic_batch = dynamic_batch
+        self.dynamic_batching = dynamic_batching
         self.optimize_batch_for_cpus = optimize_batch_for_cpus
         self.cpu_count = torch.multiprocessing.cpu_count()
         self.downsample = downsample
         self.use_largest_bin = use_largest_bin
-        self.repeat_train = repeat_train if repeat_train else 1
         self.shuffle = shuffle
 
-        self._init_histogram_bins(bins)
+        equalization_method = 'n_res' if dynamic_batching else 'n_proteins'
 
-    def _init_histogram_bins(self, bins):
+        self._init_histogram_bins(n_bins, equalization_method)
+
+
+    def _init_histogram_bins(self, n_bins, equalize='n_res'):
+        assert equalize in [
+            'n_res', 'n_proteins'
+        ], "Choose to either equalize the number of residues or proteins per bin."
         # TODO Implement for data that is either ascending or desc. Or require one.
         # TODO Currently requires a dataset sorted by length ascending
+        # TODO Implement MAX_SEQ_LEN somewhere
         # Compute length-based histogram bins and probabilities
-        self.lens = []
-        for s in (p.seq for p in self.dataset):
-            self.lens.append(len(s))
-            # TODO Implement MAX_SEQ_LEN
-            # if len(s) <= MAX_SEQ_LEN:
-            #     self.lens.append(len(s))
-            # else:
-            #     self.lens.append(MAX_SEQ_LEN)
-
-        self.hist_counts, self.hist_bins = np.histogram(self.lens, bins=bins)
-        # Make each bin define the rightmost value in each bin, ie '( , ]'.
-        self.hist_bins = self.hist_bins[1:]
-        self.bin_probs = self.hist_counts / self.hist_counts.sum()
+        self.lens = [len(p) for p in self.dataset]  # Assumes max seq len already applied
+        total_res_len = sum(self.lens)
         self.bin_map = {}
+        self.bin_avg_len = {}
+        self.median_len = np.median(self.lens)
 
-        # Compute a mapping from bin number to a list of dataset indices, i.e.:
-        #                        { 0: [0, 1, ... 67],
-        #                          1: [68, 69, ... 98],
-        #                          ...
-        #                          }
-        # In the batch generation procedure, a sequence length bin is drawn first,
-        # then proteins are selected at random from the list of indices. Each bin has
-        # proteins of similar length.
-        seq_i = 0
-        bin_j = 0
-        while seq_i < len(self.dataset):
-            if self.lens[seq_i] <= self.hist_bins[bin_j]:
-                try:
-                    self.bin_map[bin_j].append(seq_i)
-                except KeyError:
-                    self.bin_map[bin_j] = [seq_i]
-                seq_i += 1
-            else:
-                bin_j += 1
+        def record_bin(bin_idx, ptn_idx):
+            try:
+                self.bin_map[bin_idx].append(ptn_idx)
+            except KeyError:
+                self.bin_map[bin_idx] = [ptn_idx]
+
+        cur_bin = 0
+        cur_bin_sum = 0
+
+        if equalize == 'n_res':
+            for protein_idx, protein_length in enumerate(self.lens):
+                if cur_bin_sum > total_res_len // n_bins:
+                    self.bin_avg_len[cur_bin] = cur_bin_sum // len(self.bin_map[cur_bin])
+                    cur_bin += 1
+                    cur_bin_sum = 0
+
+                record_bin(cur_bin, protein_idx)
+                cur_bin_sum += protein_length
+            self.bin_avg_len[cur_bin] = cur_bin_sum // len(self.bin_map[cur_bin])
+
+        elif equalize == 'n_proteins':
+            ranked = scipy.stats.rankdata(self.lens)
+            percentile = ranked / len(self.lens) * 100
+            bins_percentile = np.linspace(0, 100, num=n_bins)
+            data_binned_indices = np.digitize(percentile, bins_percentile)
+            for protein_idx, protein_bin in enumerate(data_binned_indices):
+                record_bin(protein_bin, protein_idx)
 
     def __len__(self):
-        # If batches are dynamically sized to contain the same number of
-        # residues then the approximate number of batches is the total number
-        # of residues in the dataset divided by the size of the dynamic batch.
 
-        if self.dynamic_batch:
-            numerator = sum(self.lens) * self.repeat_train
-            divisor = self.dynamic_batch
+        # Since in either case we use simple chunking generators, we can count the number
+        # of batches each will yield. Dynamic batching simply changes the size yielded
+        # from each generator.
+
+        if self.dynamic_batching:
+            batches = 0
+            target_num_res = self.median_len * self.batch_size
+            for bin_idx, ptn_list in self.bin_map.items():
+                effective_batch_size = int(target_num_res // self.bin_avg_len[bin_idx])
+                batches += np.ceil(len(ptn_list) / effective_batch_size)
+            return int(batches)
+
         else:
-            numerator = len(self.dataset) * self.repeat_train
-            divisor = self.batch_size
-
-        if self.downsample:
-            numerator *= self.downsample
-
-        return int(np.ceil(numerator / divisor))
+            batches = 0
+            for bin_idx, ptn_list in self.bin_map.items():
+                batches += np.ceil(len(ptn_list) / self.batch_size)
+            return int(batches)
 
     def __iter__(self):
+        """Yield indices representing protein batches intelligently by length."""
+
+        def bin_generator(some_list, n):
+            """Create a chunking generator to yield fixed-size batches from a bin list."""
+            for i in range(0, len(some_list), n):
+                yield some_list[i:i + n]
+
+        def make_new_mapping_for_epoch():
+            """Create new generators for batching this epoch, shuffling if requested."""
+            cur_bin_mapping = {}
+            for bin, ptn_list in self.bin_map.items():
+                # Set effective batch size
+                if self.dynamic_batching:
+                    target_num_res = self.median_len * self.batch_size
+                    effective_batch_size = int(target_num_res // self.bin_avg_len[bin])
+                else:
+                    effective_batch_size = self.batch_size
+                # Shuffle for this epoch if requested
+                if self.shuffle:
+                    random.shuffle(ptn_list)
+                # Initialize generators for each bin
+                cur_bin_mapping[bin] = bin_generator(ptn_list, effective_batch_size)
+            return cur_bin_mapping
 
         def batch_generator():
-            i = 0
-            while i < len(self):
-                if not self.shuffle:
-                    yield np.arange(
-                        self.batch_size * i,
-                        max(self.batch_size * i + self.batch_size, len(self.dataset)))
-                    i += 1
+            """Create main batch generator which accesses smaller bin generators."""
+            # Re-initialize generators per bin
+            bin_generators = make_new_mapping_for_epoch()
+            # Select bin, deleting its reference if the generator has run out
+            while len(bin_generators) > 0:
+                if self.shuffle:
+                    selected_bin = np.random.choice(list(bin_generators.keys()))
+                else:
+                    selected_bin = list(bin_generators.keys())[0]
+                try:
+                    yield next(bin_generators[selected_bin])
+                except StopIteration:
+                    del bin_generators[selected_bin]
                     continue
 
-                if self.use_largest_bin:
-                    bin = len(self.hist_bins) - 1
-                else:
-                    bin = np.random.choice(range(len(self.hist_bins)), p=self.bin_probs)
-                if self.dynamic_batch:
-                    # Make the batch size a multiple of the number of available
-                    # CPUs for fast DRMSD loss computation
-                    if self.optimize_batch_for_cpus:
-                        largest_possible = int(self.dynamic_batch / self.hist_bins[bin])
-                        this_batch_size = max(
-                            1, largest_possible - (largest_possible % self.cpu_count))
-                    else:
-                        this_batch_size = max(
-                            1, int(self.dynamic_batch / self.hist_bins[bin]))
-                else:
-                    this_batch_size = self.batch_size
-                yield np.random.choice(self.bin_map[bin], size=this_batch_size)
-                i += 1
+        # TODO add support for batch sizes divisible by cpu count
+        # if self.optimize_batch_for_cpus:
+        #     largest_possible = int(self.dynamic_batching / self.hist_bins[bin])
+        #     this_batch_size = max(1,
+        #         largest_possible - (largest_possible % self.cpu_count))
 
         return batch_generator()
+
+
+if __name__ == '__main__':
+    import sidechainnet as scn
+    d = scn.load(12, 30, scn_dataset=True)
+    samp = SimilarLengthBatchSampler(d,
+                                     12,
+                                     dynamic_batching=False,
+                                     optimize_batch_for_cpus=False,
+                                     equalize='n_proteins')
+    indices = []
+    lens = []
+    for b in iter(samp):
+        print(b)
+        indices.extend(b)
