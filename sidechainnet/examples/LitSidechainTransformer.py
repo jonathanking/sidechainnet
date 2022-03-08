@@ -135,14 +135,18 @@ class LitSidechainTransformer(pl.LightningModule):
         self.ff2 = torch.nn.Linear(d_in, d_out)
         self.output_activation = torch.nn.Tanh()
 
-        # Initialize last projection bias s.t. model starts out predicting the mean
+        # Initialize model parameters
+        self._init_parameters()
         if angle_means is not None:
-            self._init_parameters()
+            self._init_angle_mean_projection()
 
     def _init_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
                 torch.nn.init.xavier_uniform_(p)
+
+    def _init_angle_mean_projection(self):
+        """Initialize last projection bias s.t. model starts out predicting the mean."""
         angle_means = np.arctanh(self.hparams.angle_means)
         self.ff2.bias = torch.nn.Parameter(angle_means)
         torch.nn.init.zeros_(self.ff2.weight)
