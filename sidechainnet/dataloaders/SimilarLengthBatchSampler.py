@@ -42,6 +42,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         self.downsample = downsample
         self.use_largest_bin = use_largest_bin
         self.shuffle = shuffle
+        self._original_shuffle_method = shuffle
 
         equalization_method = 'n_res' if dynamic_batching else 'n_proteins'
 
@@ -74,7 +75,8 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
 
         if equalize == 'n_res':
             for protein_idx, protein_length in enumerate(self.lens):
-                if cur_bin_sum > total_res_len // n_bins:
+                # We're careful not to accidentally make an extra bin for last few items
+                if (cur_bin != n_bins - 1 and cur_bin_sum > total_res_len // n_bins):
                     self.bin_avg_len[cur_bin] = cur_bin_sum // len(self.bin_map[cur_bin])
                     cur_bin += 1
                     cur_bin_sum = 0
@@ -87,7 +89,7 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
             ranked = scipy.stats.rankdata(self.lens)
             percentile = ranked / len(self.lens) * 100
             bins_percentile = np.linspace(0, 100, num=n_bins)
-            data_binned_indices = np.digitize(percentile, bins_percentile)
+            data_binned_indices = np.digitize(percentile, bins_percentile) - 1  # offset
             for protein_idx, protein_bin in enumerate(data_binned_indices):
                 record_bin(protein_bin, protein_idx)
 
@@ -132,6 +134,8 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                 # Shuffle for this epoch if requested
                 if self.shuffle:
                     random.shuffle(ptn_list)
+                if self.descending:
+                    ptn_list = ptn_list[::-1]
                 # Initialize generators for each bin
                 cur_bin_mapping[bin] = bin_generator(ptn_list, effective_batch_size)
             return cur_bin_mapping
@@ -152,25 +156,65 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                     del bin_generators[selected_bin]
                     continue
 
+        def desc_batch_generator():
+            """Yield largest proteins first."""
+            # Re-initialize generators per bin
+            bin_generators = make_new_mapping_for_epoch()
+            # Select bin, deleting its reference if the generator has run out
+            while len(bin_generators) > 0:
+                selected_bin = list(bin_generators.keys())[-1]
+                try:
+                    yield next(bin_generators[selected_bin])
+                except StopIteration:
+                    del bin_generators[selected_bin]
+                    continue
+
         # TODO add support for batch sizes divisible by cpu count
         # if self.optimize_batch_for_cpus:
         #     largest_possible = int(self.dynamic_batching / self.hist_bins[bin])
         #     this_batch_size = max(1,
         #         largest_possible - (largest_possible % self.cpu_count))
+        if self.descending:
+            return desc_batch_generator()
+        else:
+            return batch_generator()
 
-        return batch_generator()
+    def make_descending(self):
+        """Modify sampling method for future epochs to yield largest proteins first."""
+        self.descending = True
+        self.shuffle = False
+
+    def turn_off_descending(self):
+        """Revert sampling to method before self.make_descending() was called."""
+        self.descending = False
+        self.shuffle = self._original_shuffle_method
 
 
 if __name__ == '__main__':
     import sidechainnet as scn
     d = scn.load(12, 30, scn_dataset=True)
     samp = SimilarLengthBatchSampler(d,
-                                     12,
-                                     dynamic_batching=False,
+                                     24,
+                                     dynamic_batching=True,
                                      optimize_batch_for_cpus=False,
-                                     equalize='n_proteins')
+                                     shuffle=False)
+
+    samp.make_descending()
     indices = []
     lens = []
+    i = 0
     for b in iter(samp):
         print(b)
         indices.extend(b)
+        i += 1
+        if i == 4:
+            break
+    print('test')
+    samp.turn_off_descending()
+    i = 0
+    for b in iter(samp):
+        print(b)
+        indices.extend(b)
+        i += 1
+        if i == 4:
+            break

@@ -95,7 +95,7 @@ def prepare_dataloaders(data,
             shuffle=shuffle))
 
     if dynamic_batching:
-        print(f"Approximating {batch_size * train_dataset.lengths.median():.0f}"
+        print(f"Approximating {batch_size * np.median(train_dataset.lengths):.0f}"
               " residues/batch.")
 
     valid_loaders = {}

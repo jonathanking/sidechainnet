@@ -503,6 +503,12 @@ class LitSCNDataModule(pl.LightningDataModule):
         means = scn.structure.trig_transform(means).view(1, 1, n_angles * 2)
 
     def train_dataloader(self):
+        self.scn_data_dict['train'].batch_sampler.turn_off_descending()
+        return self.scn_data_dict['train']
+
+    def get_descending_size_train_dataloader(self):
+        """Return train dataloader with a smpler that yields largest proteins first."""
+        self.scn_data_dict['train'].batch_sampler.make_descending()
         return self.scn_data_dict['train']
 
     def val_dataloader(self):
