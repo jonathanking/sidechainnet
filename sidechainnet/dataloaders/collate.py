@@ -40,7 +40,9 @@ def prepare_dataloaders(data,
                         dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
                         train_eval_downsample=0.1,
-                        shuffle=True):
+                        shuffle=True,
+                        overfit_batches=0,
+                        overfit_batches_small=True):
     """Return dataloaders for model training according to user specifications.
 
     Using the pre-processed data, stored in a nested Python dictionary, this
@@ -61,12 +63,12 @@ def prepare_dataloaders(data,
     if collate_fn is None:
         collate_fn = protein_batch_collate_fn
 
-    # TODO Default to descending to fail early
-
     train_dataset = SCNDataset(data['train'],
                                split_name='train',
                                trim_edges=True,
-                               sort_by_length='ascending')
+                               sort_by_length='ascending',
+                               overfit_batches=overfit_batches,
+                               overfit_batches_small=overfit_batches_small)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,

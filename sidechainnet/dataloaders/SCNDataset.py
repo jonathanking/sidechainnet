@@ -26,7 +26,9 @@ class SCNDataset(torch.utils.data.Dataset):
                  data,
                  split_name="",
                  trim_edges=False,
-                 sort_by_length='ascending') -> None:
+                 sort_by_length='ascending',
+                 overfit_batches=0,
+                 overfit_batches_small=True) -> None:
         """Initialize a SCNDataset from underlying SidechainNet formatted dictionary."""
         super().__init__()
         # Determine available datasplits
@@ -58,10 +60,16 @@ class SCNDataset(torch.utils.data.Dataset):
         # Create SCNProtein objects and add to data structure
         for split in self.splits:
             d = data[split]
+            count = 0
             for c, a, s, u, m, e, n, r, z, i in zip(d['crd'], d['ang'], d['seq'],
                                                     d['ums'], d['msk'], d['evo'],
                                                     d['sec'], d['res'], d['mod'],
                                                     d['ids']):
+                # This portion is simply to skip over very small proteins when ovrftng
+                if (not overfit_batches_small and overfit_batches and split == 'train' and
+                        count < len(d['seq']) // 2):
+                    count += 1
+                    continue
                 try:
                     self.split_to_ids[split].append(i)
                 except KeyError:

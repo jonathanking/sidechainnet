@@ -152,6 +152,16 @@ def create_parser():
                           default=0.5,
                           help="When combining losses, use weight w where "
                           "loss = w * LossA + (1-w) * LossB.")
+    training.add_argument("--overfit_batches_small",
+                          type=my_bool,
+                          default="True",
+                          help="If true, overfit the smallest batch. Else, start with "
+                          "something larger.")
+    training.add_argument("--early_stopping",
+                          type=my_bool,
+                          default="True",
+                          help="If true, use early stopping callback.")
+
 
     # Callbacks
     callback_args = parser.add_argument_group("Callbacks")
@@ -272,14 +282,15 @@ def main():
 
     # Make callbacks
     my_callbacks = []
-    my_callbacks.append(
-        callbacks.EarlyStopping(
-            monitor=target_monitor_loss,
-            min_delta=args.opt_min_delta,
-            patience=args.opt_patience,
-            verbose=True,
-            check_finite=True,
-            mode='min' if 'acc' not in target_monitor_loss else 'max'))
+    if args.early_stopping:
+        my_callbacks.append(
+            callbacks.EarlyStopping(
+                monitor=target_monitor_loss,
+                min_delta=args.opt_min_delta,
+                patience=args.opt_patience,
+                verbose=True,
+                check_finite=True,
+                mode='min' if 'acc' not in target_monitor_loss else 'max'))
     my_callbacks.append(callbacks.LearningRateMonitor(logging_interval='step'))
     if args.enable_checkpointing:
         my_callbacks.append(
