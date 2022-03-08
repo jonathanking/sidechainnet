@@ -1,66 +1,79 @@
-import numpy as np
+"""Learning rate scheduling for Transformers."""
 
 
-class ScheduledOptim():
-    """
+class NoamOpt:
+    """NoamOpt warmup scheduler from Alexander Rush's 'The Annotated Transformer'.
+
     A learning rate scheduler that implements the scheduling used in the
-    Attenion is All You Need paper. Work extends on original implemention by
-    github user jadore801120.
-    https://github.com/jadore801120/attention-is-all-you-need-pytorch
+    Attenion is All You Need paper.
+
+    Implementation from https://nlp.seas.harvard.edu/2018/04/03/attention.html#optimizer.
+    State dict from https://stackoverflow.com/a/66696341/2780645.
+
+    @inproceedings{opennmt,
+        author    = {Guillaume Klein and
+                    Yoon Kim and
+                    Yuntian Deng and
+                    Jean Senellart and
+                    Alexander M. Rush},
+        title     = {OpenNMT: Open-Source Toolkit for Neural Machine Translation},
+        booktitle = {Proc. ACL},
+        year      = {2017},
+        url       = {https://doi.org/10.18653/v1/P17-4012},
+        doi       = {10.18653/v1/P17-4012}
+        }
     """
 
-    def __init__(self, optimizer, d_model, n_warmup_steps):
-        self._optimizer = optimizer
-        self.n_warmup_steps = n_warmup_steps
-        self.n_current_steps = 0
-        self.init_lr = np.power(d_model, -0.5)
+    def __init__(self, model_size, warmup, optimizer, factor=1):
+        self.optimizer = optimizer
+        self._step = 0
+        self.warmup = warmup
+        self.factor = factor
+        self.model_size = model_size  # Think char-level size of transformer (i.e. 256)
+        self._rate = 0
 
-    def step(self):
-        """
-        Update the base optimizer.
-        """
-        self._update_learning_rate()
-        self._optimizer.step()
-
-    def zero_grad(self):
-        """
-        Zero gradients.
-        """
-        self._optimizer.zero_grad()
-
-    def _get_lr_scale(self):
-        return np.min([
-            np.power(self.n_current_steps, -0.5),
-            np.power(self.n_warmup_steps, -1.5) * self.n_current_steps])
-
-    def _update_learning_rate(self):
-        """
-        Update learning rate per policy described in original paper.
-        Linear ramp-up, exponential decay.
-        """
-
-        self.n_current_steps += 1
-        lr = self.init_lr * self._get_lr_scale()
-        self.cur_lr = lr
-        for param_group in self._optimizer.param_groups:
-            param_group['lr'] = lr
-
-    def state_dict(self):
-        """
-        Returns a tuple of the relevant state information for saving this
-        optimizer.
-        """
-        return (self._optimizer.state_dict(), self.n_warmup_steps, self.n_current_steps, self.init_lr)
+    @property
+    def param_groups(self):
+        return self.optimizer.param_groups
 
     @property
     def state(self):
-        return self._optimizer.state_dict()
+        return self.state_dict()
 
-    def load_state_dict(self, d):
+    def step(self, closure=None):
+        """Update parameters and rate."""
+        self._step += 1
+        rate = self.rate()
+        for p in self.optimizer.param_groups:
+            p['lr'] = rate
+        self._rate = rate
+        self.optimizer.step(closure)
+
+    def rate(self, step=None):
+        """Implement `lrate` above."""
+        if step is None:
+            step = self._step
+        return self.factor * \
+            (self.model_size ** (-0.5) *
+             min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+    def zero_grad(self):
+        """Zero gradients."""
+        self.optimizer.zero_grad()
+
+    def state_dict(self):
+        """Return the state of the warmup scheduler as a :class:`dict`.
+
+        It contains an entry for every variable in self.__dict__ which
+        is not the optimizer.
         """
-        Loads the state information for a saved version of this optimizer.
+        return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
+
+    def load_state_dict(self, state_dict):
+        """Load the warmup scheduler's state.
+
+        Arguments:
+            state_dict (dict): warmup scheduler state. Should be an object returned
+                from a call to :meth:`state_dict`.
         """
-        self._optimizer.load_state_dict(d[0])
-        self.n_warmup_steps = d[1]
-        self.n_current_steps = d[2]
-        self.init_lr = d[3]
+        self.__dict__.update(state_dict)

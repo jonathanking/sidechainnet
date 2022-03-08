@@ -10,7 +10,7 @@ from sidechainnet.examples.losses import angle_mse, angle_diff
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
 from sidechainnet.structure.structure import inverse_trig_transform
 from sidechainnet.utils.openmm import OpenMMEnergyH
-from sidechainnet.examples.optim import ScheduledOptim
+from sidechainnet.examples.optim import NoamOpt
 
 import pytorch_lightning as pl
 
@@ -183,25 +183,43 @@ class LitSidechainTransformer(pl.LightningModule):
         Returns:
             dict: Pytorch Lightning dictionary with keys "optimizer" and "lr_scheduler".
         """
+        # Setup default optimizer construction values
+        if self.hparams.opt_lr_scheduling == "noam":
+            lr = 0
+            betas = (0.9, 0.98)
+            eps = 1e-9
+        else:
+            lr = self.hparams.opt_lr
+            betas = (0.9, 0.999)
+            eps = 1e-8
+
         # Prepare optimizer
         if self.hparams.opt_name == "adam":
             opt = torch.optim.Adam(filter(lambda x: x.requires_grad, self.parameters()),
-                                   lr=self.hparams.opt_lr,
+                                   lr=lr,
+                                   betas=betas,
+                                   eps=eps,
                                    weight_decay=self.hparams.opt_weight_decay)
         elif self.hparams.opt_name == "adamw":
             opt = torch.optim.AdamW(filter(lambda x: x.requires_grad, self.parameters()),
-                                    lr=self.hparams.opt_lr,
+                                    lr=lr,
+                                    betas=betas,
+                                    eps=eps,
                                     weight_decay=self.hparams.opt_weight_decay)
         elif self.hparams.opt_name == "sgd":
             opt = torch.optim.SGD(filter(lambda x: x.requires_grad, self.parameters()),
-                                  lr=self.hparams.opt_lr,
+                                  lr=lr,
+                                  betas=betas,
+                                  eps=eps,
                                   weight_decay=self.hparams.opt_weight_decay)
 
         # Prepare scheduler
         if self.hparams.opt_lr_scheduling == "noam":
-            opt = ScheduledOptim(opt, self.hparams.d_in, self.hparams.opt_n_warmup_steps)
+            opt = NoamOpt(model_size=self.hparams.d_in,
+                          warmup=self.hparams.opt_n_warmup_steps,
+                          optimizer=opt,
+                          factor=self.hparams.opt_noam_lr_factor)
             sch = None
-            # TODO: Use better warm up scheduler
         else:
             sch = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 opt,

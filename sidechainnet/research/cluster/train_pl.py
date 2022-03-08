@@ -147,6 +147,10 @@ def create_parser():
                           default='val_acc',
                           help="Metric to use for early stopping, chkpts, etc. Choose "
                           "validation loss or accuracy.")
+    training.add_argument('--opt_noam_lr_factor',
+                          type=float,
+                          default=1.,
+                          help="Scale for Noam Opt.")
     training.add_argument("--loss_combination_weight",
                           type=float,
                           default=0.5,
