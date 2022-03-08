@@ -4,6 +4,7 @@ import multiprocessing as mp
 
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as callbacks
+from pytorch_lightning.tuner.tuning import Tuner
 import sidechainnet as scn
 import torch
 import torch.utils.data
@@ -225,17 +226,17 @@ def main():
 
     # Load dataset
     data = scn.load(**dict_args, with_pytorch='dataloaders')
-    data_module = LitSCNDataModule(data)
+    data_module = LitSCNDataModule(data, batch_size=args.batch_size)
 
     # Update args with dataset information
     dict_args['angle_means'] = data_module.get_train_angle_means(6, None)
     dict_args['dataloader_name_mapping'] = data_module.val_dataloader_idx_to_name
     if dict_args['opt_lr_scheduling_metric'] == 'val_acc':
-        target = 'acc'
-        target_monitor_loss = f'metrics/valid/{data_module.val_dataloader_target}_{target}'
+        tgt = 'acc'
+        target_monitor_loss = f'metrics/valid/{data_module.val_dataloader_target}_{tgt}'
     else:
-        target = 'rmse' if args.loss_name == 'mse' else args.loss_name
-        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{target}'
+        tgt = 'rmse' if args.loss_name == 'mse' else args.loss_name
+        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{tgt}'
     dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
 
     # Prepare model
@@ -263,12 +264,13 @@ def main():
     # Make callbacks
     my_callbacks = []
     my_callbacks.append(
-        callbacks.EarlyStopping(monitor=target_monitor_loss,
-                                min_delta=args.opt_min_delta,
-                                patience=args.opt_patience,
-                                verbose=True,
-                                check_finite=True,
-                                mode='min' if 'acc' not in target_monitor_loss else 'max'))
+        callbacks.EarlyStopping(
+            monitor=target_monitor_loss,
+            min_delta=args.opt_min_delta,
+            patience=args.opt_patience,
+            verbose=True,
+            check_finite=True,
+            mode='min' if 'acc' not in target_monitor_loss else 'max'))
     my_callbacks.append(callbacks.LearningRateMonitor(logging_interval='step'))
     my_callbacks.append(
         callbacks.ModelCheckpoint(dirpath=checkpoint_dir,
@@ -283,11 +285,29 @@ def main():
         my_callbacks.append(
             callbacks.StochasticWeightAveraging(swa_epoch_start=args.swa_epoch_start))
 
-    # Begin Training
+    # Create a trainer
     trainer = pl.Trainer.from_argparse_args(argparse.Namespace(**dict_args),
                                             callbacks=my_callbacks)
 
-    trainer.tune(model)  # Look for largest batch size and optimal LR
+    # Look for largest batch size and optimal LR
+    tuner = Tuner(trainer)
+    data_module.set_train_dataloader_descending()
+    if dict_args['auto_scale_batch_size']:
+        tuner.scale_batch_size(
+            model,
+            datamodule=data_module,
+            mode='power',
+            init_val=1)
+    if dict_args["auto_lr_find"]:
+        lr_finder = tuner.lr_find(model, data_module.train_dataloader())
+        fig = lr_finder.plot(suggest=True)
+        fig.savefig(os.path.join(model.save_dir, 'lr_finder.png'))
+        wandb.save(os.path.join(model.save_dir, 'lr_finder.png'))
+        model.opt_lr = model.hparams.opt_lr = lr_finder.suggestion()
+        print('New learning rate:', model.opt_lr)
+        wandb.config.update({"opt_lr": model.opt_lr})
+
+    # Train the model
     trainer.fit(model, data_module)
     trainer.test(model, data_module)
 

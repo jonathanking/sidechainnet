@@ -103,7 +103,8 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
             batches = 0
             target_num_res = self.median_len * self.batch_size
             for bin_idx, ptn_list in self.bin_map.items():
-                effective_batch_size = int(target_num_res // self.bin_avg_len[bin_idx])
+                effective_batch_size = max(
+                    1, int(target_num_res // self.bin_avg_len[bin_idx]))
                 batches += np.ceil(len(ptn_list) / effective_batch_size)
             return int(batches)
 
@@ -128,7 +129,8 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
                 # Set effective batch size
                 if self.dynamic_batching:
                     target_num_res = self.median_len * self.batch_size
-                    effective_batch_size = int(target_num_res // self.bin_avg_len[bin])
+                    effective_batch_size = max(
+                        1, int(target_num_res // self.bin_avg_len[bin]))
                 else:
                     effective_batch_size = self.batch_size
                 # Shuffle for this epoch if requested

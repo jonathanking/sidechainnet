@@ -33,6 +33,7 @@ from openmm.openmm import LangevinMiddleIntegrator
 from openmm.unit import kelvin, nanometer, picosecond, picoseconds
 
 import sidechainnet
+from sidechainnet.utils.download import MAX_SEQ_LEN
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
@@ -581,6 +582,33 @@ class SCNProtein(object):
             assert isinstance(self.unmodified_seq, str)
             ums = self.unmodified_seq.split()
             self.unmodified_seq = " ".join(ums[n_removed_left:n_removed_right])
+        # Reset structure builders
+        self.sb = None
+
+    def trim_to_max_seq_len(self):
+        """Trim edges of seq/ums, 2ndary, evo, mask, angles, and coords to MAX_SEQ_LEN."""
+        if len(self) <= MAX_SEQ_LEN:
+            return
+        n_removed_right = MAX_SEQ_LEN - len(self.seq)
+        # Trim simple attributes
+        for at in [
+                "seq", "int_seq", "angles", "secondary_structure", "int_secondary",
+                "is_modified", "evolutionary", "int_mask", "mask"
+        ]:
+            data = getattr(self, at)
+            if data is not None:
+                setattr(self, at, data[:n_removed_right])
+        # Trim coordinate data
+        end_point = n_removed_right * self.atoms_per_res
+        if self.coords is not None:
+            self.coords = self.coords[:end_point]
+        if self.hcoords is not None:
+            self.hcoords = self.hcoords[:end_point]
+        # Trim unmodified seq
+        if self.unmodified_seq is not None:
+            assert isinstance(self.unmodified_seq, str)
+            ums = self.unmodified_seq.split()
+            self.unmodified_seq = " ".join(ums[:n_removed_right])
         # Reset structure builders
         self.sb = None
 
