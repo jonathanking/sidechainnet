@@ -88,6 +88,11 @@ def create_parser():
                            type=int,
                            help="Number of workers for each DataLoader.",
                            default=mp.cpu_count() // 2)
+    data_args.add_argument("--shuffle",
+                           type=my_bool,
+                           help="If True, shuffle dataloaders (default=True).",
+                           default="True")
+
     # Model-specific args
     parser = LitSidechainTransformer.add_model_specific_args(parser)
 
@@ -155,6 +160,7 @@ def create_parser():
     callback_args.add_argument("--use_batch_gradient_verification",
                                type=my_bool,
                                default="False")
+    callback_args.add_argument("--auto_lr_find_custom", type=my_bool, default="False")
 
     return parser
 
@@ -237,6 +243,9 @@ def main():
     else:
         tgt = 'rmse' if args.loss_name == 'mse' else args.loss_name
         target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{tgt}'
+    if dict_args['overfit_batches'] > 0:
+        tgt = 'rmse' if args.loss_name == 'mse' else args.loss_name
+        target_monitor_loss = f"losses/train/{tgt}_step"
     dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
 
     # Prepare model
@@ -272,10 +281,11 @@ def main():
             check_finite=True,
             mode='min' if 'acc' not in target_monitor_loss else 'max'))
     my_callbacks.append(callbacks.LearningRateMonitor(logging_interval='step'))
-    my_callbacks.append(
-        callbacks.ModelCheckpoint(dirpath=checkpoint_dir,
-                                  filename='{epoch:03d}-{step}-{val_loss:.2f}',
-                                  monitor=target_monitor_loss))
+    if args.enable_checkpointing:
+        my_callbacks.append(
+            callbacks.ModelCheckpoint(dirpath=checkpoint_dir,
+                                      filename='{epoch:03d}-{step}-{val_loss:.2f}',
+                                      monitor=target_monitor_loss))
     # my_callbacks.append(ModuleDataMonitor(submodules=True))
     if args.use_batch_gradient_verification:
         my_callbacks.append(
@@ -293,19 +303,16 @@ def main():
     tuner = Tuner(trainer)
     data_module.set_train_dataloader_descending()
     if dict_args['auto_scale_batch_size']:
-        tuner.scale_batch_size(
-            model,
-            datamodule=data_module,
-            mode='power',
-            init_val=1)
-    if dict_args["auto_lr_find"]:
-        lr_finder = tuner.lr_find(model, data_module.train_dataloader())
+        tuner.scale_batch_size(model, datamodule=data_module, mode='power', init_val=1)
+        wandb.config.update({"batch_size": data_module.batch_size}, allow_val_change=True)
+    if dict_args["auto_lr_find_custom"]:
+        lr_finder = tuner.lr_find(model, data_module)
         fig = lr_finder.plot(suggest=True)
         fig.savefig(os.path.join(model.save_dir, 'lr_finder.png'))
         wandb.save(os.path.join(model.save_dir, 'lr_finder.png'))
         model.opt_lr = model.hparams.opt_lr = lr_finder.suggestion()
         print('New learning rate:', model.opt_lr)
-        wandb.config.update({"opt_lr": model.opt_lr})
+        wandb.config.update({"opt_lr": model.opt_lr}, allow_val_change=True)
 
     # Train the model
     trainer.fit(model, data_module)

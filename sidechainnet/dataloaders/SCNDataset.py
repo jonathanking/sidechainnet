@@ -94,7 +94,8 @@ class SCNDataset(torch.utils.data.Dataset):
         del _unsorted_proteins
 
         # Add metadata
-        self.angle_means = data['settings']['angle_means']
+        self.angle_means = compute_angle_means(
+            [p.angles for p in self.ids_to_SCNProtein.values()])
         self.lengths = np.array([len(p) for p in self])
 
     def get_protein_list_by_split_name(self, split_name):

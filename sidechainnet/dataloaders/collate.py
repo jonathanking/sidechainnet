@@ -1,5 +1,4 @@
 """Implements a collating function for use with PyTorch's DataLoaders."""
-import collections
 
 import numpy as np
 import torch
@@ -8,9 +7,6 @@ from sidechainnet.dataloaders.ProteinBatch import ProteinBatch
 from sidechainnet.dataloaders.SCNDataset import SCNDataset
 
 from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatchSampler
-from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
-from sidechainnet.utils.download import MAX_SEQ_LEN
 
 
 def protein_batch_collate_fn(protein_objects):

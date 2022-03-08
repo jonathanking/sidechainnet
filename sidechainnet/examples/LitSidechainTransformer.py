@@ -78,6 +78,10 @@ class LitSidechainTransformer(pl.LightningModule):
                                 type=str,
                                 default="relu",
                                 help="Activation for Transformer layers.")
+        model_args.add_argument("--log_structures",
+                                type=my_bool,
+                                default="True",
+                                help="Whether or not to log structures while training.")
 
         return parent_parser
 
@@ -260,7 +264,7 @@ class LitSidechainTransformer(pl.LightningModule):
             prog_bar=True,
         )
 
-        self.log("trainer/batch_size", len(batch), on_step=True, on_epoch=False)
+        self.log("trainer/batch_size", float(len(batch)), on_step=True, on_epoch=False)
         self._log_angle_metrics(loss_dict, 'train')
 
         return loss_dict
@@ -351,7 +355,8 @@ class LitSidechainTransformer(pl.LightningModule):
         correct_angle_preds = abs_error < acc_tol
 
         # An entire residue is correct if the residue has >= 1 predicted angles
-        # and all of those angles are correct. When computing correctness, we allow nans.
+        # and all of those angles are correct. When computing correctness, an angle is
+        # correct if it met the tolerance or if it is nan.
         res_is_predicted = ~torch.isnan(abs_error).all(dim=-1)  # Avoids all-nan rows
         res_is_correct = torch.logical_or(correct_angle_preds,
                                           torch.isnan(abs_error)).all(dim=-1)
@@ -361,8 +366,10 @@ class LitSidechainTransformer(pl.LightningModule):
         loss_dict["angle_metrics"]["acc"] = accuracy
 
         # Compute Residue-Independent Accuracy (RIA) which evaluates each angle indp.
-        ria = torch.nansum(correct_angle_preds) / torch.isfinite(
-            correct_angle_preds).sum()
+        ang_is_predicted = ~torch.isnan(correct_angle_preds)
+        ang_is_correct = torch.logical_or(correct_angle_preds, torch.isnan(abs_error))
+        num_correct_angles = torch.logical_and(ang_is_predicted, ang_is_correct).sum()
+        ria = num_correct_angles / ang_is_predicted.sum()
         loss_dict['angle_metrics']['ria'] = ria
 
         return loss_dict
@@ -478,7 +485,7 @@ class LitSidechainTransformer(pl.LightningModule):
             loss_dict['mse'] = mse_loss.detach()
         if self.hparams.loss_name == "openmm" or self.hparams.loss_name == "mse_openmm":
             loss_dict = self._compute_openmm_loss(batch, sc_angs_pred, loss_dict, split)
-        if do_struct:
+        if do_struct and self.hparams.log_structures:
             self._generate_structure_viz(batch, sc_angs_pred, split)
 
         loss_dict = self._compute_angle_metrics(sc_angs_true, sc_angs_pred, loss_dict)
@@ -523,7 +530,7 @@ class LitSCNDataModule(pl.LightningDataModule):
         means = self.scn_data_dict['train'].dataset.angle_means[start_angle:end_angle]
         n_angles = means.shape[-1]
         means = torch.tensor(means).view(1, 1, len(means))
-        means = scn.structure.trig_transform(means).view(1, 1, n_angles * 2)
+        means = scn.structure.trig_transform(means).view(1, 1, n_angles * 2).squeeze()
         return means
 
     def train_dataloader(self):
