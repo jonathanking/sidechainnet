@@ -17,8 +17,6 @@ import wandb
 
 torch.set_printoptions(precision=5, sci_mode=False)
 
-# TODO: variable sq length https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html
-
 
 def create_parser():
     """Create an argument parser for the program."""
@@ -165,7 +163,6 @@ def create_parser():
                           type=my_bool,
                           default="True",
                           help="If true, use early stopping callback.")
-
 
     # Callbacks
     callback_args = parser.add_argument_group("Callbacks")
