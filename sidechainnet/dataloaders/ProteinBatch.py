@@ -114,7 +114,7 @@ class ProteinBatch(object):
                 batch.append(c)
             batch = np.array(batch)
             batch = batch[:, :MAX_SEQ_LEN]
-            batch = torch.tensor(batch, device=self.device, dtype=torch.long)
+            batch = torch.as_tensor(batch, device=self.device, dtype=torch.long)
             if seqs_as_onehot:
                 batch = torch.nn.functional.one_hot(batch, len(vocab))
                 if vocab.include_pad_char:
@@ -134,7 +134,7 @@ class ProteinBatch(object):
                 batch.append(c)
             batch = np.array(batch)
             batch = batch[:, :MAX_SEQ_LEN]
-            batch = torch.tensor(batch, device=self.device, dtype=torch.long)
+            batch = torch.as_tensor(batch, device=self.device, dtype=torch.long)
         elif dtype in ["pssm", "ang"]:
             # Mask other features with 0-vectors of a matching shape
             for item in items:
@@ -143,7 +143,7 @@ class ProteinBatch(object):
                 batch.append(c)
             batch = np.array(batch)
             batch = batch[:, :MAX_SEQ_LEN]
-            batch = torch.tensor(batch, device=self.device, dtype=torch.float32)
+            batch = torch.as_tensor(batch, device=self.device, dtype=torch.float32)
         elif dtype == "crd":
             for item in items:
                 z = np.zeros(
@@ -153,7 +153,7 @@ class ProteinBatch(object):
             batch = np.array(batch)
             # There are multiple rows per res, so we allow the coord matrix to be larger
             batch = batch[:, :MAX_SEQ_LEN * NUM_COORDS_PER_RES]
-            batch = torch.tensor(batch, device=self.device, dtype=torch.float32)
+            batch = torch.as_tensor(batch, device=self.device, dtype=torch.float32)
 
         return batch
 
