@@ -209,12 +209,11 @@ class LitSidechainTransformer(pl.LightningModule):
         elif self.hparams.opt_name == "sgd":
             opt = torch.optim.SGD(filter(lambda x: x.requires_grad, self.parameters()),
                                   lr=lr,
-                                  betas=betas,
-                                  eps=eps,
-                                  weight_decay=self.hparams.opt_weight_decay)
+                                  weight_decay=self.hparams.opt_weight_decay,
+                                  momentum=0.9)
 
         # Prepare scheduler
-        if self.hparams.opt_lr_scheduling == "noam":
+        if self.hparams.opt_lr_scheduling == "noam" and "adam" in self.hparams.opt_name:
             opt = NoamOpt(model_size=self.hparams.d_in,
                           warmup=self.hparams.opt_n_warmup_steps,
                           optimizer=opt,
@@ -405,14 +404,30 @@ class LitSidechainTransformer(pl.LightningModule):
         }
         self.log_dict(angle_metrics_dict,
                       on_epoch=True,
-                      on_step=False,
+                      on_step=True,
                       add_dataloader_idx=False)
 
     def _generate_structure_viz(self, batch, sc_angs_pred, split):
         sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred, n_angles=6)
         # Select the first protein in the batch to visualize
         j = -1
-        p = copy.deepcopy(batch[j])
+        b = batch[j]
+        # p = copy.deepcopy(batch[j])
+        p = SCNProtein(
+            coordinates=b.coords.detach().cpu().numpy(),
+            angles=b.angles.detach().cpu().numpy(),
+            sequence=b.seq,
+            unmodified_seq=b.unmodified_seq,
+            mask=b.mask,
+            evolutionary=b.evolutionary,
+            secondary_structure=b.secondary_structure,
+            resolution=b.resolution,
+            is_modified=b.is_modified,
+            id=b.id,
+            split=b.split,
+            add_sos_eos=b.add_sos_eos,
+        )
+        p.numpy()
         assert p is not batch[j]
         p.trim_to_max_seq_len()
         p.angles[:, 6:] = sc_angs_pred_rad[j, 0:len(p)].detach().cpu().numpy()
@@ -449,29 +464,18 @@ class LitSidechainTransformer(pl.LightningModule):
         wandb.log({f"structures/{split}/png": wandb.Image(both_png_path)})
 
     def _compute_openmm_loss(self, batch, sc_angs_pred, loss_dict, split):
-        proteins = []
-        for (a, s, i, m) in zip(batch.angs, batch.str_seqs, batch.pids, batch.msks):
-            p = SCNProtein(angles=a.clone(),
-                           sequence=str(s),
-                           id=i,
-                           mask="".join(["+" if x else "-" for x in m]))
-            proteins.append(p)
+        proteins = batch
         loss_total = 0
         sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred, n_angles=6)
         loss_fn = OpenMMEnergyH()
         for p, sca in zip(proteins, sc_angs_pred_rad):
-            # print(p.mask)
-            # print(p, end=" ")
             # Fill in protein obj with predicted angles instead of true angles
-            # print("Set angles")
-            p.angles[:, 6:] = sca
-            # print("Build coords.")
+            p.cuda()
+            p.angles[:, 6:] = sca[:len(p)]  # we truncate here to remove batch pa
             p.add_hydrogens(from_angles=True)
-            # print("About to apply loss.")
             eloss = loss_fn.apply(p, p.hcoords)
             loss_total += eloss
-            # print(eloss.item())
-            # del p
+
         loss = openmm_loss = loss_total / len(proteins)
 
         loss_dict['loss'] = loss
@@ -479,19 +483,21 @@ class LitSidechainTransformer(pl.LightningModule):
 
         # Record performance metrics
         self.log(
-            split + "/openmm",
+            f"losses/{split}/openmm",
             openmm_loss.detach(),
-            on_step=True,
+            on_step=split == 'train',
             on_epoch=True,
             prog_bar=True,
         )
         if self.hparams.loss_name == "mse_openmm":
             loss = loss_dict['mse'] * 0.8 + openmm_loss / 1e12 * .2
-            self.log(split + "/mse_openmm",
+            loss_dict['loss'] = loss
+            self.log(f"losses/{split}/mse_openmm",
                      loss.detach(),
-                     on_step=True,
+                     on_step=split == 'train',
                      on_epoch=True,
                      prog_bar=True)
+
         return loss_dict
 
     def _get_losses(self,
@@ -502,9 +508,9 @@ class LitSidechainTransformer(pl.LightningModule):
                     split='train'):
         loss_dict = {}
         mse_loss = angle_mse(sc_angs_true, sc_angs_pred)
+        loss_dict['mse'] = mse_loss.detach()
         if self.hparams.loss_name == "mse":
             loss_dict['loss'] = mse_loss
-            loss_dict['mse'] = mse_loss.detach()
         if self.hparams.loss_name == "openmm" or self.hparams.loss_name == "mse_openmm":
             loss_dict = self._compute_openmm_loss(batch, sc_angs_pred, loss_dict, split)
         if do_struct and self.hparams.log_structures:
