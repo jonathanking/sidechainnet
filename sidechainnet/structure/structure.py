@@ -255,7 +255,7 @@ def trig_transform(t):
     Returns:
         torch.tensor: Angle tensor with shape (batch x L x num_angle x 2).
     """
-    new_t = torch.zeros(*t.shape, 2)
+    new_t = torch.zeros(*t.shape, 2, device=t.device)
     if len(new_t.shape) == 4:
         new_t[:, :, :, 0] = torch.cos(t)
         new_t[:, :, :, 1] = torch.sin(t)
