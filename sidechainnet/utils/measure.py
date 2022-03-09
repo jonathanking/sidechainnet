@@ -230,8 +230,18 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
             prev_coords = coords[res_id - 1] if res_id > 0 else None
             next_coords = coords[res_id + 1] if res_id + 1 < len(coords) else None
             prev_ang = dihedrals[res_id - 1] if res_id > 0 else None
-            res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
-                                      prev_ang)
+            # TODO remove prints for release
+            try:
+                res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
+                                          prev_ang)
+            except ValueError:
+                print("STANDARDIZE_RESIDUE")
+                print(chain)
+                print(res)
+                print(all_res_angles)
+                print(prev_coords)
+                print(next_coords)
+                print(prev_ang)
 
     dihedrals_np = np.asarray(dihedrals)
     coords_np = np.concatenate(coords)
