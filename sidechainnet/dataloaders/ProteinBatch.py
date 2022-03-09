@@ -7,12 +7,16 @@ import numpy as np
 
 
 class ProteinBatch(object):
-    """Represents a batch of Protein objects that can be collated, constructed, etc."""
+    """Represents batch of Proteins for collation, construction, etc. Enforces max len."""
 
-    def __init__(self, proteins, batch_pad_char=0) -> None:
+    def __init__(self, proteins, batch_pad_char=0, device=torch.device('cpu')) -> None:
         self.proteins = proteins
         self.batch_pad_char = batch_pad_char
         self.max_len = max((len(p) for p in self.proteins))
+        self.device = device
+
+        self._angles = None
+        self._coords = None
 
     def __getitem__(self, idx):
         return self.proteins[idx]
@@ -22,8 +26,12 @@ class ProteinBatch(object):
 
     @property
     def angles(self):
+        if self._angles is not None:
+            return self._angles
+
         angles = (p.angles for p in self)
-        return self.pad_for_batch(angles, dtype='ang')
+        self._angles = self.pad_for_batch(angles, dtype='ang')
+        return self._angles
 
     def _get_seqs(self, one_hot=True):
         seqs = (p.int_seq for p in self)  # We request int representation rather than str
@@ -59,7 +67,10 @@ class ProteinBatch(object):
 
     @property
     def coords(self):
-        return self.pad_for_batch((p.coords for p in self), 'crd')
+        if self._coords is not None:
+            return self._coords
+        self._coords = self.pad_for_batch((p.coords for p in self), 'crd')
+        return self._coords
 
     @property
     def is_modified(self):
@@ -103,11 +114,11 @@ class ProteinBatch(object):
                 batch.append(c)
             batch = np.array(batch)
             batch = batch[:, :MAX_SEQ_LEN]
-            batch = torch.LongTensor(batch)
+            batch = torch.tensor(batch, device=self.device, dtype=torch.long)
             if seqs_as_onehot:
                 batch = torch.nn.functional.one_hot(batch, len(vocab))
                 if vocab.include_pad_char:
-                    # Delete the column for the pad character since it is implied (0-vector)
+                    # Delete the col for the pad character since it is implied (0-vector)
                     if len(batch.shape) == 3:
                         batch = batch[:, :, :-1]
                     elif len(batch.shape) == 2:
@@ -123,7 +134,7 @@ class ProteinBatch(object):
                 batch.append(c)
             batch = np.array(batch)
             batch = batch[:, :MAX_SEQ_LEN]
-            batch = torch.LongTensor(batch)
+            batch = torch.tensor(batch, device=self.device, dtype=torch.long)
         elif dtype in ["pssm", "ang"]:
             # Mask other features with 0-vectors of a matching shape
             for item in items:
@@ -132,7 +143,7 @@ class ProteinBatch(object):
                 batch.append(c)
             batch = np.array(batch)
             batch = batch[:, :MAX_SEQ_LEN]
-            batch = torch.FloatTensor(batch)
+            batch = torch.tensor(batch, device=self.device, dtype=torch.float32)
         elif dtype == "crd":
             for item in items:
                 z = np.zeros(
@@ -142,12 +153,21 @@ class ProteinBatch(object):
             batch = np.array(batch)
             # There are multiple rows per res, so we allow the coord matrix to be larger
             batch = batch[:, :MAX_SEQ_LEN * NUM_COORDS_PER_RES]
-            batch = torch.FloatTensor(batch)
+            batch = torch.tensor(batch, device=self.device, dtype=torch.float32)
 
         return batch
-    
+
     def __len__(self):
         return len(self.proteins)
     
+    def cuda(self):
+        self.device = torch.device('cuda')
+
+    def cpu(self):
+        self.device = torch.device('cpu')
+
+    def set_device(self, device):
+        self.device = device
+
     def __str__(self):
         return f"ProteinBatch(n={len(self)}, max_len={self.max_len})"

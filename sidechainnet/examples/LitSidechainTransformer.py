@@ -242,6 +242,7 @@ class LitSidechainTransformer(pl.LightningModule):
         return d
 
     def _prepare_model_input(self, batch):
+        batch.set_device(self.device)
         # True values still have nans, replace with 0s so they can go into the network
         # Also select out backbone and sidechain angles
         bb_angs = torch.nan_to_num(batch.angles[:, :, :6], nan=0.0)
@@ -257,7 +258,7 @@ class LitSidechainTransformer(pl.LightningModule):
         # Stack model inputs into a single tensor
         model_in = torch.cat([bb_angs, batch.secondary, batch.evolutionary], dim=-1)
 
-        return model_in.to(self.device), sc_angs_true.to(self.device)
+        return model_in, sc_angs_true
 
     def training_step(self, batch, batch_idx):
         """Perform a single step of training (model in, model out, log loss).
@@ -456,7 +457,7 @@ class LitSidechainTransformer(pl.LightningModule):
         pymol.cmd.show("lines", "not (name c,o,n and not pro/n)")
         pymol.cmd.hide("cartoon", "pred")
         both_png_path = os.path.join(self.save_dir, "pngs", f"{p.id}_both.png")
-        # TODO: Ray tracing occurs despit ray=0
+        # TODO: Ray tracing occurs despite ray=0
         with Suppressor():
             pymol.cmd.png(both_png_path, width=1000, height=1000, quiet=1, dpi=300, ray=0)
         both_pse_path = os.path.join(self.save_dir, "pdbs", f"{p.id}_both.pse")

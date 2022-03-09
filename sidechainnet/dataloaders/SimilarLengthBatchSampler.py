@@ -52,9 +52,6 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         assert equalize in [
             'n_res', 'n_proteins'
         ], "Choose to either equalize the number of residues or proteins per bin."
-        # TODO Implement for data that is either ascending or desc. Or require one.
-        # TODO Currently requires a dataset sorted by length ascending
-        # TODO Implement MAX_SEQ_LEN somewhere
         # Compute length-based histogram bins and probabilities
         self.lens = [len(p) for p in self.dataset]  # Assumes max seq len already applied
         assert all(x <= y for x, y in zip(self.lens, self.lens[1:])), (
