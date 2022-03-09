@@ -125,7 +125,7 @@ def create_parser():
     training.add_argument('--opt_patience',
                           type=int,
                           default=10,
-                          help="Patience for LR or chkpt routines.")
+                          help="Patience for LR routines.")
     training.add_argument('--opt_min_delta',
                           type=float,
                           default=0.01,
@@ -163,6 +163,10 @@ def create_parser():
                           type=my_bool,
                           default="True",
                           help="If true, use early stopping callback.")
+    training.add_argument("--early_stopping_patience",
+                          type=int,
+                          default=10,
+                          help="How many epochs to wait for improvement before stopping.")
 
     # Callbacks
     callback_args = parser.add_argument_group("Callbacks")
@@ -288,7 +292,7 @@ def main():
             callbacks.EarlyStopping(
                 monitor=target_monitor_loss,
                 min_delta=args.opt_min_delta,
-                patience=args.opt_patience,
+                patience=args.early_stopping_patience,
                 verbose=True,
                 check_finite=True,
                 mode='min' if 'acc' not in target_monitor_loss else 'max'))
