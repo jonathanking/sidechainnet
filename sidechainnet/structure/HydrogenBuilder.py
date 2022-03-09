@@ -167,6 +167,7 @@ class HydrogenBuilder(object):
             # Append Hydrogens immediately after heavy atoms, followed by PADs to L=26
             new_coords.append(self.concatenate((crd, hydrogen_positions)))
             prev_res_atoms = atoms
+        # TODO are these on the correct device?
         self.reduced_coords = self.concatenate(new_coords)
         return self.reduced_coords
 
