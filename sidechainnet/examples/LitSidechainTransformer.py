@@ -387,12 +387,12 @@ class LitSidechainTransformer(pl.LightningModule):
 
         loss_dict["angle_metrics"]["acc"] = accuracy
 
-        # Compute Residue-Independent Accuracy (RIA) which evaluates each angle indp.
+        # Compute Accuracy per Angle (APA) which evaluates each angle indp.
         ang_is_predicted = ~torch.isnan(correct_angle_preds)
         ang_is_correct = torch.logical_or(correct_angle_preds, torch.isnan(abs_error))
         num_correct_angles = torch.logical_and(ang_is_predicted, ang_is_correct).sum()
-        ria = num_correct_angles / ang_is_predicted.sum()
-        loss_dict['angle_metrics']['ria'] = ria
+        apa = num_correct_angles / ang_is_predicted.sum()
+        loss_dict['angle_metrics']['apa'] = apa
 
         return loss_dict
 
