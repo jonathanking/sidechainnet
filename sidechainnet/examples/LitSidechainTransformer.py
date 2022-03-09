@@ -412,22 +412,24 @@ class LitSidechainTransformer(pl.LightningModule):
         # Select the first protein in the batch to visualize
         j = -1
         b = batch[j]
-        # p = copy.deepcopy(batch[j])
-        p = SCNProtein(
-            coordinates=b.coords.detach().cpu().numpy(),
-            angles=b.angles.detach().cpu().numpy(),
-            sequence=b.seq,
-            unmodified_seq=b.unmodified_seq,
-            mask=b.mask,
-            evolutionary=b.evolutionary,
-            secondary_structure=b.secondary_structure,
-            resolution=b.resolution,
-            is_modified=b.is_modified,
-            id=b.id,
-            split=b.split,
-            add_sos_eos=b.add_sos_eos,
-        )
-        p.numpy()
+        if torch.is_tensor(b.coords):
+            p = SCNProtein(
+                coordinates=b.coords.detach().cpu().numpy(),
+                angles=b.angles.detach().cpu().numpy(),
+                sequence=b.seq,
+                unmodified_seq=b.unmodified_seq,
+                mask=b.mask,
+                evolutionary=b.evolutionary,
+                secondary_structure=b.secondary_structure,
+                resolution=b.resolution,
+                is_modified=b.is_modified,
+                id=b.id,
+                split=b.split,
+                add_sos_eos=b.add_sos_eos,
+            )
+            p.numpy()
+        else:
+            p = copy.deepcopy(batch[j])
         assert p is not batch[j]
         p.trim_to_max_seq_len()
         p.angles[:, 6:] = sc_angs_pred_rad[j, 0:len(p)].detach().cpu().numpy()
