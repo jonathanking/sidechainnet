@@ -16,6 +16,7 @@ from sidechainnet.examples.LitSidechainTransformer import (LitSCNDataModule,
 import wandb
 
 torch.set_printoptions(precision=5, sci_mode=False)
+torch.autograd.set_detect_anomaly(True)
 
 
 def create_parser():
@@ -112,14 +113,14 @@ def create_parser():
     training.add_argument('--opt_name',
                           '-opt',
                           type=str,
-                          choices=['adam', 'sgd', 'adamw'],
+                          choices=['adam', 'sgd', 'adamw', 'radam'],
                           default='sgd',
                           help="Training optimizer.")
     training.add_argument("--opt_lr", "-lr", type=float, default=1e-4)
     training.add_argument('--opt_lr_scheduling',
                           type=str,
-                          choices=['noam', 'plateau'],
-                          default='plateau',
+                          choices=['noam', 'plateau', 'none'],
+                          default='none',
                           help="noam: Use LR as described in Transformer paper, plateau:"
                           " Decrease learning rate after Validation loss plateaus.")
     training.add_argument('--opt_patience',
@@ -141,17 +142,22 @@ def create_parser():
                           default=10_000,
                           help="Number of warmup train steps when using lr-scheduling.")
     training.add_argument('--opt_lr_scheduling_metric',
-                          choices=['val_loss', 'val_acc'],
-                          default='val_acc',
+                          type=str,
+                          default='losses/valid/V50_rmse',
                           help="Metric to use for early stopping, chkpts, etc. Choose "
                           "validation loss or accuracy.")
     training.add_argument('--opt_noam_lr_factor',
                           type=float,
                           default=1.,
                           help="Scale for Noam Opt.")
+    training.add_argument('--opt_begin_mse_openmm_step',
+                          type=int,
+                          default=4000,
+                          help="Training step at which to begin training with"
+                          " OpenMM + MSE combination loss.")
     training.add_argument("--loss_combination_weight",
                           type=float,
-                          default=0.5,
+                          default=0.8,
                           help="When combining losses, use weight w where "
                           "loss = w * LossA + (1-w) * LossB.")
     training.add_argument("--overfit_batches_small",
@@ -167,7 +173,7 @@ def create_parser():
                           type=int,
                           default=10,
                           help="How many epochs to wait for improvement before stopping.")
-
+    # TODO Add custom argument for supplying checkpoint file
     # Callbacks
     callback_args = parser.add_argument_group("Callbacks")
     callback_args.add_argument("--use_swa", type=my_bool, default="False")
@@ -197,11 +203,12 @@ def init_wandb(use_cluster, project, entity, model, dict_args):
     wandb_dir = "/scr/jok120/wandb" if use_cluster else os.path.expanduser("~/scr")
     if wandb_dir:
         os.makedirs(wandb_dir, exist_ok=True)
-    logger = WandbLogger(project=project,
-                         entity=entity,
-                         dir=wandb_dir,
-                         save_code=True,
-                         log_model=True)
+    logger = WandbLogger(
+        project=project,
+        entity=entity,
+        dir=wandb_dir,
+        save_code=True,
+        log_model=True)  # TODO add id='runid' to resume (e.g. 19j0mxjk)
     logger.experiment.config.update(dict_args, allow_val_change=True)
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -227,6 +234,24 @@ def init_wandb(use_cluster, project, entity, model, dict_args):
     return logger, checkpoint_dir
 
 
+class ResetOptimizersOnGlobalStep(pl.Callback):
+    """Re-init the optimizer at the specified global step. Helps to handle new loss fn."""
+
+    def __init__(self, on_step):
+        super().__init__()
+        self.on_step = on_step
+
+    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
+        if pl_module.global_step == self.on_step:
+            print("Reinitializing optimizers.")
+            # print("Switching to SGD.")
+            # pl_module.hparams.opt_lr = 1e-6
+            # pl_module.hparams.opt_lr_scheduling = 'plateau'
+            opt_dict = pl_module.configure_optimizers()
+            trainer.optimizers = [opt_dict['optimizer']]
+            if 'lr_scheduler' in opt_dict:
+                trainer.lr_schedulers = [opt_dict['lr_scheduler']]
+
 def main():
     """Argument parsing, model loading, and model training."""
     # Parse args and update some defaults
@@ -241,6 +266,8 @@ def main():
         if args.gradient_clip_algorithm is None else args.gradient_clip_algorithm,
         auto_select_gpus=True,
     )
+    # dict_args.pop('gradient_clip_val')
+    # dict_args.pop('gradient_clip_algorithm')
 
     # Prepare torch
     pl.seed_everything(args.seed)
@@ -252,16 +279,6 @@ def main():
     # Update args with dataset information
     dict_args['angle_means'] = data_module.get_train_angle_means(6, None)
     dict_args['dataloader_name_mapping'] = data_module.val_dataloader_idx_to_name
-    if dict_args['opt_lr_scheduling_metric'] == 'val_acc':
-        tgt = 'acc'
-        target_monitor_loss = f'metrics/valid/{data_module.val_dataloader_target}_{tgt}'
-    else:
-        tgt = 'rmse' if args.loss_name == 'mse' else args.loss_name
-        target_monitor_loss = f'losses/valid/{data_module.val_dataloader_target}_{tgt}'
-    if dict_args['overfit_batches'] > 0:
-        tgt = 'rmse' if args.loss_name == 'mse' else args.loss_name
-        target_monitor_loss = f"losses/train/{tgt}_step"
-    dict_args['opt_lr_scheduling_metric'] = target_monitor_loss
 
     # Prepare model
     if args.model == "scn-trans-enc":
@@ -290,18 +307,18 @@ def main():
     if args.early_stopping:
         my_callbacks.append(
             callbacks.EarlyStopping(
-                monitor=target_monitor_loss,
+                monitor=args.opt_lr_scheduling_metric,
                 min_delta=args.opt_min_delta,
                 patience=args.early_stopping_patience,
                 verbose=True,
                 check_finite=True,
-                mode='min' if 'acc' not in target_monitor_loss else 'max'))
+                mode='min' if 'acc' not in args.opt_lr_scheduling_metric else 'max'))
     my_callbacks.append(callbacks.LearningRateMonitor(logging_interval='step'))
     if args.enable_checkpointing:
         my_callbacks.append(
             callbacks.ModelCheckpoint(dirpath=checkpoint_dir,
                                       filename='{epoch:03d}-{step}-{val_loss:.2f}',
-                                      monitor=target_monitor_loss))
+                                      monitor=args.opt_lr_scheduling_metric))
     # my_callbacks.append(ModuleDataMonitor(submodules=True))
     if args.use_batch_gradient_verification:
         my_callbacks.append(
@@ -310,6 +327,8 @@ def main():
     if args.use_swa:
         my_callbacks.append(
             callbacks.StochasticWeightAveraging(swa_epoch_start=args.swa_epoch_start))
+
+    my_callbacks.append(ResetOptimizersOnGlobalStep(dict_args['opt_begin_mse_openmm_step']))
 
     # Create a trainer
     trainer = pl.Trainer.from_argparse_args(argparse.Namespace(**dict_args),

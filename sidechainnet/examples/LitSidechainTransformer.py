@@ -9,10 +9,13 @@ from sidechainnet.dataloaders.SCNProtein import SCNProtein
 from sidechainnet.examples.losses import angle_mse, angle_diff
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
 from sidechainnet.structure.structure import inverse_trig_transform
+from sidechainnet.utils.download import MAX_SEQ_LEN
 from sidechainnet.utils.openmm import OpenMMEnergyH
 from sidechainnet.examples.optim import NoamOpt
+from sidechainnet.examples.transformer import PositionalEncoding
 
 import pytorch_lightning as pl
+import radam
 
 from sidechainnet.utils.sequence import VOCAB
 import sidechainnet as scn
@@ -114,6 +117,7 @@ class LitSidechainTransformer(pl.LightningModule):
             **kwargs):
         """Create a LitSidechainTransformer module."""
         super().__init__()
+        self.automatic_optimization = True
         self.save_hyperparameters()
 
         # Initialize layers
@@ -122,6 +126,7 @@ class LitSidechainTransformer(pl.LightningModule):
                                                       d_seq_embedding,
                                                       padding_idx=VOCAB.pad_id)
         self.ff1 = torch.nn.Linear(d_nonseq_data + d_seq_embedding, d_in)
+        self.positional_encoding = PositionalEncoding(d_model=d_in, max_len=MAX_SEQ_LEN)
         self.encoder_layer = torch.nn.TransformerEncoderLayer(
             d_model=d_in,
             nhead=n_heads,
@@ -165,6 +170,7 @@ class LitSidechainTransformer(pl.LightningModule):
             seq = self.input_embedding(seq)
         x = torch.cat([x, seq], dim=-1)
         x = self.ff1(x)
+        x = self.positional_encoding(x)
         x = self.transformer_encoder(x, src_key_padding_mask=padding_mask)
         x = self.ff2(x)
         x = self.output_activation(x)
@@ -200,6 +206,12 @@ class LitSidechainTransformer(pl.LightningModule):
                                    betas=betas,
                                    eps=eps,
                                    weight_decay=self.hparams.opt_weight_decay)
+        elif self.hparams.opt_name == "radam":
+            opt = radam.RAdam(filter(lambda x: x.requires_grad, self.parameters()),
+                              lr=lr,
+                              betas=betas,
+                              eps=eps,
+                              weight_decay=self.hparams.opt_weight_decay)
         elif self.hparams.opt_name == "adamw":
             opt = torch.optim.AdamW(filter(lambda x: x.requires_grad, self.parameters()),
                                     lr=lr,
@@ -213,13 +225,14 @@ class LitSidechainTransformer(pl.LightningModule):
                                   momentum=0.9)
 
         # Prepare scheduler
-        if self.hparams.opt_lr_scheduling == "noam" and "adam" in self.hparams.opt_name:
+        if (self.hparams.opt_lr_scheduling == "noam" and
+                self.hparams.opt_name in ['adam', 'adamw']):
             opt = NoamOpt(model_size=self.hparams.d_in,
                           warmup=self.hparams.opt_n_warmup_steps,
                           optimizer=opt,
                           factor=self.hparams.opt_noam_lr_factor)
             sch = None
-        else:
+        elif self.hparams.opt_lr_scheduling == 'plateau':
             sch = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 opt,
                 patience=self.hparams.opt_patience,
@@ -227,6 +240,8 @@ class LitSidechainTransformer(pl.LightningModule):
                 threshold=self.hparams.opt_min_delta,
                 mode='min'
                 if 'acc' not in self.hparams.opt_lr_scheduling_metric else 'max')
+        else:
+            sch = None
 
         d = {"optimizer": opt}
         if sch is not None:
@@ -288,6 +303,16 @@ class LitSidechainTransformer(pl.LightningModule):
 
         self.log("trainer/batch_size", float(len(batch)), on_step=True, on_epoch=False)
         self._log_angle_metrics(loss_dict, 'train')
+
+        if loss_dict['loss'] is None:
+            return None
+
+        if not self.automatic_optimization:
+            opt = self.optimizers()
+            opt.zero_grad()
+            self.manual_backward(loss_dict['loss'])
+            torch.nn.utils.clip_grad_value_(self.parameters(), 0.5)
+            opt.step()
 
         return loss_dict
 
@@ -405,7 +430,7 @@ class LitSidechainTransformer(pl.LightningModule):
         }
         self.log_dict(angle_metrics_dict,
                       on_epoch=True,
-                      on_step=True,
+                      on_step=split == 'train',
                       add_dataloader_idx=False)
 
     def _generate_structure_viz(self, batch, sc_angs_pred, split):
@@ -466,42 +491,31 @@ class LitSidechainTransformer(pl.LightningModule):
         pymol.cmd.delete("all")
         wandb.log({f"structures/{split}/png": wandb.Image(both_png_path)})
 
-    def _compute_openmm_loss(self, batch, sc_angs_pred, loss_dict, split):
+    def _compute_openmm_loss(self, batch, sc_angs_pred):
+        # TODO ignore protein entries like 1QCR_9_I that are a-carbon only
         proteins = batch
-        loss_total = 0
+        loss_total = count = 0.
         sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred, n_angles=6)
         loss_fn = OpenMMEnergyH()
         for p, sca in zip(proteins, sc_angs_pred_rad):
-            # Fill in protein obj with predicted angles instead of true angles
             p.cuda()
+            # Fill in protein obj with predicted angles instead of true angles
+            if "-" in p.mask:
+                continue
+            p.trim_to_max_seq_len()  # TODO implement update_with_pred_angs
             p.angles[:, 6:] = sca[:len(p)]  # we truncate here to remove batch pa
             p.add_hydrogens(from_angles=True)
             eloss = loss_fn.apply(p, p.hcoords)
+            if ~torch.isfinite(eloss):
+                continue
             loss_total += eloss
+            count += 1
 
-        loss = openmm_loss = loss_total / len(proteins)
-
-        loss_dict['loss'] = loss
-        loss_dict[self.hparams.loss_name] = loss.detach()
-
-        # Record performance metrics
-        self.log(
-            f"losses/{split}/openmm",
-            openmm_loss.detach(),
-            on_step=split == 'train',
-            on_epoch=True,
-            prog_bar=True,
-        )
-        if self.hparams.loss_name == "mse_openmm":
-            loss = loss_dict['mse'] * 0.8 + openmm_loss / 1e12 * .2
-            loss_dict['loss'] = loss
-            self.log(f"losses/{split}/mse_openmm",
-                     loss.detach(),
-                     on_step=split == 'train',
-                     on_epoch=True,
-                     prog_bar=True)
-
-        return loss_dict
+        if count:
+            loss = loss_total / count
+        else:
+            loss = None
+        return loss
 
     def _get_losses(self,
                     batch,
@@ -509,17 +523,56 @@ class LitSidechainTransformer(pl.LightningModule):
                     sc_angs_pred,
                     do_struct=False,
                     split='train'):
+
+        def log_omm(val, label):
+            """Log val to 'losses/split/label'."""
+            if val is not None:
+                self.log(f"losses/{split}/{label}",
+                         val.detach(),
+                         on_step=split == 'train',
+                         on_epoch=True,
+                         prog_bar=True)
+
         loss_dict = {}
         mse_loss = angle_mse(sc_angs_true, sc_angs_pred)
         loss_dict['mse'] = mse_loss.detach()
         if self.hparams.loss_name == "mse":
             loss_dict['loss'] = mse_loss
-        if self.hparams.loss_name == "openmm" or self.hparams.loss_name == "mse_openmm":
-            loss_dict = self._compute_openmm_loss(batch, sc_angs_pred, loss_dict, split)
-        if do_struct and self.hparams.log_structures:
-            self._generate_structure_viz(batch, sc_angs_pred, split)
+
+        if self.hparams.loss_name == "openmm":
+            openmm_loss = self._compute_openmm_loss(batch, sc_angs_pred)
+            loss_dict['openmm'] = openmm_loss.detach()
+            loss_dict['loss'] = openmm_loss
+            log_omm(loss_dict['openmm'], 'openmm')
+
+        if self.hparams.loss_name == "mse_openmm":
+            if self.global_step < self.hparams.opt_begin_mse_openmm_step:  # or self.global_step % 2 == 0:
+                loss_dict['loss'] = mse_loss
+            else:
+                if self.global_step == self.hparams.opt_begin_mse_openmm_step:
+                    print("Starting to train with OpenMM/MSE Combination loss at step",
+                          self.global_step)
+                openmm_loss = self._compute_openmm_loss(batch, sc_angs_pred)
+                if openmm_loss is None:
+                    loss_dict['openmm'] = None
+                    loss_dict['loss'] = None
+                else:
+                    loss_dict['openmm'] = openmm_loss.detach()
+                    a = self.hparams.loss_combination_weight
+                    b = 1 - a
+                    loss = mse_loss * a + openmm_loss / 1e12 * b
+                    loss_dict['loss'] = loss
+                    # Scale the value of the loss significantly
+                    if torch.log10(loss) - 1 > 0:
+                        loss_dict['loss'] = loss / 10**(torch.floor(torch.log10(loss) - 1))
+                    log_omm(loss_dict['loss'], 'mse_openmm')
+                    log_omm(loss_dict['openmm'], 'openmm')
 
         loss_dict = self._compute_angle_metrics(sc_angs_true, sc_angs_pred, loss_dict)
+
+        # Generate structures only after we no longer need the objects intact
+        if do_struct and self.hparams.log_structures:
+            self._generate_structure_viz(batch, sc_angs_pred, split)
 
         return loss_dict
 
@@ -534,7 +587,7 @@ class LitSCNDataModule(pl.LightningDataModule):
     """A Pytorch Lightning DataModule for SidechainNet data, downstream of scn.load()."""
 
     def __init__(self, scn_data_dict, batch_size, val_dataloader_target='V50'):
-        """Create LitSCFNDataModule from preloaded data.
+        """Create LitSCNDataModule from preloaded data.
 
         Args:
             scn_data_dict (dict): Dictionary mapping train/valid/test splits to their
