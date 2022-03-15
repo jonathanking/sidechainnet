@@ -5,6 +5,7 @@ this is done for us by OpenMM and we simply must return the computed forces rath
 than perform any differentiation directly.
 """
 
+import numpy as np
 import torch
 from torch.autograd.functional import jacobian as get_jacobian
 
@@ -54,9 +55,9 @@ class OpenMMEnergyH(torch.autograd.Function):
     """A force-field based loss function."""
 
     @staticmethod
-    def forward(ctx, protein, hcoords, force_scaling=1):
+    def forward(ctx, protein, hcoords, force_scaling=1, force_clipping_val=1e7):
         """Compute potential energy of the protein system and save atomic forces."""
-        # Update protein's hcoords
+        # Update protein's hcoords, scaled to match OpenMM's units
         protein.update_hydrogens_for_openmm(hcoords / 10)
 
         # Compute potential energy and forces
@@ -65,6 +66,10 @@ class OpenMMEnergyH(torch.autograd.Function):
                               dtype=torch.float64,
                               device=protein.device)
         forces = protein.get_forces() / 10
+
+        # Some forces may have inf/-inf, so we clip large values to avoid nan gradients
+        forces[forces > force_clipping_val] = force_clipping_val
+        forces[forces < -force_clipping_val] = -force_clipping_val
 
         # Save context
         ctx.forces = forces
