@@ -28,7 +28,8 @@ class SCNDataset(torch.utils.data.Dataset):
                  trim_edges=False,
                  sort_by_length='ascending',
                  overfit_batches=0,
-                 overfit_batches_small=True) -> None:
+                 overfit_batches_small=True,
+                 complete_structures_only=False) -> None:
         """Initialize a SCNDataset from underlying SidechainNet formatted dictionary."""
         super().__init__()
         # Determine available datasplits
@@ -37,6 +38,8 @@ class SCNDataset(torch.utils.data.Dataset):
             for existing_data_label in data.keys():
                 if split_label in existing_data_label:
                     self.splits.append(existing_data_label)
+
+        starting_length = len(data[self.splits[0]]['seq'])
 
         # If only a single split was provided, prepare the data for protein construction
         if not len(self.splits):
@@ -70,10 +73,6 @@ class SCNDataset(torch.utils.data.Dataset):
                         count < len(d['seq']) // 2):
                     count += 1
                     continue
-                try:
-                    self.split_to_ids[split].append(i)
-                except KeyError:
-                    self.split_to_ids[split] = [i]
 
                 p = SCNProtein(coordinates=c,
                                angles=a,
@@ -88,8 +87,15 @@ class SCNDataset(torch.utils.data.Dataset):
                                split=split)
                 if trim_edges:
                     p.trim_edges()
+                if complete_structures_only and "-" in p.mask:
+                    continue
+
                 self.ids_to_SCNProtein[i] = p
                 _unsorted_proteins.append(p)
+                try:
+                    self.split_to_ids[split].append(i)
+                except KeyError:
+                    self.split_to_ids[split] = [i]
 
         if sort_by_length == 'ascending':
             argsorted = np.argsort([len(p) for p in _unsorted_proteins])
@@ -105,6 +111,12 @@ class SCNDataset(torch.utils.data.Dataset):
         self.angle_means = compute_angle_means(
             [p.angles for p in self.ids_to_SCNProtein.values()])
         self.lengths = np.array([len(p) for p in self])
+
+        # Report excluded entries
+        if complete_structures_only:
+            n_filtered_entries = starting_length - len(self.lengths)
+            print(f"{n_filtered_entries} ({n_filtered_entries/starting_length:.1%})"
+                  " data set entries were excluded due to missing residues.")
 
     def get_protein_list_by_split_name(self, split_name):
         """Return list of SCNProtein objects belonging to str split_name."""

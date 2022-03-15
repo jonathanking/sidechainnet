@@ -42,7 +42,7 @@ from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
-OPENMM_PLATFORM = "CUDA"  # CUDA or CPU
+OPENMM_PLATFORM = "CPU" #CUDA"  # CUDA or CPU
 
 
 class SCNProtein(object):
@@ -239,7 +239,7 @@ class SCNProtein(object):
     def update_hydrogens_for_openmm(self, hcoords):
         """Use a set of hydrogen coords to update OpenMM data for this protein."""
         mask = self.get_hydrogen_coord_mask()
-        self._hcoords_for_openmm = hcoords * mask
+        self._hcoords_for_openmm = torch.nan_to_num(hcoords * mask, nan=0.0)
         self.update_positions(self._hcoords_for_openmm)  # Use our openmm only hcoords
 
         # Below is experimental code that only passes hcoords from GPU to CPU once

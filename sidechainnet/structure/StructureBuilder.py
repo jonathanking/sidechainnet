@@ -533,7 +533,7 @@ def _convert_seq_to_str(seq):
     return seq_as_str
 
 
-@torch.jit.script
+# @torch.jit.script
 def _init_bb_helper(BB_n_ca: float, ang3: torch.Tensor, BB_ca_c: float, device: str):
     """Torchscript friendly helper for _init_bb. Currently unused."""
     n = torch.tensor([0.0, 0.0, 0.001], requires_grad=True, device=device)

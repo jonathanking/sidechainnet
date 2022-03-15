@@ -149,7 +149,10 @@ class HydrogenBuilder(object):
             # Add empty hydrogen coordinates for missing residues
             # TODO Check hydrogen generation with nans
             if self.isnan(crd).all():
-                new_coords.append(self.ones((NUM_COORDS_PER_RES_W_HYDROGENS, 3)) * np.nan)
+                empty = self.ones((NUM_COORDS_PER_RES_W_HYDROGENS, 3)) * np.nan
+                if not self.is_numpy:
+                    empty = empty.to(self.device)
+                new_coords.append(empty)
                 prev_res_atoms = None
                 continue
             # Create an organized mapping from atom name to Catesian coordinates
@@ -761,7 +764,7 @@ class AtomHolder(dict):
 ###########################################
 
 
-@njit
+# @njit
 def _M(axis: np.ndarray, theta):
     """Numba compiled function for generating rotation matrix. See HB.M()"""
     axis = axis / np.sqrt(np.dot(axis, axis))
@@ -776,7 +779,7 @@ def _M(axis: np.ndarray, theta):
     return r
 
 
-@njit
+# @njit
 def _M_posneg(axis: np.ndarray, theta):
     """Numba compiled function for generating two similar rotation matrices."""
     axis = axis / np.sqrt(np.dot(axis, axis))

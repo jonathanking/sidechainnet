@@ -122,7 +122,7 @@ def standard_nerf(a, b, c, l, theta, chi):
     return res.squeeze()
 
 
-@torch.jit.script
+# @torch.jit.script
 def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
     """Return coordinates for point d given previous points & parameters. Optimized NeRF.
 
@@ -164,7 +164,7 @@ def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
         ]).to(torch.float32).unsqueeze(1)).squeeze() + c
 
 
-@njit
+# @njit
 def sn_nerf_numpy(a, b, c, l_cd, theta, chi, l_bc):
     """Return coordinates for point d given previous points & parameters. Optimized NeRF.
 

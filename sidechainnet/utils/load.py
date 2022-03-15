@@ -278,15 +278,12 @@ def load(casp_version=12,
     scn_dict = scn.utils.manual_adjustment._repair_1GJJ_1_A(scn_dict)
 
     scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
-    if complete_structures_only:
-        scn_dict = filter_dictionary_by_missing_residues(scn_dict)
 
     # By default, the load function returns a dictionary
     if not with_pytorch and not scn_dataset:
         return scn_dict
     elif not with_pytorch and scn_dataset:
         return SCNDataset(scn_dict)
-
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
             scn_dict,
@@ -300,7 +297,8 @@ def load(casp_version=12,
             train_eval_downsample=train_eval_downsample,
             shuffle=shuffle,
             overfit_batches=kwargs['overfit_batches'],
-            overfit_batches_small=kwargs['overfit_batches_small'])
+            overfit_batches_small=kwargs['overfit_batches_small'],
+            complete_structures_only=complete_structures_only)
 
     return
 

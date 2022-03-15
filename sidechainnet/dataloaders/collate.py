@@ -42,7 +42,8 @@ def prepare_dataloaders(data,
                         train_eval_downsample=0.1,
                         shuffle=True,
                         overfit_batches=0,
-                        overfit_batches_small=True):
+                        overfit_batches_small=True,
+                        complete_structures_only=False):
     """Return dataloaders for model training according to user specifications.
 
     Using the pre-processed data, stored in a nested Python dictionary, this
@@ -68,7 +69,8 @@ def prepare_dataloaders(data,
                                trim_edges=True,
                                sort_by_length='ascending',
                                overfit_batches=overfit_batches,
-                               overfit_batches_small=overfit_batches_small)
+                               overfit_batches_small=overfit_batches_small,
+                               complete_structures_only=complete_structures_only)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
