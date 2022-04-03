@@ -482,7 +482,7 @@ BOXURLS = {
 
     # CASP 7
     "sidechainnet_casp7_30.pkl":
-        "https://pitt.box.com/shared/static/hjblmbwei2dkwhfjatttdmamznt1k9ef.pkl",
+        "https://pitt.box.com/shared/static/krprccxr3sv9tpfu1r7xrtaulg0qucy7.pkl",
     "sidechainnet_casp7_50.pkl":
         "https://pitt.box.com/shared/static/4pw56huei1123a5rd6g460886kg0pex7.pkl",
     "sidechainnet_casp7_70.pkl":
@@ -496,5 +496,5 @@ BOXURLS = {
 
     # Other
     "sidechainnet_debug.pkl":
-        "https://pitt.box.com/shared/static/tevlb6nuii6kk520vi4x0u7li0eoxuep.pkl"
+        "https://pitt.box.com/shared/static/1w087htft56umnedlgp9yo4frnhmaakt.pkl"
 }
