@@ -39,8 +39,6 @@ class SCNDataset(torch.utils.data.Dataset):
                 if split_label in existing_data_label:
                     self.splits.append(existing_data_label)
 
-        starting_length = len(data[self.splits[0]]['seq'])
-
         # If only a single split was provided, prepare the data for protein construction
         if not len(self.splits):
             assert split_name, "Please provide a split name if providing a single split."
@@ -52,6 +50,8 @@ class SCNDataset(torch.utils.data.Dataset):
                         compute_angle_means(data['ang']) if data['ang'] else None
                 }
             }
+
+        starting_length = len(data[self.splits[0]]['seq'])
 
         # TODO: handle more cleverly the case when no angle/other data is provided
 
@@ -134,6 +134,8 @@ class SCNDataset(torch.utils.data.Dataset):
             start = len(self) + start if start < 0 else start
             return [self.idx_to_SCNProtein[i] for i in range(start, stop, step)]
         else:
+            if id < 0:
+                id = len(self) + id
             return self.idx_to_SCNProtein[id]
 
     def __len__(self):

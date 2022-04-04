@@ -66,6 +66,10 @@ class ProteinBatch(object):
         return self.pad_for_batch((p.evolutionary for p in self), 'pssm')
 
     @property
+    def pssm(self):
+        return self.evolutionary
+
+    @property
     def coords(self):
         if self._coords is not None:
             return self._coords
@@ -159,7 +163,7 @@ class ProteinBatch(object):
 
     def __len__(self):
         return len(self.proteins)
-    
+
     def cuda(self):
         self.device = torch.device('cuda')
 

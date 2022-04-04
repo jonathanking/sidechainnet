@@ -79,7 +79,8 @@ class StructureBuilder(object):
             raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
                              f"You have provided {tuple(self.coords.shape)}.")
         if (self.coords is not None and
-            (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str)):
+            (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str) and
+            (self.coords.shape[0] // NUM_COORDS_PER_RES_W_HYDROGENS) != len(self.seq_as_str)):
             raise ValueError(
                 f"The length of the coordinate matrix must match the sequence length "
                 f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
@@ -97,8 +98,11 @@ class StructureBuilder(object):
         self.next_bb = None
         self.pdb_creator = None
         self.nerf_method = nerf_method
-        self.has_hydrogens = False
-        self.atoms_per_res = NUM_COORDS_PER_RES
+        try:
+            self.has_hydrogens = self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
+        except AttributeError:
+            self.has_hydrogens = False
+        self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS if self.has_hydrogens else NUM_COORDS_PER_RES
         self.terminal_atoms = None
 
     def __len__(self):

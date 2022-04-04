@@ -335,7 +335,7 @@ class SCNProtein(object):
         self.simulation.context.setPositions(self.positions)
 
     def get_hydrogen_coord_mask(self):
-        """Return a torch tensor with 0s representing pad characters in self.hcoords."""
+        """Return a torch tensor with nans representing pad characters in self.hcoords."""
         if self._hcoord_mask is not None:
             return self._hcoord_mask
         else:
@@ -347,6 +347,7 @@ class SCNProtein(object):
                 self._hcoord_mask[i * hy.NUM_COORDS_PER_RES_W_HYDROGENS:i *
                                   hy.NUM_COORDS_PER_RES_W_HYDROGENS + n_heavy_atoms +
                                   n_hydrogens, :] = 1.0
+            self._hcoord_mask[self._hcoord_mask == 0] = torch.nan
             return self._hcoord_mask
 
     ##########################################
@@ -565,8 +566,8 @@ class SCNProtein(object):
         n_removed_right = None if n_removed_right == 0 else -n_removed_right
         # Trim simple attributes
         for at in [
-                "seq", "int_seq", "angles", "secondary_structure", "int_secondary", "is_modified",
-                "evolutionary", "int_mask", "mask"
+                "seq", "int_seq", "angles", "secondary_structure", "int_secondary",
+                "is_modified", "evolutionary", "int_mask", "mask"
         ]:
             data = getattr(self, at)
             if data is not None:

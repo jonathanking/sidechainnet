@@ -296,9 +296,8 @@ def load(casp_version=12,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
             train_eval_downsample=train_eval_downsample,
             shuffle=shuffle,
-            overfit_batches=kwargs['overfit_batches'],
-            overfit_batches_small=kwargs['overfit_batches_small'],
-            complete_structures_only=complete_structures_only)
+            complete_structures_only=complete_structures_only,
+            **kwargs)
 
     return
 

@@ -43,6 +43,8 @@ class SimilarLengthBatchSampler(torch.utils.data.Sampler):
         self.use_largest_bin = use_largest_bin
         self.shuffle = shuffle
         self._original_shuffle_method = shuffle
+        if shuffle:
+            self.turn_off_descending()
 
         equalization_method = 'n_res' if dynamic_batching else 'n_proteins'
 
