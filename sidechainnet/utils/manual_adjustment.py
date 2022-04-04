@@ -73,7 +73,7 @@ def _repair_1GJJ_1_A(datadict):
             for idx, cur_id in enumerate(datadict[split]["ids"]):
                 if cur_id == '1GJJ_1_A':
                     found_splits_indices.append((split, idx))
-        except KeyError:
+        except (TypeError, KeyError):
             continue
 
     # Carefully split into two entries containing the appropriate data ranges
