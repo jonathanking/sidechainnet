@@ -21,16 +21,8 @@ Other features:
 import warnings
 
 import numpy as np
-import openmm
 import prody
 import torch
-from openmm import Platform
-from openmm.app import Topology
-from openmm.app import element as elem
-from openmm.app.forcefield import ForceField, HBonds
-from openmm.app.modeller import Modeller
-from openmm.openmm import LangevinMiddleIntegrator
-from openmm.unit import kelvin, nanometer, picosecond, picoseconds
 
 import sidechainnet
 from sidechainnet.utils.download import MAX_SEQ_LEN
@@ -42,7 +34,7 @@ from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
-OPENMM_PLATFORM = "CPU" #CUDA"  # CUDA or CPU
+OPENMM_PLATFORM = "CPU"  #CUDA"  # CUDA or CPU
 
 
 class SCNProtein(object):
@@ -85,6 +77,8 @@ class SCNProtein(object):
         self.is_numpy = isinstance(self.coords, np.ndarray)
         self._hcoords_for_openmm = None
 
+        self.warn()
+
     @property
     def sequence(self):
         return self.seq
@@ -104,10 +98,12 @@ class SCNProtein(object):
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
         return self.sb.to_3Dmol(style=style)
 
-    def to_pdb(self, path, title=None, from_angles=False):
+    def to_pdb(self, path, title=None, from_angles=False, hcoords=None):
         """Save structure to path as a PDB file."""
         if not title:
             title = self.id
+        if hcoords is not None:
+            self.sb = sidechainnet.StructureBuilder(self.seq, hcoords)
         if self.sb is None:
             if from_angles:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
@@ -138,6 +134,12 @@ class SCNProtein(object):
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
         return self.sb.to_png(path)
+
+    def warn(self):
+        self.warn = True
+
+    def warn_off(self):
+        self.warn = False
 
     @property
     def num_missing(self):
@@ -202,6 +204,7 @@ class SCNProtein(object):
         if not self.openmm_initialized:
             self.initialize_openmm()
         self.simulation.context.setPositions(self.positions)
+        self.simulation.context.applyConstraints()
         self.starting_state = self.simulation.context.getState(getEnergy=True,
                                                                getForces=True)
         self.starting_energy = self.starting_state.getPotentialEnergy()
@@ -292,6 +295,13 @@ class SCNProtein(object):
                 if an == "PAD":
                     hcoord_idx += 1
                     continue
+                if self.warn and np.isnan(c).any():
+                    self.positions = self.topology = self.openmm_seq = None
+                    raise ValueError(
+                        "There are missing atoms which are not currently supported for "
+                        f"hydrogen building or energy analysis. Ex: res {residue_name} "
+                        f"atom {an} protein {str(self)}.\nTo continue, execute "
+                        "<SCNProtein>.warn_off().")
                 self.topology.addAtom(name=an,
                                       element=get_element_from_atomname(an),
                                       residue=residue)
@@ -306,7 +316,8 @@ class SCNProtein(object):
         self.topology.createStandardBonds()
         # TODO think about disulfide bonds at a later point, see CYS/CYX (bridge, no H)
         # self.topology.createDisulfideBonds(self.positions)
-        self.positions = np.array(self.positions)
+        # if torch.is_tensor()
+        self.positions = np.array(self.positions) / 10  # We scale to convert from A to nm
         return self.topology, self.positions
 
     def initialize_openmm(self):
@@ -315,7 +326,8 @@ class SCNProtein(object):
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
         self.system = self.forcefield.createSystem(self.modeller.topology,
-                                                   nonbondedMethod=openmm.app.NoCutoff,
+                                                #    nonbondedMethod=openmm.app.NoCutoff,
+                                                   nonbondedMethod=PME,
                                                    nonbondedCutoff=1 * nanometer,
                                                    constraints=HBonds)
         self.integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond,
@@ -373,7 +385,8 @@ class SCNProtein(object):
         # self.pdbfixer.addMissingHydrogens(7.0)
 
     def minimize(self):
-        """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
+        """Perform an energy minimization using OpenMM. Return ∆E."""
+        self.get_openmm_repr()
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
         self.system = self.forcefield.createSystem(self.modeller.topology,
@@ -390,7 +403,9 @@ class SCNProtein(object):
         self.starting_positions = np.asarray(
             self.simulation.context.getState(getPositions=True).getPositions(
                 asNumpy=True))
+
         self.simulation.minimizeEnergy()
+
         self.state = self.simulation.context.getState(getVelocities=True,
                                                       getPositions=True,
                                                       getParameters=True,
@@ -412,6 +427,22 @@ class SCNProtein(object):
             self.ending_positions, self.starting_positions).apply(self.ending_positions)
         rmsd = prody.calcRMSD(self.starting_positions, aligned_minimized)
         return rmsd
+
+    def _make_start_and_end_pdbs(self):
+        # starting_coords = np.zeros_like(self.hcoords)
+        # ending_coords = np.zeros_like(self.hcoords)
+        # starting_coords[self.hcoord_to_pos_map_keys] = self.starting_positions[
+        #     self.hcoord_to_pos_map_values]
+        # ending_coords[self.hcoord_to_pos_map_keys] = self.ending_positions[
+        #     self.hcoord_to_pos_map_values]
+        # Again, we must scale by a factor of 10 to convert from nm to Angstrom
+        with open(f"{self.id}_start.pdb", "w") as f:
+            PDBFile.writeFile(self.topology, self.starting_positions * 10, f)
+        with open(f"{self.id}_end.pdb", "w") as f:
+            PDBFile.writeFile(self.topology, self.ending_positions * 10, f)
+
+        # self.to_pdb(f"{self.id}_start.pdb", hcoords=starting_coords)
+        # self.to_pdb(f"{self.id}_end.pdb", hcoords=ending_coords)
 
     ###################################
     #         OTHER FUNCTIONS         #
@@ -481,9 +512,11 @@ class SCNProtein(object):
 
             n_pad = NUM_COORDS_PER_RES - num_heavy
 
-            to_stack.extend(
-                [hcoords[h_start:h_end],
-                 torch.zeros(n_pad, 3, requires_grad=True)])
+            # TODO Test this works with nans and not zeros
+            to_stack.extend([
+                hcoords[h_start:h_end],
+                torch.zeros(n_pad, 3, requires_grad=True) * torch.nan
+            ])
 
         return torch.cat(to_stack)
 
