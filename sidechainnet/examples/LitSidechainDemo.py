@@ -8,6 +8,7 @@ from sidechainnet.examples.optim import NoamOpt
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
 from sidechainnet.structure.structure import inverse_trig_transform
 from sidechainnet.utils.sequence import VOCAB
+import sidechainnet as scn
 
 
 class LitSidechainTransformerBaseModule(pl.LightningModule):
