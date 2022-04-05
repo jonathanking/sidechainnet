@@ -98,8 +98,10 @@ def prepare_dataloaders(data,
         print(f"Approximating {batch_size * np.median(train_dataset.lengths):.0f}"
               " residues/batch.")
 
+    vsplits = filter(lambda split: "valid" in split, data.keys())
+
     valid_loaders = {}
-    for vsplit in filter(lambda split: "valid" in split, data.keys()):
+    for vsplit in vsplits:
         valid_loader = torch.utils.data.DataLoader(SCNDataset(data[vsplit],
                                                               split_name=vsplit,
                                                               trim_edges=True,
@@ -122,6 +124,6 @@ def prepare_dataloaders(data,
         'train-eval': train_eval_loader,
         'test': test_loader
     }
-    dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in VALID_SPLITS})
+    dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in vsplits})
 
     return dataloaders
