@@ -8,7 +8,6 @@ from pytorch_lightning.tuner.tuning import Tuner
 import sidechainnet as scn
 import torch
 import torch.utils.data
-from pl_bolts.callbacks import (BatchGradientVerificationCallback, ModuleDataMonitor)
 from pytorch_lightning.loggers import WandbLogger
 from sidechainnet.examples.LitSidechainTransformer import (LitSCNDataModule,
                                                            LitSidechainTransformer)
