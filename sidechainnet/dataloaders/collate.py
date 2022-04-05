@@ -99,7 +99,7 @@ def prepare_dataloaders(data,
               " residues/batch.")
 
     valid_loaders = {}
-    for vsplit in VALID_SPLITS:
+    for vsplit in filter(lambda split: "valid" in split, data.keys()):
         valid_loader = torch.utils.data.DataLoader(SCNDataset(data[vsplit],
                                                               split_name=vsplit,
                                                               trim_edges=True,
