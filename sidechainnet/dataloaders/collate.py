@@ -98,7 +98,7 @@ def prepare_dataloaders(data,
         print(f"Approximating {batch_size * np.median(train_dataset.lengths):.0f}"
               " residues/batch.")
 
-    vsplits = filter(lambda split: "valid" in split, data.keys())
+    vsplits = list(filter(lambda split: "valid" in split, data.keys()))
 
     valid_loaders = {}
     for vsplit in vsplits:
