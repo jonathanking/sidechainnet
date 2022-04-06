@@ -136,7 +136,7 @@ class LitSidechainTransformerBaseModule(pl.LightningModule):
                  add_dataloader_idx=False,
                  batch_size=len(batch))
         self._log_angle_metrics(loss_dict, 'valid',
-                                self.hparams.dataloader_name_mapping[dataloader_idx])
+                                len(batch), self.hparams.dataloader_name_mapping[dataloader_idx])
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         """Single test step with multiple possible DataLoaders. Same as validation."""
