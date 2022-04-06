@@ -1,7 +1,9 @@
 """A class for generating/visualizing protein atomic coordinates from measured angles."""
 
+import copy
 from io import UnsupportedOperation
 import numpy as np
+import prody as pr
 import torch
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
@@ -254,7 +256,7 @@ class StructureBuilder(object):
         pymol.cmd.png(path, width=800, height=800, quiet=0, dpi=200, ray=0)
         pymol.cmd.delete("all")
 
-    def to_3Dmol(self, style=None, **kwargs):
+    def to_3Dmol(self, style=None, other_protein=None, **kwargs):
         """Generate protein structure & return interactive py3Dmol.view for visualization.
 
         Args:
@@ -266,13 +268,47 @@ class StructureBuilder(object):
                 settings.
         """
         import py3Dmol
-        if not style:
-            style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
 
         view = py3Dmol.view(**kwargs)
         view.addModel(self.to_pdbstr(), 'pdb', {'keepH': True})
-        if style:
+
+        # If we have another protein to compare, align the other protein and add to viz
+        if other_protein is not None:
+            # Create copies and nan-masks of coordinate data
+            other_protein.numpy()
+            other_protein.sb = None
+            other_protein_copy = copy.deepcopy(other_protein)
+            other_protein_mask = np.isnan(other_protein_copy.coords)
+            other_protein_copy.coords[other_protein_mask] = 0
+            coords_copy = copy.deepcopy(self.coords)
+            coords_mask = np.isnan(self.coords)
+            coords_copy[coords_mask] = 0
+            # Perform alignment
+            t = pr.calcTransformation(other_protein_copy.coords, coords_copy)
+            aligned_coords = t.apply(other_protein_copy.coords)
+            # Update coords in other protein
+            other_protein_copy.coords = aligned_coords
+            if other_protein_copy.has_hydrogens:
+                other_protein_copy.hcoords = t.apply(other_protein_copy.hcoords)
+            # Replace nans
+            other_protein_copy.coords[other_protein_mask] = np.nan
+            coords_copy[coords_mask] = np.nan
+            # Add viz to model
+            view.addModel(other_protein_copy.to_pdbstr())
+
+        # Set visualization style
+        if not style:
+            style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
+        if other_protein is None:
             view.setStyle(style)
+        elif other_protein is not None:
+            style1 = {'cartoon': {'color': '#599BFB'},
+                      'stick': {'radius': .07, 'color': '#599BFB'}}
+            style2 = {'cartoon': {'color': '#FB5960'},
+                      'stick': {'radius': .15, 'color': '#FB5960'}}
+            view.setStyle({"model": 0}, style1)
+            view.setStyle({"model": 1}, style2)
+
         view.zoomTo()
         return view
 
