@@ -7,7 +7,7 @@ import torch
 import numpy as np
 
 
-class ProteinBatch(Iterable):
+class ProteinBatch(object):
     """Represents batch of Proteins for collation, construction, etc. Enforces max len."""
 
     def __init__(self, proteins, batch_pad_char=0, device=torch.device('cpu')) -> None:

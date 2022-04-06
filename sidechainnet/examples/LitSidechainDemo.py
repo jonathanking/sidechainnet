@@ -133,7 +133,8 @@ class LitSidechainTransformerBaseModule(pl.LightningModule):
                  on_step=False,
                  on_epoch=True,
                  prog_bar=name == self.hparams.opt_lr_scheduling_metric,
-                 add_dataloader_idx=False)
+                 add_dataloader_idx=False,
+                 batch_size=len(batch))
         self._log_angle_metrics(loss_dict, 'valid',
                                 self.hparams.dataloader_name_mapping[dataloader_idx])
 
@@ -153,7 +154,8 @@ class LitSidechainTransformerBaseModule(pl.LightningModule):
         self.log("losses/test/rmse",
                  torch.sqrt(loss_dict['mse']),
                  on_step=False,
-                 on_epoch=True)
+                 on_epoch=True,
+                 batch_size=len(batch))
         self._log_angle_metrics(loss_dict, 'test')
 
     def _compute_angle_metrics(self,
