@@ -156,7 +156,7 @@ class LitSidechainTransformerBaseModule(pl.LightningModule):
                  on_step=False,
                  on_epoch=True,
                  batch_size=len(batch))
-        self._log_angle_metrics(loss_dict, 'test')
+        self._log_angle_metrics(loss_dict, 'test', batch_size=len(batch))
 
     def _compute_angle_metrics(self,
                                sc_angs_true,
@@ -217,7 +217,7 @@ class LitSidechainTransformerBaseModule(pl.LightningModule):
 
         return loss_dict
 
-    def _log_angle_metrics(self, loss_dict, split, dataloader_name=""):
+    def _log_angle_metrics(self, loss_dict, split, batch_size, dataloader_name=""):
         dl_name_str = dataloader_name + "_" if dataloader_name else ""
 
         angle_metrics_dict = {
@@ -227,7 +227,7 @@ class LitSidechainTransformerBaseModule(pl.LightningModule):
         self.log_dict(angle_metrics_dict,
                       on_epoch=True,
                       on_step=split == 'train',
-                      add_dataloader_idx=False)
+                      add_dataloader_idx=False, batch_size=batch_size)
 
     def _get_losses(self,
                     batch,
