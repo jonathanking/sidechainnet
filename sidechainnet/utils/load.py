@@ -283,7 +283,7 @@ def load(casp_version=12,
     if not with_pytorch and not scn_dataset:
         return scn_dict
     elif not with_pytorch and scn_dataset:
-        return SCNDataset(scn_dict)
+        return SCNDataset(scn_dict, complete_structures_only=complete_structures_only, trim_edges=True)
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
             scn_dict,
