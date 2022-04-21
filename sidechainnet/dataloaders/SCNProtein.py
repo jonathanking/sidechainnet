@@ -374,6 +374,8 @@ class SCNProtein(object):
 
     def minimize(self):
         """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
+        if not hasattr(self, "topology") or self.topology is None:
+            self.initialize_openmm()
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
         self.system = self.forcefield.createSystem(self.modeller.topology,

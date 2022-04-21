@@ -66,9 +66,9 @@ def get_alias(protein):
 
 
 def load_p(start=0, l=2):
-    d = scn.load("debug", scn_dir="/home/jok120/openmm_loss/sidechainnet_data", scn_dataset=True)
+    d = scn.load("debug", scn_dir="/home/jok120/sidechainnet_data", scn_dataset=True, complete_structures_only=True, filter_by_resolution=True)
     # p = d["1HD1_1_A"]
-    p = d["90#2LEM_1_A"]  # much longer, len 216
+    p = d[0]  # much longer, len 216
     if l > 0:
         p.seq = p.seq[start:start+l]
         p.coords = p.coords[start*14:start*14 + 14*l]
