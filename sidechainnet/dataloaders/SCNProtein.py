@@ -154,10 +154,12 @@ class SCNProtein(object):
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
 
-    def build_coords_from_angles(self, add_hydrogens=False):
+    def build_coords_from_angles(self, angles=None, add_hydrogens=False):
         """Build protein coordinates iff no StructureBuilder already exists."""
+        if angles is None:
+            angles = self.angles
         if self.sb is None:
-            self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            self.sb = sidechainnet.StructureBuilder(self.seq, angles)
             if add_hydrogens:
                 self.sb.add_hydrogens()
                 self.hcoords = self.sb.coords
@@ -167,17 +169,17 @@ class SCNProtein(object):
         else:
             print("StructureBuilder already exists. Coords not rebuilt.")
 
-    def add_hydrogens(self, from_angles=False, coords=None):
+    def add_hydrogens(self, from_angles=False, angles=None, coords=None):
         """Add hydrogens to the internal protein structure representation."""
         if (isinstance(self.angles, torch.Tensor) and
                 torch.isnan(self.angles).all(dim=1).any()) or isinstance(
                     self.angles, np.ndarray) and np.isnan(self.angles).all(axis=1).any():
             raise ValueError("Adding hydrogens to structures with missing residues is not"
                              " supported.")
+        if angles is None:
+            angles = self.angles
         if from_angles:
-            self.sb = structure.StructureBuilder(self.seq,
-                                                 ang=self.angles,
-                                                 device=self.device)
+            self.sb = structure.StructureBuilder(self.seq, ang=angles, device=self.device)
             self.sb.build()
         elif coords is not None:
             self.sb = structure.StructureBuilder(self.seq, crd=coords, device=self.device)
