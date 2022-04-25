@@ -93,7 +93,7 @@ class SCNProtein(object):
         """Return length of protein sequence."""
         return len(self.seq)
 
-    def to_3Dmol(self, from_angles=False, style=None):
+    def to_3Dmol(self, from_angles=False, style=None, other_protein=None):
         """Return an interactive visualization of the protein with py3DMol."""
         if self.sb is None:
             if from_angles:
@@ -102,7 +102,7 @@ class SCNProtein(object):
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
-        return self.sb.to_3Dmol(style=style)
+        return self.sb.to_3Dmol(style=style, other_protein=other_protein)
 
     def to_pdb(self, path, title=None, from_angles=False):
         """Save structure to path as a PDB file."""
@@ -116,6 +116,21 @@ class SCNProtein(object):
             else:
                 self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
         return self.sb.to_pdb(path, title)
+
+    def to_pdbstr(self, title=None, from_angles=False, hcoords=None):
+        """Save structure to path as a PDB file."""
+        if not title:
+            title = self.id
+        if hcoords is not None:
+            self.sb = sidechainnet.StructureBuilder(self.seq, hcoords)
+        if self.sb is None:
+            if from_angles:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+            elif self.has_hydrogens:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+            else:
+                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+        return self.sb.to_pdbstr(title)
 
     def to_gltf(self, path, title="test", from_angles=False):
         """Save structure to path as a gltf (3D-object) file."""
