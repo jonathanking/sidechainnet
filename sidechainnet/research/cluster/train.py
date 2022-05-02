@@ -27,7 +27,7 @@ from sidechainnet.examples.sidechain_only_models import SidechainTransformer
 import sidechainnet as scn
 from sidechainnet.examples.losses import angle_mse
 from sidechainnet.examples.optim import ScheduledOptim
-from sidechainnet.utils.openmm import OpenMMEnergyH
+from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 from sidechainnet.structure import inverse_trig_transform
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 

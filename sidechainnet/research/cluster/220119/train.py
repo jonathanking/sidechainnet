@@ -26,7 +26,7 @@ from sidechainnet.examples.sidechain_only_models import SidechainTransformer
 import sidechainnet as scn
 from sidechainnet.examples.losses import mse_over_angles
 from sidechainnet.examples.optim import ScheduledOptim
-from sidechainnet.utils.openmm import OpenMMEnergyH
+from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 
 
 def train_epoch(model, data, optimizer, device, loss_name):

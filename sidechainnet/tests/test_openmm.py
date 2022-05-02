@@ -1,9 +1,9 @@
 import sidechainnet as scn
 import torch
-import sidechainnet.utils.openmm as mm
+import sidechainnet.utils.openmm_loss as mm
 import torch.optim as optim
 import numpy as np
-from sidechainnet.utils.openmm import OpenMMEnergy, OpenMMEnergyH
+from sidechainnet.utils.openmm_loss import OpenMMEnergy, OpenMMEnergyH
 from tqdm import tqdm
 
 SCN_DIR = '/home/jok120/sidechainnet_data'

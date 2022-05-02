@@ -10,7 +10,7 @@ from sidechainnet.examples.losses import angle_mse, angle_diff
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
 from sidechainnet.structure.structure import inverse_trig_transform
 from sidechainnet.utils.download import MAX_SEQ_LEN
-from sidechainnet.utils.openmm import OpenMMEnergyH
+from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 from sidechainnet.examples.optim import NoamOpt
 from sidechainnet.examples.transformer import PositionalEncoding
 

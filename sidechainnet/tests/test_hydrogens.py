@@ -8,7 +8,7 @@ from pstats import Stats, SortKey
 from tqdm import tqdm
 
 import sidechainnet as scn
-from sidechainnet.utils.openmm import OpenMMEnergy, OpenMMEnergyH
+from sidechainnet.utils.openmm_loss import OpenMMEnergy, OpenMMEnergyH
 
 torch.autograd.set_detect_anomaly(True)
 torch.set_printoptions(sci_mode=False, precision=3)
