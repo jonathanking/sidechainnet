@@ -18,6 +18,7 @@ Other features:
     * visualize proteins with SCNProtein.to_3Dmol()
     * write PDB files for proteins with SCNProtein.to_PDB()
 """
+import pickle
 import warnings
 
 import numpy as np
@@ -42,7 +43,7 @@ from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
-OPENMM_PLATFORM = "CPU" #CUDA"  # CUDA or CPU
+OPENMM_PLATFORM = "CPU"  #CUDA"  # CUDA or CPU
 
 
 class SCNProtein(object):
@@ -218,6 +219,11 @@ class SCNProtein(object):
         """Return potential energy of the system given current atom positions."""
         if not self.openmm_initialized:
             self.initialize_openmm()
+        # if self.has_missing_atoms:
+        #     self.make_pdbfixer()
+        #     self.pdbfixer.findMissingAtoms()
+        #     self.pdbfixer.addMissingAtoms()
+        #     self.positions = self.pdbfixer.positions
         self.simulation.context.setPositions(self.positions)
         self.starting_state = self.simulation.context.getState(getEnergy=True,
                                                                getForces=True)
@@ -297,6 +303,7 @@ class SCNProtein(object):
         hcoords = self.hcoords.cpu().detach().numpy(
         ) if not self.is_numpy else self.hcoords
         coord_gen = coord_generator(hcoords, self.atoms_per_res)
+        self.has_missing_atoms = False
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
@@ -308,6 +315,12 @@ class SCNProtein(object):
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 if an == "PAD":
                     hcoord_idx += 1
+                    continue
+                # Handle missing atoms
+                if np.isnan(c).any():
+                    raise ValueError("Cannot construct an OpenMM Representation with "
+                                     f"missing atoms ({i} {residue_name}).")
+                    self.has_missing_atoms = True
                     continue
                 self.topology.addAtom(name=an,
                                       element=get_element_from_atomname(an),
@@ -574,6 +587,50 @@ class SCNProtein(object):
         self.coords[np.isnan(self.coords)] = value
         self.angles[np.isnan(self.angles)] = value
 
+    def pickle(self, path):
+        """Write a pickled version of the protein.
+
+        Args:
+            path (str): Path to pickle file.
+        """
+        if self.has_hydrogens:
+            self.hcoords = torch.tensor(self.hcoords)
+            self.coords = self.hydrogenrep_to_heavyatomrep().detach().numpy()
+        d = {
+            "angles": self.angles,
+            "sequence": self.seq,
+            "id": self.id,
+            "evolutionary": self.evolutionary,
+            "mask": self.mask,
+            "coordinates": self.coords,
+            "secondary_structure": self.secondary_structure,
+            "resolution": self.resolution,
+            "unmodified_seq": self.unmodified_seq,
+            "is_modified": self.is_modified,
+            "split": self.split,
+            "add_sos_eos": self.add_sos_eos
+        }
+        with open(path, "wb") as f:
+            pickle.dump(d, f)
+
+    def copy(self):
+        """Duplicates the protein. Does not support OpenMM data."""
+        newp = SCNProtein(coordinates=self.coords.copy(),
+                          angles=self.angles.copy(),
+                          sequence=self.seq,
+                          unmodified_seq=self.unmodified_seq,
+                          mask=self.mask,
+                          evolutionary=self.evolutionary,
+                          secondary_structure=self.secondary_structure,
+                          resolution=self.resolution,
+                          is_modified=self.is_modified,
+                          id=self.id,
+                          split=self.split,
+                          add_sos_eos=self.add_sos_eos)
+        newp.hcoords = self.hcoords.copy()
+        newp.has_hydrogens = self.has_hydrogens
+        return newp
+
     def trim_edges(self):
         """Trim edges of seq/ums, 2ndary, evo, mask, angles, and coords based on mask."""
         assert isinstance(self.mask, str)
@@ -667,3 +724,16 @@ def get_element_from_atomname(atom_name):
         return elem.hydrogen
     else:
         raise ValueError(f"Unknown element for atom name {atom_name}.")
+
+
+if __name__ == "__main__":
+    import sidechainnet as scn
+    d = scn.load("debug",
+                 scn_dataset=True,
+                 complete_structures_only=True,
+                 trim_edges=True,
+                 scn_dir="/home/jok120/sidechainnet_data",
+                 filter_by_resolution=True)
+    d.filter(lambda x: len(x) < 15)
+    d[2].add_hydrogens(from_angles=True)
+    d[2].get_energy()

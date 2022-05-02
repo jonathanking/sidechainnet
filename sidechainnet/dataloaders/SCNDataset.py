@@ -12,11 +12,14 @@ SCNProteins may be iterated over or selected from the SCNDataset.
     >>> d["1HD1_1_A"]
     SCNProtein(1HD1_1_A, len=75, missing=0, split='train')
 """
+import copy
+import datetime
+import pickle
 import numpy as np
 import torch
 
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
-from sidechainnet.utils.organize import compute_angle_means
+from sidechainnet.utils.organize import compute_angle_means, EMPTY_SPLIT_DICT
 
 
 class SCNDataset(torch.utils.data.Dataset):
@@ -51,7 +54,7 @@ class SCNDataset(torch.utils.data.Dataset):
                 }
             }
 
-        starting_length = len(data[self.splits[0]]['seq'])
+        starting_length = sum([len(data[split]['seq']) for split in self.splits])
 
         # TODO: handle more cleverly the case when no angle/other data is provided
 
@@ -166,8 +169,23 @@ class SCNDataset(torch.utils.data.Dataset):
             self.split_to_ids[p.split].remove(pnid)
             del self.ids_to_SCNProtein[pnid]
         self.idx_to_SCNProtein = {}
-        for i, protein in enumerate(self):
+        for i, protein in enumerate(self.ids_to_SCNProtein.values()):
             self.idx_to_SCNProtein[i] = protein
+
+    def filter(self, func, verbose=True):
+        """Filter the SCNDataset, keeping all entries where func(protein) is True.
+
+        Args:
+            func (function): A function that takes as input a single SCNProtein and
+            returns True or False.
+        """
+        starting_size = len(self)
+        to_keep = [p.id for p in filter(func, self)]
+        self.filter_ids(to_keep)
+        if verbose:
+            n_filtered_entries = starting_size - len(self)
+            print(f"{n_filtered_entries} ({n_filtered_entries/starting_size:.1%})"
+                  " data set entries were excluded by user-defined function.")
 
     def _sort_by_length(self, reverse_sort):
         """Sorts all data entries by sequence length."""
@@ -186,3 +204,53 @@ class SCNDataset(torch.utils.data.Dataset):
         self.resolutions = [self.resolutions[i] for i in sorted_len_indices]
         self.secs = [self.secs[i] for i in sorted_len_indices]
         self.mods = [self.mods[i] for i in sorted_len_indices]
+
+    def pickle(self, path, description=None):
+        """Create and save a pickled Python dictionary representing the dataset.
+
+        Args:
+            path (str): Path to new file.
+        """
+        complete_dict = {
+            "date": datetime.datetime.now().strftime("%I:%M%p %b %d, %Y"),
+            "settings": {
+                "angle_means": self.angle_means
+            }
+        }
+        for split in self.splits:
+            if split not in complete_dict:
+                complete_dict[split] = copy.deepcopy(EMPTY_SPLIT_DICT)
+            for p in self.get_protein_list_by_split_name(split):
+                p.numpy()
+                complete_dict[split]["ang"].append(p.angles)
+                complete_dict[split]["seq"].append(p.seq)
+                complete_dict[split]["ids"].append(p.id)
+                complete_dict[split]["evo"].append(p.evolutionary)
+                complete_dict[split]["msk"].append(p.mask)
+                if p.has_hydrogens:
+                    p.hcoords = torch.tensor(p.hcoords)
+                    p.coords = p.hydrogenrep_to_heavyatomrep().numpy()
+                complete_dict[split]["crd"].append(p.coords)
+                complete_dict[split]["sec"].append(p.secondary_structure)
+                complete_dict[split]["res"].append(p.resolution)
+                complete_dict[split]["ums"].append(p.unmodified_seq)
+                complete_dict[split]["mod"].append(p.is_modified)
+
+        if not description:
+            description = "Pickled SCNDataset."
+        complete_dict['description'] = description
+
+        with open(path, "wb") as f:
+            pickle.dump(complete_dict, f)
+
+        return
+
+
+if __name__ == "__main__":
+    import sidechainnet as scn
+    d = scn.load("debug",
+                 scn_dataset=True,
+                 complete_structures_only=True,
+                 trim_edges=True,
+                 scn_dir="/home/jok120/sidechainnet_data")
+    d.filter(lambda p: len(p) < 50)
