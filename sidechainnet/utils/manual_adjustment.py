@@ -68,10 +68,14 @@ def _repair_1GJJ_1_A(datadict):
     """
     # Locate positions in data arrays
     found_splits_indices = []
-    for split in scn.DATA_SPLITS:
-        for idx, cur_id in enumerate(datadict[split]["ids"]):
-            if cur_id == '1GJJ_1_A':
-                found_splits_indices.append((split, idx))
+
+    for split in datadict.keys():
+        try:
+            for idx, cur_id in enumerate(datadict[split]["ids"]):
+                if cur_id == '1GJJ_1_A':
+                    found_splits_indices.append((split, idx))
+        except (KeyError, TypeError):
+            continue
 
     # Carefully split into two entries containing the appropriate data ranges
     for split, idx in found_splits_indices:
