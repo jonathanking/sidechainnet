@@ -5,8 +5,7 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=any_gpu
-#SBATCH --output="sidechainnet/research/cluster/220427/out/slurm-%A_%a.out"
-
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220427/out/%A_%6a.out"
 
 ############################
 ##       Script Vars      ##
@@ -44,11 +43,12 @@ echo "Updated repo."
 ############################
 ##     Array Job Exec.    ##
 ############################
-SCRIPT_PATH="/net/pulsar/home/koes/jok120/repos/sidechainnet/utils/minimize_scn.py"
+SCRIPT_PATH="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/utils/minimize_scn.py"
 DATAPATH="/net/pulsar/home/koes/jok120/scn220502/sidechainnet_casp7_30.pkl"
-PICKLEOUTPATH="/net/pulsar/home/koes/jok120/scnmin220502/"
+UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220502/unmin"
+MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220502/min"
 
-python $SCRIPT_PATH process_index $DATAPATH $PICKLEOUTPATH $SLURM_ARRAY_TASK_ID
+python $SCRIPT_PATH process_index $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
 
 
 ############################
