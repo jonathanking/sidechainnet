@@ -40,6 +40,7 @@ from sidechainnet import structure
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
@@ -77,13 +78,16 @@ class SCNProtein(object):
         self.atoms_per_res = NUM_COORDS_PER_RES
         self.has_hydrogens = False
         self.openmm_initialized = False
-        self.hcoords = self.coords.copy() if self.coords is not None else None
+        self.is_numpy = isinstance(self.coords, np.ndarray)
+        if self.is_numpy:
+            self.hcoords = self.coords.copy() if self.coords is not None else None
+        else:
+            self.hcoords = torch.clone(self.coords) if self.coords is not None else None
         self.starting_energy = None
         self.positions = None
         self.forces = None
         self._hcoord_mask = None
         self.device = 'cpu'
-        self.is_numpy = isinstance(self.coords, np.ndarray)
         self._hcoords_for_openmm = None
 
     @property
@@ -513,9 +517,10 @@ class SCNProtein(object):
 
             n_pad = NUM_COORDS_PER_RES - num_heavy
 
-            to_stack.extend(
-                [hcoords[h_start:h_end],
-                 torch.zeros(n_pad, 3, requires_grad=True)])
+            to_stack.extend([
+                hcoords[h_start:h_end],
+                torch.ones(n_pad, 3, requires_grad=True) * GLOBAL_PAD_CHAR
+            ])
 
         return torch.cat(to_stack)
 
