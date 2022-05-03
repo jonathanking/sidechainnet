@@ -10,10 +10,14 @@
 ############################
 ##       Description      ##
 ############################
+# This slurm script will help minimize a SidechainNet dataset.
 # This file is meant to be run in 3 steps.
 #   1. Run sbatch --export=ALL,JOB_TYPE=setup,CASP_V=7,CASP_T=30 THISFILE.
+#           This splits up the desired sidechainnet file into individual protein files.
 #   2. Run sbatch --export=ALL,JOB_TYPE=process_index,CASP_V=7,CASP_T=30 --array 0-N_PROTEINS-1 THISFILE
+#           This minimizes each protein file independently.
 #   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=7,CASP_T=30 THISFILE.
+#           This collapses the minimized structures into a single minimized dataset.
 
 ############################
 ##       Script Vars      ##
