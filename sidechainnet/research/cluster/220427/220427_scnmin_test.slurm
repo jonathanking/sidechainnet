@@ -63,10 +63,14 @@ then
     echo "Done."
     echo $(ls -1q $UNMIN_PATH/*.pkl | wc -l) files processed.
 elif [[ $JOB_TYPE == process_index ]]
+then
     python $SCRIPT_PATH process_index $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
 elif [[ $JOB_TYPE == cleanup ]]
+then
     echo "Cleaning up files (merging minimized SidechainNet files into a single dict)."
     python $SCRIPT_PATH cleanup $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
+else
+    echo "$JOB_TYPE is not a valid command."
 fi
 
 ############################
