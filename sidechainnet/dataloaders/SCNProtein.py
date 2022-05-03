@@ -110,19 +110,23 @@ class SCNProtein(object):
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
 
-    def add_hydrogens(self, from_angles=False, coords=None):
+    def add_hydrogens(self, from_angles=False, coords=None, **kwargs):
         """Add hydrogens to the internal protein structure representation."""
         if from_angles:
             self.sb = structure.StructureBuilder(self.seq,
                                                  ang=self.angles,
-                                                 device=self.device)
+                                                 device=self.device,
+                                                 **kwargs)
             self.sb.build()
         elif coords is not None:
-            self.sb = structure.StructureBuilder(self.seq, crd=coords, device=self.device)
+            self.sb = structure.StructureBuilder(self.seq, crd=coords, 
+                                                 device=self.device,
+                                                 **kwargs)
         else:
             self.sb = structure.StructureBuilder(self.seq,
                                                  crd=self.coords,
-                                                 device=self.device)
+                                                 device=self.device,
+                                                 *kwargs)
         self.sb.add_hydrogens()
         self.hcoords = self.sb.coords
         self.has_hydrogens = True
