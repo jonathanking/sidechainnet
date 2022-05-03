@@ -28,6 +28,7 @@ import os
 from multiprocessing import Pool, cpu_count
 import pkg_resources
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
+import time
 
 import numpy as np
 import prody as pr
@@ -270,6 +271,9 @@ def _create(args):
 
 def _create_all(args):
     """Generate all thinnings of a particular CASP dataset, starting with the largest."""
+    from sidechainnet.utils.download import _init_dssp_data
+    _init_dssp_data()
+
     # First, parse raw proteinnet files into Python dictionaries for convenience
     pnids = get_proteinnet_ids(casp_version=args.casp_version, split="all", thinning=100)
     pnids = pnids[:args.limit]  # Limit the length of the list for debugging
@@ -458,9 +462,8 @@ def get_proteinnet_ids(casp_version, split, thinning=None):
         return list(PNID_CSV_FILE[PNID_CSV_FILE[colname]].index.values)
 
 
-def generate_all(num_cores=multiprocessing.cpu_count(),
-                 limit=None,
-                 regenerate_scdata=False):
+def generate_all(
+        num_cores=multiprocessing.cpu_count(), limit=None, regenerate_scdata=False):
     """Generate all SidechainNet datasets for curation and upload."""
     import time
     import sidechainnet as scn
@@ -475,6 +478,35 @@ def generate_all(num_cores=multiprocessing.cpu_count(),
                    regenerate_scdata=regenerate_scdata,
                    num_cores=num_cores,
                    limit=limit)
+
+
+def generate_all_from_proteinnet(proteinnet_dir,
+                                 sidechainnet_out,
+                                 num_cores=multiprocessing.cpu_count(),
+                                 limit=None,
+                                 regenerate_scdata=False):
+    """Generate all SCN datasets for curation & upload."""
+    t = time.localtime()
+    timestamp = time.strftime('%b-%d-%Y-%H%M', t)
+    pr.startLogfile(f"sidechainnet_generateall_{timestamp}")
+    casps = list(range(7, 13))[::-1]
+    for c in casps:
+        print("CASP", c)
+        pin = os.path.join(proteinnet_dir, 'casp'+str(c), 'casp'+str(c))
+        pout = os.path.join(proteinnet_dir, 'casp' + str(c), 'pkl')
+        os.makedirs(pout, exist_ok=True)
+        parse_raw_proteinnet(pin, pout, thinning=100)
+        args = ArgsTuple(
+            casp_version=c,
+            thinning='all',
+            proteinnet_in=pin,
+            proteinnet_out=pout,
+            sidechainnet_out=sidechainnet_out,
+            regenerate_scdata=regenerate_scdata,
+            limit=limit,
+            num_cores=num_cores)
+        # Create all thinnings for the current CASP version
+        _create_all(args)
 
 
 def main(args_tuple):
