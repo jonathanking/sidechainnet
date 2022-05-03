@@ -61,6 +61,7 @@ def process_index(index, unmin_path, min_path):
             f.write(traceback.format_exc())
         exit(0)
 
+    protein.numpy()
     protein.pickle(output_path)
     print("Minimized protein written to", output_path)
 
