@@ -5,7 +5,15 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=any_gpu
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220427/out/%A_%6a.out"
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220427/out2/%A_%6a.out"
+
+############################
+##       Description      ##
+############################
+# This file is meant to be run in 3 steps.
+#   1. Run sbatch --export=ALL,JOB_TYPE=setup,CASP_V=30,CASP_T=30 THISFILE.
+#   2. Run sbatch --export=ALL,JOB_TYPE=process_index,CASP_V=30,CASP_T=30 --array 0-N_PROTEINS-1 THISFILE
+#   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=30,CASP_T=30 THISFILE.
 
 ############################
 ##       Script Vars      ##
@@ -44,12 +52,21 @@ echo "Updated repo."
 ##     Array Job Exec.    ##
 ############################
 SCRIPT_PATH="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/utils/minimize_scn.py"
-DATAPATH="/net/pulsar/home/koes/jok120/scn220502/sidechainnet_casp7_30.pkl"
+DATAPATH="/net/pulsar/home/koes/jok120/scn220502/sidechainnet_casp${CASP_V}_${CASP_T}.pkl"
 UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220502/unmin"
 MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220502/min"
 
-python $SCRIPT_PATH process_index $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
-
+if [[ $JOB_TYPE == setup ]]
+then
+    echo "Setting up files (splitting SidechainNet into separate files for minimization)."
+    python $SCRIPT_PATH setup $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
+    echo "Done."
+elif [[ $JOB_TYPE == process_index ]]
+    python $SCRIPT_PATH process_index $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
+elif [[ $JOB_TYPE == cleanup ]]
+    echo "Cleaning up files (merging minimized SidechainNet files into a single dict)."
+    python $SCRIPT_PATH cleanup $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
+fi
 
 ############################
 ##     Copy Files Back    ##
