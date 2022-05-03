@@ -88,7 +88,7 @@ class StructureBuilder(object):
                 f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
                 f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
         if self.ang is not None and (self.array_lib.isnan(self.ang)).all(axis=1).any():
-            missing_loc = np.where((self.array_lib.isnan(self.ang)).all(axis=1))
+            missing_loc = self.array_lib.where((self.array_lib.isnan(self.ang)).all(axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "
@@ -276,10 +276,11 @@ class StructureBuilder(object):
         if other_protein is not None:
             # Create copies and nan-masks of coordinate data
             other_protein.numpy()
-            other_protein.sb = None
-            other_protein_copy = copy.deepcopy(other_protein)
+            other_protein_copy = other_protein.copy()
             other_protein_mask = np.isnan(other_protein_copy.coords)
             other_protein_copy.coords[other_protein_mask] = 0
+            if torch.is_tensor(self.coords):
+                self.coords = self.coords.detach().cpu().numpy()
             coords_copy = copy.deepcopy(self.coords)
             coords_mask = np.isnan(self.coords)
             coords_copy[coords_mask] = 0
@@ -290,6 +291,7 @@ class StructureBuilder(object):
             other_protein_copy.coords = aligned_coords
             if other_protein_copy.has_hydrogens:
                 other_protein_copy.hcoords = t.apply(other_protein_copy.hcoords)
+                other_protein_copy.coords = other_protein_copy.hcoords
             # Replace nans
             other_protein_copy.coords[other_protein_mask] = np.nan
             coords_copy[coords_mask] = np.nan
