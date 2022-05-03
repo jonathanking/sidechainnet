@@ -65,7 +65,7 @@ then
     echo "Setting up files (splitting SidechainNet into separate files for minimization)."
     python $SCRIPT_PATH setup $DATAPATH $UNMIN_PATH $MIN_PATH 0
     echo "Done."
-    echo $(ls -1q $UNMIN_PATH/*.pkl | wc -l) files processed.
+    echo $(ls -1q $UNMIN_PATH/ | wc -l) files processed.
 elif [[ $JOB_TYPE == process_index ]]
 then
     python $SCRIPT_PATH process_index $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
