@@ -6,8 +6,6 @@ import seaborn as sns
 import torch
 from tqdm import tqdm
 
-import sidechainnet as scn
-from sidechainnet.dataloaders.SCNProtein import SCNProtein
 from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 
 torch.set_printoptions(sci_mode=False, precision=3)
@@ -95,19 +93,6 @@ class SCNMinimizer(object):
         for i in range(10):
             opt.step(closure)
 
-
-#             try:
-#                 opt.step(closure)
-#             except ValueError:
-#                 opt = torch.optim.LBFGS([prev_angles.detach()],
-#                                 lr=1e-1,
-#                                 max_iter=100,  # Def 20
-#                                 max_eval=None,
-#                                 tolerance_grad=1e-07,
-#                                 tolerance_change=1e-04,
-#                                 history_size=100,
-#                                 line_search_fn="strong_wolfe")  # Def: None
-
         sns.lineplot(data=losses)
         plt.title("Protein Potential Energy")
         plt.xlabel("Optimization Step")
@@ -120,3 +105,18 @@ class SCNMinimizer(object):
         p.hcoords = p.coords = p.hcoords.detach().cpu().numpy()
 
         return to_optim
+
+
+if __name__ == "__main__":
+    import sidechainnet as scn
+    from sidechainnet.utils.minimizer import SCNMinimizer
+    d = scn.load("debug",
+                 scn_dataset=True,
+                 complete_structures_only=True,
+                 trim_edges=True,
+                 scn_dir="/home/jok120/sidechainnet_data",
+                 filter_by_resolution=False)
+    m = SCNMinimizer(d)
+    p = d[0]
+    m.minimize_scnprotein(p, verbose=True)
+    p.hcoords
