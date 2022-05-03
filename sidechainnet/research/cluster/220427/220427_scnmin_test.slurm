@@ -11,9 +11,9 @@
 ##       Description      ##
 ############################
 # This file is meant to be run in 3 steps.
-#   1. Run sbatch --export=ALL,JOB_TYPE=setup,CASP_V=30,CASP_T=30 THISFILE.
-#   2. Run sbatch --export=ALL,JOB_TYPE=process_index,CASP_V=30,CASP_T=30 --array 0-N_PROTEINS-1 THISFILE
-#   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=30,CASP_T=30 THISFILE.
+#   1. Run sbatch --export=ALL,JOB_TYPE=setup,CASP_V=7,CASP_T=30 THISFILE.
+#   2. Run sbatch --export=ALL,JOB_TYPE=process_index,CASP_V=7,CASP_T=30 --array 0-N_PROTEINS-1 THISFILE
+#   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=7,CASP_T=30 THISFILE.
 
 ############################
 ##       Script Vars      ##
