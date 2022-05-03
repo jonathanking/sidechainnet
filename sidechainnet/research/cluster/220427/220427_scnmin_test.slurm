@@ -59,7 +59,7 @@ MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220502/min"
 if [[ $JOB_TYPE == setup ]]
 then
     echo "Setting up files (splitting SidechainNet into separate files for minimization)."
-    python $SCRIPT_PATH setup $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
+    python $SCRIPT_PATH setup $DATAPATH $UNMIN_PATH $MIN_PATH 0
     echo "Done."
     echo $(ls -1q $UNMIN_PATH/*.pkl | wc -l) files processed.
 elif [[ $JOB_TYPE == process_index ]]
@@ -68,7 +68,7 @@ then
 elif [[ $JOB_TYPE == cleanup ]]
 then
     echo "Cleaning up files (merging minimized SidechainNet files into a single dict)."
-    python $SCRIPT_PATH cleanup $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
+    python $SCRIPT_PATH cleanup $DATAPATH $UNMIN_PATH $MIN_PATH 0
 else
     echo "$JOB_TYPE is not a valid command."
 fi
