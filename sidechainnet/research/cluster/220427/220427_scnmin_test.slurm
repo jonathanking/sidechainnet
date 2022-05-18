@@ -5,7 +5,8 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=any_gpu
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220427/out2/%A_%6a.out"
+#SBATCH --exclude=g122
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220427/out4/%A_%6a.out"
 
 ############################
 ##       Description      ##
@@ -18,6 +19,7 @@
 #           This minimizes each protein file independently.
 #   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=7,CASP_T=30 THISFILE.
 #           This collapses the minimized structures into a single minimized dataset.
+echo "Running job ${SLURM_JOB_ID} on node ${SLURMD_NODENAME}."
 
 ############################
 ##       Script Vars      ##
@@ -57,8 +59,8 @@ echo "Updated repo."
 ############################
 SCRIPT_PATH="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/utils/minimize_scn.py"
 DATAPATH="/net/pulsar/home/koes/jok120/scn220502/sidechainnet_casp${CASP_V}_${CASP_T}.pkl"
-UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220502/unmin"
-MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220502/min"
+UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220511/unmin"
+MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220512/min"
 
 if [[ $JOB_TYPE == setup ]]
 then
