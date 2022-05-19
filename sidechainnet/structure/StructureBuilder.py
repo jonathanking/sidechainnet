@@ -21,7 +21,7 @@ class StructureBuilder(object):
     really a terminal atom because it's tail is masked out?).
     """
 
-    def __init__(self, seq, ang=None, crd=None, device='cpu', nerf_method="sn_nerf"):
+    def __init__(self, seq, ang=None, crd=None, device='cpu', nerf_method="standard"):
         """Initialize a StructureBuilder for a single protein. Does not build coordinates.
 
         To generate coordinates after initialization, see build().
