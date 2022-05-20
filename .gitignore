@@ -129,3 +129,5 @@ resources/dev/*
 *_*.out
 *wandb*
 *.chkpt
+sidechainnet/utils/minimize_old.py
+sidechainnet/utils/openmmpdb.py
