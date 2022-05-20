@@ -99,15 +99,20 @@ def prepare_dataloaders(data,
               " residues/batch.")
 
     valid_loaders = {}
-    for vsplit in VALID_SPLITS:
-        valid_loader = torch.utils.data.DataLoader(SCNDataset(data[vsplit],
-                                                              split_name=vsplit,
-                                                              trim_edges=True,
-                                                              sort_by_length='ascending'),
-                                                   num_workers=num_workers,
-                                                   batch_size=batch_size,
-                                                   collate_fn=collate_fn)
-        valid_loaders[vsplit] = valid_loader
+    valid_splits = [splitname for splitname in data.keys() if "valid" in splitname]
+    for vsplit in valid_splits:
+        try:
+            valid_loader = torch.utils.data.DataLoader(SCNDataset(
+                data[vsplit],
+                split_name=vsplit,
+                trim_edges=True,
+                sort_by_length='ascending'),
+                                                       num_workers=num_workers,
+                                                       batch_size=batch_size,
+                                                       collate_fn=collate_fn)
+            valid_loaders[vsplit] = valid_loader
+        except KeyError:
+            pass
 
     test_loader = torch.utils.data.DataLoader(SCNDataset(data['test'],
                                                          split_name='test',
@@ -122,6 +127,6 @@ def prepare_dataloaders(data,
         'train-eval': train_eval_loader,
         'test': test_loader
     }
-    dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in VALID_SPLITS})
+    dataloaders.update(valid_loaders)
 
     return dataloaders

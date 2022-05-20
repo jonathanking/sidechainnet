@@ -64,7 +64,7 @@ def create_parser():
                            choices=['30', '50', '70', '90', '100', 'debug'],
                            help="CASP thinning for SidechainNet.",
                            default='30')
-    data_args.add_argument("--scn_data_file",
+    data_args.add_argument("--local_scn_path",
                            type=str,
                            help="Direct path to SCN data file.")
     data_args.add_argument("--filter_by_resolution",

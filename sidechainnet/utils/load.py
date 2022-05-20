@@ -256,6 +256,7 @@ def load(casp_version=12,
                 ....    prediction = model(sequence, pssm)
                 ....    ...
     """
+    # TODO Make scndataset loading default
     if local_scn_path:
         local_path = local_scn_path
     else:
@@ -298,8 +299,7 @@ def load(casp_version=12,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
             train_eval_downsample=train_eval_downsample,
             shuffle=shuffle,
-            complete_structures_only=complete_structures_only,
-            **kwargs)
+            complete_structures_only=complete_structures_only)
 
     return
 
