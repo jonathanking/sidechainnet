@@ -1,4 +1,5 @@
 import sys
+import traceback
 from typing import Dict
 import pymol
 import copy
@@ -6,6 +7,7 @@ import os
 import numpy as np
 import torch
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
+from sidechainnet.examples.AnglePredictionHelper import AnglePredictionHelper
 from sidechainnet.examples.losses import angle_mse, angle_diff
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
 from sidechainnet.structure.structure import inverse_trig_transform
@@ -468,7 +470,15 @@ class LitSidechainTransformer(pl.LightningModule):
         # Now to generate the files for the true structure
         ptrue = batch[j]
         ptrue_pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_true.pdb")
-        ptrue.to_pdb(ptrue_pdbfile)
+        try:
+            ptrue.to_pdb(ptrue_pdbfile)
+        except ValueError as e:
+            print(ptrue, "failed to save to a PDB file.")
+            print(ptrue.seq)
+            print(ptrue.coords.shape, ptrue.coords)
+            print(ptrue.hcoords.shape, ptrue.hcoords)
+            traceback.print_exc()
+            exit(1)
 
         # Now, open the two files in pymol, align them, show sidechains, and save PNG
         pymol.cmd.load(ptrue_pdbfile, "true")
@@ -564,16 +574,34 @@ class LitSidechainTransformer(pl.LightningModule):
                     loss_dict['loss'] = loss
                     # Scale the value of the loss significantly
                     if torch.log10(loss) - 1 > 0:
-                        loss_dict['loss'] = loss / 10**(torch.floor(torch.log10(loss) - 1))
+                        loss_dict['loss'] = loss / 10**(
+                            torch.floor(torch.log10(loss) - 1))
                     log_omm(loss_dict['loss'], 'mse_openmm')
                     log_omm(loss_dict['openmm'], 'openmm')
 
         loss_dict = self._compute_angle_metrics(sc_angs_true, sc_angs_pred, loss_dict)
+        loss_dict = self._compute_structure_metrics(batch, sc_angs_true, sc_angs_pred,
+                                                    loss_dict)
 
         # Generate structures only after we no longer need the objects intact
         if do_struct and self.hparams.log_structures:
             self._generate_structure_viz(batch, sc_angs_pred, split)
 
+        return loss_dict
+
+    def _compute_structure_metrics(self, batch, sc_angs_true, sc_angs_pred, loss_dict):
+        """Compute & return loss dict with structure-based performance metrics (ie rmsd).
+
+        Args:
+            batch (ProteinBatch): A ProteinBatch object yielded during training.
+            sc_angs_true (tensor): nan-padded tensor of true angles.
+            sc_angs_pred (tensor): real-valued tensor of predicted protein angles.
+            loss_dict (dict): Dictionary whose keys are metrics/losses to be recorded.
+        """
+        prediction_obj = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
+        loss_dict['rmsd'] = prediction_obj.rmsd()
+        loss_dict['drmsd'] = prediction_obj.drmsd()
+        loss_dict['lndrmsd'] = prediction_obj.lndrmsd()
         return loss_dict
 
     def make_example_input_array(self, data_module):

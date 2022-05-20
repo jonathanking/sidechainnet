@@ -175,3 +175,11 @@ class ProteinBatch(object):
 
     def __str__(self):
         return f"ProteinBatch(n={len(self)}, max_len={self.max_len})"
+
+    def copy(self):
+        """Create and return a copy of the ProteinBatch."""
+        new_proteins = [p.copy() for p in self.proteins]
+        new_pb = ProteinBatch(new_proteins,
+                              batch_pad_char=self.batch_pad_char,
+                              device=self.device)
+        return new_pb
