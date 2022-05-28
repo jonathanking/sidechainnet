@@ -271,7 +271,7 @@ class LitSidechainTransformer(pl.LightningModule):
         sc_angs_true = scn.structure.trig_transform(sc_angs_true_untransformed).reshape(
             sc_angs_true_untransformed.shape[0], sc_angs_true_untransformed.shape[1], 12)
 
-        # Stack model inputs into a single tensor
+        # Stack model inputs into a single tensor  # TODO normalize the input, esp angs
         model_in = torch.cat([bb_angs, batch.secondary, batch.evolutionary], dim=-1)
 
         return model_in, sc_angs_true
@@ -307,13 +307,15 @@ class LitSidechainTransformer(pl.LightningModule):
             torch.nn.utils.clip_grad_value_(self.parameters(), 0.5)
             opt.step()
 
-        return {
-            "loss": loss_dict if loss_dict['loss'] is not None else None,
+        return_vals = {
             "batch": batch,
             "model_in": model_in,
             "sc_angs_pred": sc_angs_pred,
             "sc_angs_true": sc_angs_true
         }
+        return_vals.update(loss_dict)
+
+        return return_vals
 
     def validation_step(self,
                         batch,
@@ -354,7 +356,7 @@ class LitSidechainTransformer(pl.LightningModule):
                     sc_angs_pred,
                     do_struct=False,
                     split='train'):
-
+        # Create a helper obj to analyze preds; remember `batch` is metadata, not tensors
         pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
 
         loss_dict = {}
@@ -394,8 +396,8 @@ class LitSidechainTransformer(pl.LightningModule):
         loss_dict.update(pred_helper.angle_metrics_dict())
         # loss_dict.update(pred_helper.structure_metrics_dict())  # be more explicit
         loss_dict['rmsd'] = pred_helper.rmsd()
-        loss_dict['drmsd'] = pred_helper.drmsd()
-        loss_dict['lndrmsd'] = pred_helper.lndrmsd()
+        # loss_dict['drmsd'] = pred_helper.drmsd()
+        # loss_dict['lndrmsd'] = pred_helper.lndrmsd()
 
         # Generate structures only after we no longer need the objects intact
         if do_struct and self.hparams.log_structures:

@@ -169,6 +169,10 @@ class ProteinBatch(object):
 
     def cpu(self):
         self.device = torch.device('cpu')
+    
+    def torch(self):
+        for p in self:
+            p.torch()
 
     def set_device(self, device):
         self.device = device

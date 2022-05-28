@@ -5,6 +5,7 @@ from io import UnsupportedOperation
 import numpy as np
 import prody as pr
 import torch
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
@@ -359,7 +360,8 @@ class ResidueBuilder(object):
         self.bb = []
         self.sc = []
         self.coords = []
-        self.coordinate_padding = torch.zeros(3, requires_grad=True, device=self.device)
+        self.coordinate_padding = torch.ones(3, requires_grad=True,
+                                             device=self.device) * GLOBAL_PAD_CHAR
 
     @property
     def AA(self):

@@ -2,8 +2,9 @@
 import numpy as np
 import torch
 from sidechainnet.examples.losses import angle_diff, angle_mse, drmsd, rmsd
-from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP
+from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP, NUM_SC_ANGLES
 from sidechainnet.structure.structure import inverse_trig_transform
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 
 
@@ -20,21 +21,34 @@ class AnglePredictionHelper(object):
         """
         self.batch_true = batch
         self.batch_pred = None
-        self.angs_true = sc_angs_true
-        self.angs_pred = sc_angs_pred.clone()
+        self.sc_angs_true = sc_angs_true
+        self.sc_angs_pred = sc_angs_pred.clone()  # A differentiable copy
 
         # We know that the true angle matrix has been padded with nans.
         # Let's copy over that information into the predicted matrices.
-        assert torch.isnan(self.angs_true).any(), ("The true angle tensor must be padded "
-                                                   "with nans (0 found).")
-        self.angs_pred[torch.isnan(self.angs_true)] = torch.nan
+        assert torch.isnan(self.sc_angs_true).any(), ("The true angle tensor must be "
+                                                      "padded with nans (0 found).")
+        self.sc_angs_pred[torch.isnan(self.sc_angs_true)] = torch.nan
 
-        # Init the predicted batch to be equal to the true batch but with pred angles
+        # Convert sin/cos values into radians
+        self.sc_angs_pred_rad = inverse_trig_transform(self.sc_angs_pred, n_angles=6)
+        self.sc_angs_true_rad = inverse_trig_transform(self.sc_angs_true, n_angles=6)
+
+        # Init the predicted batch to start as a copy of the true batch
         self.batch_pred = self.batch_true.copy()
+
+        # Move coordinate/angle numpy arrays -> torch tensors
+        self.batch_pred.torch()
+        self.batch_true.torch()
+
+        # However, we add the predicted data (sc-angles) to the batch explicitly
         for idx in range(len(batch)):
-            self.batch_pred[idx].angles = self.angs_pred[idx, 0:len(self.batch_true[idx])]
+            # We must also slice the angle tensor to remove sequence length padding
+            pred_angles_rad = self.sc_angs_pred_rad[idx, 0:len(self.batch_true[idx])]
+            self.batch_pred[idx].angles[:, -NUM_SC_ANGLES:] = pred_angles_rad
 
         self.structures_built = False
+        self._unpadded_coords = []
 
     def build_structures_from_angles(self):
         """Call build_coords_from_angles on each underlying SCNProtein for comparison."""
@@ -53,8 +67,12 @@ class AnglePredictionHelper(object):
         # TODO may be parallelized
 
     @staticmethod
-    def _remove_padding(true_arr, target_arr, pad_char=0):
+    def _remove_padding(true_arr, target_arr, pad_char=GLOBAL_PAD_CHAR):
         """Remove padded rows (dim=-1) from a target array using a true array.
+
+        In this context, this function is used to remove empty atom rows from coordinate
+        tensors. SidechainNet uses an atomic representation with an equal number of atoms
+        per residue. Empty atom rows are typically representing using tensor([nan]*3).
 
         Args:
             true_arr (tensor): True values, correctly padded with pad_char.
@@ -66,10 +84,17 @@ class AnglePredictionHelper(object):
             tensor: A version of target_arr where any padded rows have been removed. May
                 not match the same size.
         """
-        real_valued_rows = (true_arr != pad_char).any(dim=-1)
+        if np.isnan(pad_char):
+            real_valued_rows = (~torch.isnan(true_arr)).any(dim=-1)
+        else:
+            real_valued_rows = (true_arr != pad_char).any(dim=-1)
         return target_arr[real_valued_rows]
 
-    def map_over_coords(self, fn, remove_padding=True, len_normalize=False):
+    def map_over_coords(self,
+                        fn,
+                        remove_padding=True,
+                        len_normalize=False,
+                        make_numpy=False):
         """Return a list of values after mapping a function over the (true, pred) coords.
 
         Args:
@@ -79,33 +104,44 @@ class AnglePredictionHelper(object):
                 vectors. Defaults to True.
             len_normalize (bool, optional): If True, scale the result of the function by
                 the length of each protein. Defaults to False.
+            make_numpy (bool, optional): If True, convert the coordinate tensors to numpy
+                matrices before executing the function.
 
         Returns:
             list: A list of computed values.
         """
-        # TODO Memoize unpadded coordinates
-
         if not self.structures_built:
             self.build_structures_from_angles()
 
         def compute_values():
-            for t, p in zip(self.batch_true, self.batch_pred):
-                if remove_padding:
+            for i, (t, p) in enumerate(zip(self.batch_true, self.batch_pred)):
+                if remove_padding and len(self._unpadded_coords) < len(self.batch_true):
+                    self._unpadded_coords = []
                     a = self._remove_padding(t.coords, t.coords)
                     b = self._remove_padding(t.coords, p.coords)
+                    self._unpadded_coords.append((a, b))
+                elif remove_padding:
+                    a, b = self._unpadded_coords[i]
                 else:
                     a = t.coords
                     b = p.coords
+
+                if make_numpy:
+                    a = a.detach().numpy()
+                    b = b.detach().numpy()
+
                 value = fn(a, b) if not len_normalize else fn(a, b) / len(t)
                 yield value
 
         values = compute_values()
 
-        return list(values)
+        return torch.as_tensor(list(values))
 
     def rmsd(self):
         """Compute RMSD over all pairs of coordinates in the predicted batch."""
-        return torch.mean(self.map_over_coords(rmsd))
+        # We use `make_numpy` because ProDy cannot operate on tensors
+        rmsd_val = torch.mean(self.map_over_coords(rmsd, make_numpy=True))
+        return rmsd_val
 
     def drmsd(self):
         """Compute DRMSD over all pairs of coordinates in the predicted batch."""
@@ -118,21 +154,23 @@ class AnglePredictionHelper(object):
     def openmm_loss(self):
         """Compute OpenMMEnergyH loss for predicted structures."""
         # TODO make more efficient using persisent batch_pred / prebuilt structures
-        return self._compute_openmm_loss(self.batch_true, self.angs_pred)
+        return self._compute_openmm_loss(self.batch_true, self.sc_angs_pred)
 
     def angle_mse(self):
         """Return the mean squared error between two angle tensors padded with nans."""
-        return angle_mse(self.angs_true, self.angs_pred)
+        return angle_mse(self.sc_angs_true, self.sc_angs_pred)
 
     def angle_metrics_dict(self):
         """Return a dictionary containing a large number of relevant angle metrics."""
         empty_dict = {}
-        return self._compute_angle_metrics(self.angs_true, self.angs_pred, empty_dict)
+        return self._compute_angle_metrics(self.sc_angs_true, self.sc_angs_pred,
+                                           empty_dict)
 
     def structure_metrics_dict(self):
         """Return a dictionary containing a large number of relevant structure metrics."""
         empty_dict = {}
-        return self._compute_angle_metrics(self.angs_true, self.angs_pred, empty_dict)
+        return self._compute_angle_metrics(self.sc_angs_true, self.sc_angs_pred,
+                                           empty_dict)
 
     def _compute_structure_metrics(self, batch, sc_angs_true, sc_angs_pred, loss_dict):
         """Compute & return loss dict with structure-based performance metrics (ie rmsd).
@@ -163,12 +201,9 @@ class AnglePredictionHelper(object):
         Returns:
             loss_dict (dict): Updated dictionary containing new keys MAE_X1...ACC.
         """
-        # Conver sin/cos values into radians
-        sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred.detach(), n_angles=6)
-        sc_angs_true_rad = inverse_trig_transform(sc_angs_true.detach(), n_angles=6)
-
         # Absolue Error Only (contains nans)
-        abs_error = torch.abs(angle_diff(sc_angs_true_rad, sc_angs_pred_rad))
+        abs_error = torch.abs(
+            angle_diff(self.sc_angs_true_rad.detach(), self.sc_angs_pred_rad.detach()))
 
         loss_dict['angle_metrics'] = {}
 
