@@ -42,45 +42,19 @@ class VisualizeStructuresEveryNSteps(pl.Callback):
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         """Generate protein structure visualization only every self.n_steps."""
         if pl_module.global_step % self.n_steps == 0:
-            self._generate_structure_viz(batch, outputs['sc_angs_pred'], split='train')
+            self._generate_viz_with_pred_helper(outputs["pred_helper"], pl_module)
 
-    def _generate_structure_viz(self, batch, sc_angs_pred, split):
+    def _generate_viz_with_pred_helper(self, pred_helper, pl_module):
         import pymol
-
-        sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred, n_angles=6)
         # Select the first protein in the batch to visualize
-        j = -1
-        b = batch[j]
-        if torch.is_tensor(b.coords):
-            p = SCNProtein(
-                coordinates=b.coords.detach().cpu().numpy(),
-                angles=b.angles.detach().cpu().numpy(),
-                sequence=b.seq,
-                unmodified_seq=b.unmodified_seq,
-                mask=b.mask,
-                evolutionary=b.evolutionary,
-                secondary_structure=b.secondary_structure,
-                resolution=b.resolution,
-                is_modified=b.is_modified,
-                id=b.id,
-                split=b.split,
-                add_sos_eos=b.add_sos_eos,
-            )
-            p.numpy()
-        else:
-            p = copy.deepcopy(batch[j])
-        assert p is not batch[j]
-        p.trim_to_max_seq_len()
-        p.angles[:, 6:] = sc_angs_pred_rad[j, 0:len(p)].detach().cpu().numpy()
+        p = pred_helper.batch_pred[0]
         p.numpy()
-        p.build_coords_from_angles()  # Make sure the coordinates saved to PDB are updated
-        pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_pred.pdb")
+        pdbfile = os.path.join(pl_module.save_dir, "pdbs", f"{p.id}_pred.pdb")
         p.to_pdb(pdbfile)
-        wandb.log({f"structures/{split}/molecule": wandb.Molecule(pdbfile)})
+        wandb.log({"structures/train/molecule": wandb.Molecule(pdbfile)})
 
-        # Now to generate the files for the true structure
-        ptrue = batch[j]
-        ptrue_pdbfile = os.path.join(self.save_dir, "pdbs", f"{p.id}_true.pdb")
+        ptrue = pred_helper.batch_true[0]
+        ptrue_pdbfile = os.path.join(pl_module.save_dir, "pdbs", f"{p.id}_true.pdb")
         try:
             ptrue.to_pdb(ptrue_pdbfile)
         except ValueError as e:
@@ -102,15 +76,17 @@ class VisualizeStructuresEveryNSteps(pl.Callback):
         pymol.cmd.zoom()
         pymol.cmd.show("lines", "not (name c,o,n and not pro/n)")
         pymol.cmd.hide("cartoon", "pred")
-        both_png_path = os.path.join(self.save_dir, "pngs", f"{p.id}_both.png")
+        both_png_path = os.path.join(pl_module.save_dir, "pngs",
+                                     f"{p.id}_both_{pl_module.global_step}.png")
         # TODO: Ray tracing occurs despite ray=0
         with Suppressor():
             pymol.cmd.png(both_png_path, width=1000, height=1000, quiet=1, dpi=300, ray=0)
-        both_pse_path = os.path.join(self.save_dir, "pdbs", f"{p.id}_both.pse")
+        both_pse_path = os.path.join(pl_module.save_dir, "pdbs",
+                                     f"{p.id}_both_{pl_module.global_step}.pse")
         pymol.cmd.save(both_pse_path)
-        wandb.save(both_pse_path, base_path=self.save_dir)
+        wandb.save(both_pse_path, base_path=pl_module.save_dir)
         pymol.cmd.delete("all")
-        wandb.log({f"structures/{split}/png": wandb.Image(both_png_path)})
+        wandb.log({"structures/train/png": wandb.Image(both_png_path)})
 
 
 class Suppressor(object):

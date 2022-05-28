@@ -288,10 +288,11 @@ class LitSidechainTransformer(pl.LightningModule):
         # Predict sidechain angles given input and sequence
         sc_angs_pred = self(model_in, batch.seqs_int)  # ( B x L x 12)
 
+        # Create a helper obj to analyze preds; remember `batch` is metadata, not tensors
+        pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
+
         # Compute loss and step
-        loss_dict = self._get_losses(batch,
-                                     sc_angs_true,
-                                     sc_angs_pred,
+        loss_dict = self._get_losses(pred_helper,
                                      do_struct=batch_idx == 0,
                                      split='train')
         # Log metrics
@@ -308,10 +309,8 @@ class LitSidechainTransformer(pl.LightningModule):
             opt.step()
 
         return_vals = {
-            "batch": batch,
             "model_in": model_in,
-            "sc_angs_pred": sc_angs_pred,
-            "sc_angs_true": sc_angs_true
+            "pred_helper": pred_helper
         }
         return_vals.update(loss_dict)
 
@@ -327,10 +326,11 @@ class LitSidechainTransformer(pl.LightningModule):
         # Predict sidechain angles given input and sequence
         sc_angs_pred = self(model_in, batch.seqs_int)  # ( B x L x 12)
 
+        # Create a helper obj to analyze preds; remember `batch` is metadata, not tensors
+        pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
+
         # Compute loss
-        loss_dict = self._get_losses(batch,
-                                     sc_angs_true,
-                                     sc_angs_pred,
+        loss_dict = self._get_losses(pred_helper,
                                      do_struct=batch_idx == 0 and dataloader_idx == 0,
                                      split='valid')
         self.log_helper.log_validation_step(loss_dict, dataloader_idx)
@@ -342,22 +342,19 @@ class LitSidechainTransformer(pl.LightningModule):
         # Predict sidechain angles given input and sequence
         sc_angs_pred = self(model_in, batch.seqs_int)  # ( B x L x 12)
 
+        # Create a helper obj to analyze preds; remember `batch` is metadata, not tensors
+        pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
+
         # Compute loss
-        loss_dict = self._get_losses(batch,
-                                     sc_angs_true,
-                                     sc_angs_pred,
+        loss_dict = self._get_losses(pred_helper,
                                      do_struct=batch_idx == 0,
                                      split='test')
         self.log_helper.log_test_step(loss_dict)
 
     def _get_losses(self,
-                    batch,
-                    sc_angs_true,
-                    sc_angs_pred,
+                    pred_helper,
                     do_struct=False,
                     split='train'):
-        # Create a helper obj to analyze preds; remember `batch` is metadata, not tensors
-        pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
 
         loss_dict = {}
         mse_loss = pred_helper.angle_mse()
@@ -401,8 +398,9 @@ class LitSidechainTransformer(pl.LightningModule):
         loss_dict['gdc_all'] = pred_helper.gdc_all()
 
         # Generate structures only after we no longer need the objects intact
-        if do_struct and self.hparams.log_structures:
-            self._generate_structure_viz(batch, sc_angs_pred, split)
+        # TODO Remove out of date structure viz arguments etc
+        # if do_struct and self.hparams.log_structures:
+        #     self._generate_structure_viz(batch, sc_angs_pred, split)
 
         return loss_dict
 
