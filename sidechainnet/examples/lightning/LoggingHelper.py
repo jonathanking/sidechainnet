@@ -19,8 +19,10 @@ class LoggingHelper(object):
     def log_training_step(self, loss_dict, batch):
         """Log a single training step with the PyTorch Lightning Module's logger."""
         for key, value in loss_dict.items():
+            loss_or_metric = ("losses"
+                              if key in self.pl_module.hparams.loss_name else "metrics")
             if key == 'mse':
-                self.log('losses/train/rmse',
+                self.log(f'{loss_or_metric}/train/rmse',
                          torch.sqrt(value),
                          on_step=True,
                          on_epoch=True,
@@ -28,7 +30,7 @@ class LoggingHelper(object):
             elif key in ['loss', 'angle_metrics']:
                 continue
             else:
-                self.log(f'losses/train/{key}',
+                self.log(f'{loss_or_metric}/train/{key}',
                          value,
                          on_step=True,
                          on_epoch=True,
@@ -39,9 +41,12 @@ class LoggingHelper(object):
 
     def log_validation_step(self, loss_dict, dataloader_idx):
         """Log a single validation step with the PyTorch Lightning Module's logger."""
-        name = (f"losses/valid/"
-                f"{self.pl_module.hparams.dataloader_name_mapping[dataloader_idx]}_rmse")
         for key, value in loss_dict.items():
+            loss_or_metric = ("losses"
+                              if key in self.pl_module.hparams.loss_name else "metrics")
+            name = (
+                f"{loss_or_metric}/valid/"
+                f"{self.pl_module.hparams.dataloader_name_mapping[dataloader_idx]}_rmse")
             if key == 'mse':
                 self.log(name,
                          torch.sqrt(loss_dict['mse']),
@@ -66,8 +71,10 @@ class LoggingHelper(object):
     def log_test_step(self, loss_dict):
         """Log a single test step with the PyTorch Lightning Module's logger."""
         for key, value in loss_dict.items():
+            loss_or_metric = ("losses"
+                              if key in self.pl_module.hparams.loss_name else "metrics")
             if key == 'mse':
-                self.log('losses/test/rmse',
+                self.log(f'{loss_or_metric}/test/rmse',
                          torch.sqrt(value),
                          on_step=False,
                          on_epoch=True,
@@ -75,7 +82,7 @@ class LoggingHelper(object):
             elif key in ['loss', 'angle_metrics']:
                 continue
             else:
-                self.log(f'losses/test/{key}',
+                self.log(f'{loss_or_metric}/test/{key}',
                          value,
                          on_step=False,
                          on_epoch=True,
