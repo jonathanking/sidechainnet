@@ -1,7 +1,7 @@
 """A class that helps manipulate a set of angle structure predictions for analysis."""
 import numpy as np
 import torch
-from sidechainnet.examples.losses import angle_diff, angle_mse, drmsd, rmsd
+from sidechainnet.examples.losses import angle_diff, angle_mse, drmsd, gdc_all, rmsd
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP, NUM_SC_ANGLES
 from sidechainnet.structure.structure import inverse_trig_transform
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
@@ -150,6 +150,10 @@ class AnglePredictionHelper(object):
     def lndrmsd(self):
         """Compute len-normalized DRMSD over all coord pairs in the predicted batch."""
         return torch.mean(self.map_over_coords(drmsd, len_normalize=True))
+
+    def gdc_all(self):
+        """Compute GDC_ALL over all coord pairs in the predicted batch."""
+        return torch.mean(self.map_over_coords(gdc_all, make_numpy=True))
 
     def openmm_loss(self):
         """Compute OpenMMEnergyH loss for predicted structures."""

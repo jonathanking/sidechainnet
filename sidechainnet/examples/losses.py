@@ -147,8 +147,11 @@ def _tile(a, dim, n_tile):
 
 # Structure Based Losses
 
+
 def gdt_ts(true, pred):
     """Compute GDT_TS between true (nan-padded) and predicted coordinate tensors.
+
+    Specifically, GDT_TS should be computed over the alpha carbons only.
 
     Args:
         true (tensor): True atomic coordinates, must be padded with nans.
@@ -158,3 +161,43 @@ def gdt_ts(true, pred):
         gdt_ts: Value of GDT_TS.
     """
     pass
+
+
+def gdc_all(true, pred, k=10):
+    """Compute GDC_ALL between true (nan-padded) and predicted coordinate tensors.
+
+    According to the CASP definition:
+        GDC_ALL = 2*(k*GDC_P1 + (k-1)*GDC_P2 ... + 1*GDC_Pk)/(k+1)*k, k=10
+        where GDC_Pk denotes percent of atoms under distance cutoff <= 0.5kÅ
+
+        Source: https://predictioncenter.org/casp14/doc/help.html
+
+    In my interpretation, I have modified it slightly:
+        GDC_ALL = 2 * 100 *(k*GDC_P1 + (k-1)*GDC_P2 ... + 1*GDC_Pk)/((k+1)*k), k=10
+        because of the desire to have it in (0, 100] and for the denominator to match
+        https://doi.org/10.1016/j.heliyon.2017.e00235. The two are equivalent when k=10.
+
+    Args:
+        true (tensor): True atomic coordinates, must be padded with nans.
+        pred (tensor): Predicted atomic coordinates.
+
+    Returns:
+        gdc_all: Value of GDC_ALL.
+    """
+    t = pr.calcTransformation(pred, true)
+    pred = t.apply(pred)
+
+    thresholds = np.arange(1, k+1) * 0.5
+    distances = np.linalg.norm(true-pred, axis=1)
+
+    # Check if each atom was within each threshold (len(threshold) x len(distances))
+    passed_check = distances <= thresholds[:, None]
+
+    # Compute the fraction passing at each threshold
+    gdc_p = passed_check.sum(axis=1) / passed_check.shape[1]
+
+    # Compute GDC_ALL according to the CASP definition
+    gdc_all = (np.arange(1, k + 1)[::-1] * gdc_p).sum()
+    gdc_all = 2 * 100 * gdc_all / ((k+1)*k)
+
+    return gdc_all

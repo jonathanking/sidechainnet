@@ -396,8 +396,9 @@ class LitSidechainTransformer(pl.LightningModule):
         loss_dict.update(pred_helper.angle_metrics_dict())
         # loss_dict.update(pred_helper.structure_metrics_dict())  # be more explicit
         loss_dict['rmsd'] = pred_helper.rmsd()
-        # loss_dict['drmsd'] = pred_helper.drmsd()
-        # loss_dict['lndrmsd'] = pred_helper.lndrmsd()
+        loss_dict['drmsd'] = pred_helper.drmsd()
+        loss_dict['lndrmsd'] = pred_helper.lndrmsd()
+        loss_dict['gdc_all'] = pred_helper.gdc_all()
 
         # Generate structures only after we no longer need the objects intact
         if do_struct and self.hparams.log_structures:
