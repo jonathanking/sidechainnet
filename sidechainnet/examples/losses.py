@@ -4,7 +4,7 @@ import numpy as np
 import prody as pr
 import torch
 
-from sidechainnet.structure.build_info import NUM_ANGLES, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 
 
 def compute_batch_drmsd(true_coordinates, pred_coordinates, seq, verbose=False):
@@ -121,7 +121,7 @@ def angle_mse(true, pred):
 
 
 def angle_mae(true, pred):
-    """Compute flattenned MeanAbsoluteError between 2 angle(Rad) tensors with nan pads."""
+    """Compute flattened MeanAbsoluteError between 2 angle(Rad) tensors with nan pads."""
     absolute_error = torch.abs(angle_diff(true, pred))
     return torch.nanmean(absolute_error)
 
@@ -129,7 +129,7 @@ def angle_mae(true, pred):
 def angle_diff(true, pred):
     """Compute signed distance between two angle tensors (does not change shape)."""
     error = true - pred
-    # Correct for out of bounds
+    # Correct for out of bounds (wrap around)
     error[error > torch.pi] -= 2 * torch.pi
     error[error < -torch.pi] += 2 * torch.pi
     return error

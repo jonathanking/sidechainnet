@@ -10,8 +10,10 @@ import torch
 import torch.utils.data
 from pl_bolts.callbacks import (BatchGradientVerificationCallback, ModuleDataMonitor)
 from pytorch_lightning.loggers import WandbLogger
-from sidechainnet.examples.LitSidechainTransformer import (LitSCNDataModule,
-                                                           LitSidechainTransformer)
+from sidechainnet.examples.lightning.LitSidechainTransformer import LitSidechainTransformer
+from sidechainnet.examples.lightning.MyPLCallbacks import (ResetOptimizersOnGlobalStep,
+                                                           VisualizeStructuresEveryNSteps)
+from sidechainnet.examples.lightning.LitSCNDataModule import LitSCNDataModule
 
 import wandb
 
@@ -91,6 +93,11 @@ def create_parser():
                            type=my_bool,
                            help="If True, shuffle dataloaders (default=True).",
                            default="True")
+    data_args.add_argument("--save_final_chkpt",
+                           type=str,
+                           default="./model_final.chkpt",
+                           help="If enable_checkpointing=False, save one checkpoint after"
+                           " training to this file.")
 
     # Model-specific args
     parser = LitSidechainTransformer.add_model_specific_args(parser)
@@ -182,6 +189,7 @@ def create_parser():
                                type=my_bool,
                                default="False")
     callback_args.add_argument("--auto_lr_find_custom", type=my_bool, default="False")
+    callback_args.add_argument("--viz_structures_every_n_steps", type=int, default=-1)
 
     return parser
 
@@ -203,12 +211,11 @@ def init_wandb(use_cluster, project, entity, model, dict_args):
     wandb_dir = "/scr/jok120/wandb" if use_cluster else os.path.expanduser("~/scr")
     if wandb_dir:
         os.makedirs(wandb_dir, exist_ok=True)
-    logger = WandbLogger(
-        project=project,
-        entity=entity,
-        dir=wandb_dir,
-        save_code=True,
-        log_model=True)  # TODO add id='runid' to resume (e.g. 19j0mxjk)
+    logger = WandbLogger(project=project,
+                         entity=entity,
+                         dir=wandb_dir,
+                         save_code=True,
+                         log_model=True)  # TODO add id='runid' to resume (e.g. 19j0mxjk)
     logger.experiment.config.update(dict_args, allow_val_change=True)
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -233,24 +240,6 @@ def init_wandb(use_cluster, project, entity, model, dict_args):
 
     return logger, checkpoint_dir
 
-
-class ResetOptimizersOnGlobalStep(pl.Callback):
-    """Re-init the optimizer at the specified global step. Helps to handle new loss fn."""
-
-    def __init__(self, on_step):
-        super().__init__()
-        self.on_step = on_step
-
-    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
-        if pl_module.global_step == self.on_step:
-            print("Reinitializing optimizers.")
-            # print("Switching to SGD.")
-            # pl_module.hparams.opt_lr = 1e-6
-            # pl_module.hparams.opt_lr_scheduling = 'plateau'
-            opt_dict = pl_module.configure_optimizers()
-            trainer.optimizers = [opt_dict['optimizer']]
-            if 'lr_scheduler' in opt_dict:
-                trainer.lr_schedulers = [opt_dict['lr_scheduler']]
 
 def main():
     """Argument parsing, model loading, and model training."""
@@ -292,8 +281,8 @@ def main():
 
     # Prepare Weights and Biases logging
     wandb_logger, checkpoint_dir = init_wandb(use_cluster=args.cluster,
-                                              project="sidechain-transformer",
-                                              entity="koes-group",
+                                              project="openmm-loss",
+                                              entity="jonathanking",
                                               model=model,
                                               dict_args=dict_args)
     dict_args.update(
@@ -327,8 +316,12 @@ def main():
     if args.use_swa:
         my_callbacks.append(
             callbacks.StochasticWeightAveraging(swa_epoch_start=args.swa_epoch_start))
-
-    my_callbacks.append(ResetOptimizersOnGlobalStep(dict_args['opt_begin_mse_openmm_step']))
+    if dict_args['loss_name'] == 'mse_openmm':
+        my_callbacks.append(
+            ResetOptimizersOnGlobalStep(dict_args['opt_begin_mse_openmm_step']))
+    if dict_args['viz_structures_every_n_steps'] != -1:
+        my_callbacks.append(
+            VisualizeStructuresEveryNSteps(dict_args['viz_structures_every_n_steps']))
 
     # Create a trainer
     trainer = pl.Trainer.from_argparse_args(argparse.Namespace(**dict_args),
@@ -352,6 +345,10 @@ def main():
     # Train the model
     trainer.fit(model, data_module)
     trainer.test(model, data_module)
+
+    # Save a final checkpoint if checkpointing was turned off
+    if not dict_args['enable_checkpointing']:
+        trainer.save_checkpoint(dict_args["save_final_chkpt"])
 
 
 if __name__ == '__main__':
