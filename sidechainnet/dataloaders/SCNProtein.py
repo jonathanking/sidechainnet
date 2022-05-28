@@ -322,8 +322,13 @@ class SCNProtein(object):
                     continue
                 # Handle missing atoms
                 if np.isnan(c).any():
+                    # if i == len(self.seq) - 1 and an in ["O", "OXT"]:
+                    #     # TODO Terminal structures mistakenly have an O where they should
+                    #     # have an OXT. The O is not present, and this is permissible.
+                    #     continue
+                    # print(coords)
                     raise ValueError("Cannot construct an OpenMM Representation with "
-                                     f"missing atoms ({i} {residue_name}).")
+                                     f"missing atoms ({i} {residue_name} {self}).")
                     self.has_missing_atoms = True
                     continue
                 self.topology.addAtom(name=an,

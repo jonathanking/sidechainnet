@@ -77,7 +77,7 @@ class LoggingHelper(object):
             else:
                 self.log(f'losses/test/{key}',
                          value,
-                         on_step=True,
+                         on_step=False,
                          on_epoch=True,
                          prog_bar=True)
 

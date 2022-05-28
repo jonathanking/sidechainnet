@@ -144,3 +144,17 @@ def _tile(a, dim, n_tile):
     order_index = torch.LongTensor(
         np.concatenate([init_dim * np.arange(n_tile) + i for i in range(init_dim)]))
     return torch.index_select(a, dim, order_index)
+
+# Structure Based Losses
+
+def gdt_ts(true, pred):
+    """Compute GDT_TS between true (nan-padded) and predicted coordinate tensors.
+
+    Args:
+        true (tensor): True atomic coordinates, must be padded with nans.
+        pred (tensor): Predicted atomic coordinates.
+
+    Returns:
+        gdt_ts: Value of GDT_TS.
+    """
+    pass
