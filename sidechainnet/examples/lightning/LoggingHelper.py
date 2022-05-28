@@ -10,30 +10,32 @@ class LoggingHelper(object):
         """Create a LoggingHelper object using a PyTorch Lightning Module."""
         self.pl_module = pl_module
 
+    def log(self, *args, **kwargs):
+        self.pl_module.log(*args, **kwargs)
+
+    def log_dict(self, *args, **kwargs):
+        self.pl_module.log_dict(*args, **kwargs)
+
     def log_training_step(self, loss_dict, batch):
         """Log a single training step with the PyTorch Lightning Module's logger."""
-        self.pl_module.log('losses/train/rmse',
-                           torch.sqrt(loss_dict['mse']),
-                           on_step=True,
-                           on_epoch=True,
-                           prog_bar=True)
-        self.pl_module.log("trainer/batch_size",
-                           float(len(batch)),
-                           on_step=True,
-                           on_epoch=False)
+        self.log('losses/train/rmse',
+                 torch.sqrt(loss_dict['mse']),
+                 on_step=True,
+                 on_epoch=True,
+                 prog_bar=True)
+        self.log("trainer/batch_size", float(len(batch)), on_step=True, on_epoch=False)
         self._log_angle_metrics(loss_dict, 'train')
 
     def log_validation_step(self, loss_dict, dataloader_idx):
         """Log a single validation step with the PyTorch Lightning Module's logger."""
         name = (f"losses/valid/"
                 f"{self.pl_module.hparams.dataloader_name_mapping[dataloader_idx]}_rmse")
-        self.pl_module.log(
-            name,
-            torch.sqrt(loss_dict['mse']),
-            on_step=False,
-            on_epoch=True,
-            prog_bar=name == self.pl_module.hparams.opt_lr_scheduling_metric,
-            add_dataloader_idx=False)
+        self.log(name,
+                 torch.sqrt(loss_dict['mse']),
+                 on_step=False,
+                 on_epoch=True,
+                 prog_bar=name == self.pl_module.hparams.opt_lr_scheduling_metric,
+                 add_dataloader_idx=False)
         self._log_angle_metrics(
             loss_dict, 'valid',
             self.pl_module.hparams.dataloader_name_mapping[dataloader_idx])

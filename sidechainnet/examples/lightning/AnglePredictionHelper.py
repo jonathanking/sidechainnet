@@ -21,7 +21,7 @@ class AnglePredictionHelper(object):
         self.batch_true = batch
         self.batch_pred = None
         self.angs_true = sc_angs_true
-        self.angs_pred = sc_angs_pred
+        self.angs_pred = sc_angs_pred.clone()
 
         # We know that the true angle matrix has been padded with nans.
         # Let's copy over that information into the predicted matrices.
