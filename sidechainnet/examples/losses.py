@@ -179,7 +179,8 @@ def gdc_all(true, pred, k=10):
 
     For comparison, GDC_SC (sidechain) exists, but uses a characteristic atom for each
     sidechain (V.CG1,L.CD1,I.CD1,P.CG,M.CE,F.CZ,W.CH2,S.OG,T.OG1,C.SG,Y.OH,N.OD1,Q.OE1,
-    D.OD2,E.OE2,K.NZ,R.NH2,H.NE2) instead of all atoms.
+    D.OD2,E.OE2,K.NZ,R.NH2,H.NE2) instead of all atoms. See doi: 10.1002/prot.22551 for
+    more discussion on GDC_SC.
 
     Args:
         true (tensor): True atomic coordinates, must be padded with nans.
