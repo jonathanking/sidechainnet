@@ -145,6 +145,7 @@ def _tile(a, dim, n_tile):
         np.concatenate([init_dim * np.arange(n_tile) + i for i in range(init_dim)]))
     return torch.index_select(a, dim, order_index)
 
+
 # Structure Based Losses
 
 
@@ -164,7 +165,7 @@ def gdt_ts(true, pred):
 
 
 def gdc_all(true, pred, k=10):
-    """Compute GDC_ALL between true (nan-padded) and predicted coordinate tensors.
+    """Compute GDC_ALL between true and predicted coordinate tensors.
 
     According to the CASP definition:
         GDC_ALL = 2*(k*GDC_P1 + (k-1)*GDC_P2 ... + 1*GDC_Pk)/(k+1)*k, k=10
@@ -183,8 +184,8 @@ def gdc_all(true, pred, k=10):
     more discussion on GDC_SC.
 
     Args:
-        true (tensor): True atomic coordinates, must be padded with nans.
-        pred (tensor): Predicted atomic coordinates.
+        true (tensor): True atomic coordinates. Must not contain padding.
+        pred (tensor): Predicted atomic coordinates. Must be the same shape as true.
 
     Returns:
         gdc_all: Value of GDC_ALL.
@@ -192,8 +193,8 @@ def gdc_all(true, pred, k=10):
     t = pr.calcTransformation(pred, true)
     pred = t.apply(pred)
 
-    thresholds = np.arange(1, k+1) * 0.5
-    distances = np.linalg.norm(true-pred, axis=1)
+    thresholds = np.arange(1, k + 1) * 0.5
+    distances = np.linalg.norm(true - pred, axis=1)
 
     # Check if each atom was within each threshold (len(threshold) x len(distances))
     passed_check = distances <= thresholds[:, None]
@@ -203,6 +204,45 @@ def gdc_all(true, pred, k=10):
 
     # Compute GDC_ALL according to the CASP definition
     gdc_all = (np.arange(1, k + 1)[::-1] * gdc_p).sum()
-    gdc_all = 2 * 100 * gdc_all / ((k+1)*k)
+    gdc_all = 2 * 100 * gdc_all / ((k + 1) * k)
 
     return gdc_all
+
+
+def tm_score(true, pred):
+    """Compute TM Score between true and predicted coordinate tensors.
+
+    See original paper for formulation: https://zhanggroup.org/TM-score/TM-score.pdf,
+    DOI: 10.1002/prot.20264. Similar to GDT_TS, but is independent of protein length.
+
+    Args:
+        true (tensor): True atomic coordinates. Must not contain padding.
+        pred (tensor): Predicted atomic coordinates. Must be the same shape as true.
+
+    Returns:
+        tm_score: Value of TM Score.
+    """
+    t = pr.calcTransformation(pred, true)
+    pred = t.apply(pred)
+    distances = np.linalg.norm(true - pred, axis=1)
+
+    L = len(true)
+    d0 = 1.24 * numpy_safe_cbrt(L - 15) - 1.8
+
+    def frac(di):
+        return 1 / (1 + (di / d0)**2)
+
+    fractions = frac(distances)
+
+    tm_score = (1 / L) * fractions.sum()
+
+    return tm_score
+
+
+def numpy_safe_cbrt(a):
+    """Compute the cube root of a number in a way that numpy allows.
+
+    Numpy complains when taking the cube root of a negative number, even though it is
+    defined. See https://stackoverflow.com/a/45384691/2780645.
+    """
+    return np.sign(a) * (np.abs(a))**(1 / 3)
