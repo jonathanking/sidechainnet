@@ -157,8 +157,7 @@ class AnglePredictionHelper(object):
 
     def openmm_loss(self):
         """Compute OpenMMEnergyH loss for predicted structures."""
-        # TODO make more efficient using persisent batch_pred / prebuilt structures
-        return self._compute_openmm_loss(self.batch_true, self.sc_angs_pred)
+        return self._compute_openmm_loss()
 
     def angle_mse(self):
         """Return the mean squared error between two angle tensors padded with nans."""
@@ -246,20 +245,14 @@ class AnglePredictionHelper(object):
 
         return loss_dict
 
-    def _compute_openmm_loss(self, batch, sc_angs_pred):
+    def _compute_openmm_loss(self):
         # TODO ignore protein entries like 1QCR_9_I that are a-carbon only
-        proteins = batch
         loss_total = count = 0.
-        sc_angs_pred_rad = inverse_trig_transform(sc_angs_pred, n_angles=6)
         loss_fn = OpenMMEnergyH()
-        for p, sca in zip(proteins, sc_angs_pred_rad):
+        for p in self.batch_pred:
             p.cuda()
-            # Fill in protein obj with predicted angles instead of true angles
-            if "-" in p.mask:
-                continue
-            p.trim_to_max_seq_len()  # TODO implement update_with_pred_angs
-            p.angles[:, 6:] = sca[:len(p)]  # we truncate here to remove batch pa
-            p.add_hydrogens(from_angles=True)
+            # If structures have not been built, build them from angles.
+            p.add_hydrogens(from_angles=not self.structures_built)
             eloss = loss_fn.apply(p, p.hcoords)
             if ~torch.isfinite(eloss):
                 continue

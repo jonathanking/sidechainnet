@@ -177,6 +177,10 @@ def gdc_all(true, pred, k=10):
         because of the desire to have it in (0, 100] and for the denominator to match
         https://doi.org/10.1016/j.heliyon.2017.e00235. The two are equivalent when k=10.
 
+    For comparison, GDC_SC (sidechain) exists, but uses a characteristic atom for each
+    sidechain (V.CG1,L.CD1,I.CD1,P.CG,M.CE,F.CZ,W.CH2,S.OG,T.OG1,C.SG,Y.OH,N.OD1,Q.OE1,
+    D.OD2,E.OE2,K.NZ,R.NH2,H.NE2) instead of all atoms.
+
     Args:
         true (tensor): True atomic coordinates, must be padded with nans.
         pred (tensor): Predicted atomic coordinates.
