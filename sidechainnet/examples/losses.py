@@ -165,7 +165,7 @@ def gdt_ts(true, pred):
 
 
 def gdc_all(true, pred, k=10):
-    """Compute GDC_ALL between true and predicted coordinate tensors.
+    """Compute GDC_ALL between true and predicted coordinate arrays.
 
     According to the CASP definition:
         GDC_ALL = 2*(k*GDC_P1 + (k-1)*GDC_P2 ... + 1*GDC_Pk)/(k+1)*k, k=10
@@ -184,8 +184,8 @@ def gdc_all(true, pred, k=10):
     more discussion on GDC_SC.
 
     Args:
-        true (tensor): True atomic coordinates. Must not contain padding.
-        pred (tensor): Predicted atomic coordinates. Must be the same shape as true.
+        true (array): True atomic coordinates. Must not contain padding.
+        pred (array): Predicted atomic coordinates. Must be the same shape as true.
 
     Returns:
         gdc_all: Value of GDC_ALL.
@@ -210,14 +210,14 @@ def gdc_all(true, pred, k=10):
 
 
 def tm_score(true, pred):
-    """Compute TM Score between true and predicted coordinate tensors.
+    """Compute TM Score between true and predicted coordinate arrays.
 
     See original paper for formulation: https://zhanggroup.org/TM-score/TM-score.pdf,
     DOI: 10.1002/prot.20264. Similar to GDT_TS, but is independent of protein length.
 
     Args:
-        true (tensor): True atomic coordinates. Must not contain padding.
-        pred (tensor): Predicted atomic coordinates. Must be the same shape as true.
+        true (array): True atomic coordinates. Must not contain padding.
+        pred (array): Predicted atomic coordinates. Must be the same shape as true.
 
     Returns:
         tm_score: Value of TM Score.
