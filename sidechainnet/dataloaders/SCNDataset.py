@@ -93,6 +93,8 @@ class SCNDataset(torch.utils.data.Dataset):
                 if complete_structures_only and "-" in p.mask:
                     continue
 
+                p.trim_to_max_seq_len()  # TODO add an option to not do this by default
+
                 self.ids_to_SCNProtein[i] = p
                 _unsorted_proteins.append(p)
                 try:

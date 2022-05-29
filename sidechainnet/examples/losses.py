@@ -222,7 +222,7 @@ def tm_score(true, pred):
     Returns:
         tm_score: Value of TM Score.
     """
-    t = pr.calcTransformation(pred, true)
+    t = pr.calcTransformation(pred, true)  # TODO Measure TM during training
     pred = t.apply(pred)
     distances = np.linalg.norm(true - pred, axis=1)
 
