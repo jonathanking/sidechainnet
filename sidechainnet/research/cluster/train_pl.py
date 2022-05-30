@@ -162,11 +162,14 @@ def create_parser():
                           default=4000,
                           help="Training step at which to begin training with"
                           " OpenMM + MSE combination loss.")
-    training.add_argument("--loss_combination_weight",
+    training.add_argument("--mse_loss_weight",
                           type=float,
-                          default=0.8,
-                          help="When combining losses, use weight w where "
-                          "loss = w * LossA + (1-w) * LossB.")
+                          default=1,
+                          help="Scaling factor for MSE component of model loss.")
+    training.add_argument("--omm_loss_weight",
+                          type=float,
+                          default=1,
+                          help="Scaling factor for OpenMM component of model loss.")
     training.add_argument("--overfit_batches_small",
                           type=my_bool,
                           default="True",
@@ -180,7 +183,12 @@ def create_parser():
                           type=int,
                           default=10,
                           help="How many epochs to wait for improvement before stopping.")
-    # TODO Add custom argument for supplying checkpoint file
+    training.add_argument("--check_struct_metrics_every_n_steps",
+                          type=int,
+                          default=1,
+                          help="Compute (relatively expensive) structure-based metrics "
+                          "like RMSD/DRMSD/GDC_ALL/TM ever n steps.")
+
     # Callbacks
     callback_args = parser.add_argument_group("Callbacks")
     callback_args.add_argument("--use_swa", type=my_bool, default="False")

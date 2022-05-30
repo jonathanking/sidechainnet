@@ -72,10 +72,6 @@ class LitSidechainTransformer(pl.LightningModule):
                                 type=str,
                                 default="relu",
                                 help="Activation for Transformer layers.")
-        model_args.add_argument("--log_structures",
-                                type=my_bool,
-                                default="True",
-                                help="Whether or not to log structures while training.")
 
         return parent_parser
 
@@ -292,10 +288,7 @@ class LitSidechainTransformer(pl.LightningModule):
         pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
 
         # Compute loss and step
-        loss_dict = self._get_losses(pred_helper,
-                                     do_struct=batch_idx == 0,
-                                     split='train')
-        # Log metrics
+        loss_dict = self._get_losses(pred_helper)
         self.log_helper.log_training_step(loss_dict, batch)
 
         if loss_dict['loss'] is None:
@@ -308,10 +301,7 @@ class LitSidechainTransformer(pl.LightningModule):
             torch.nn.utils.clip_grad_value_(self.parameters(), 0.5)
             opt.step()
 
-        return_vals = {
-            "model_in": model_in,
-            "pred_helper": pred_helper
-        }
+        return_vals = {"model_in": model_in, "pred_helper": pred_helper}
         return_vals.update(loss_dict)
 
         return return_vals
@@ -330,9 +320,7 @@ class LitSidechainTransformer(pl.LightningModule):
         pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
 
         # Compute loss
-        loss_dict = self._get_losses(pred_helper,
-                                     do_struct=batch_idx == 0 and dataloader_idx == 0,
-                                     split='valid')
+        loss_dict = self._get_losses(pred_helper)
         self.log_helper.log_validation_step(loss_dict, dataloader_idx)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
@@ -346,28 +334,38 @@ class LitSidechainTransformer(pl.LightningModule):
         pred_helper = AnglePredictionHelper(batch, sc_angs_true, sc_angs_pred)
 
         # Compute loss
-        loss_dict = self._get_losses(pred_helper,
-                                     do_struct=batch_idx == 0,
-                                     split='test')
+        loss_dict = self._get_losses(pred_helper)
         self.log_helper.log_test_step(loss_dict)
 
-    def _get_losses(self,
-                    pred_helper,
-                    do_struct=False,
-                    split='train'):
+    def _get_losses(self, pred_helper):
+        """Compute the losses necessary for model training plus record relevant metrics.
 
+        Args:
+            pred_helper (AnglePredictionHelper): A prediction helper object that
+                facilitates analysis on protein structure/angle predictions.
+
+        Returns:
+            loss_dict (dict): A dictionary mapping loss and metric names to their values.
+                loss_dict['loss'] must be a tensor with gradient information for training.
+        """
         loss_dict = {}
+
+        # Angle-bassed losses/metrics
         mse_loss = pred_helper.angle_mse()
         loss_dict['mse'] = mse_loss.detach()
+        loss_dict.update(pred_helper.angle_metrics_dict())
 
-        # Basic structure-based losses/metrics
-        loss_dict['rmsd'] = pred_helper.rmsd()
-        loss_dict['drmsd'] = pred_helper.drmsd()
-        loss_dict['lndrmsd'] = pred_helper.lndrmsd()
-        loss_dict['gdc_all'] = pred_helper.gdc_all()
-        loss_dict['tm_score'] = pred_helper.tm_score()
+        # Basic structure-based losses/metrics; Computed rarely if training with MSE only
+        if ("openmm" in self.hparams.loss_name or
+                self.global_step % self.hparams.check_struct_metrics_every_n_steps
+                == 0):
+            loss_dict['rmsd'] = pred_helper.rmsd()
+            loss_dict['drmsd'] = pred_helper.drmsd()
+            loss_dict['lndrmsd'] = pred_helper.lndrmsd()
+            loss_dict['gdc_all'] = pred_helper.gdc_all()
+            loss_dict['tm_score'] = pred_helper.tm_score()
 
-        # Loss values (mse, OpenMM)
+        # More advanced measuring of OpenMM/MSE losses
         if self.hparams.loss_name == "mse":
             loss_dict['loss'] = mse_loss
 
@@ -377,7 +375,7 @@ class LitSidechainTransformer(pl.LightningModule):
             loss_dict['loss'] = openmm_loss
 
         if self.hparams.loss_name == "mse_openmm":
-            if self.global_step < self.hparams.opt_begin_mse_openmm_step:  # or self.global_step % 2 == 0:
+            if self.global_step < self.hparams.opt_begin_mse_openmm_step:
                 loss_dict['loss'] = mse_loss
             else:
                 if self.global_step == self.hparams.opt_begin_mse_openmm_step:
@@ -389,22 +387,14 @@ class LitSidechainTransformer(pl.LightningModule):
                     loss_dict['loss'] = None
                 else:
                     loss_dict['openmm'] = openmm_loss.detach()
-                    a = self.hparams.loss_combination_weight
-                    b = 1 - a
-                    loss = mse_loss * a + openmm_loss / 1e12 * b
+                    loss = (mse_loss * self.hparams.mse_loss_weight +
+                            openmm_loss * self.hparams.omm_loss_weight)
                     loss_dict['loss'] = loss
                     # Scale the value of the loss significantly
                     if torch.log10(loss) - 1 > 0:
                         loss_dict['loss'] = loss / 10**(
                             torch.floor(torch.log10(loss) - 1))
                     loss_dict['mse_openmm'] = loss_dict['loss'].detach()
-
-        loss_dict.update(pred_helper.angle_metrics_dict())
-
-        # Generate structures only after we no longer need the objects intact
-        # TODO Remove out of date structure viz arguments etc
-        # if do_struct and self.hparams.log_structures:
-        #     self._generate_structure_viz(batch, sc_angs_pred, split)
 
         return loss_dict
 
@@ -413,3 +403,10 @@ class LitSidechainTransformer(pl.LightningModule):
         example_batch = data_module.get_example_input_array()
         non_seq_data = self._prepare_model_input(example_batch)[0]
         self.example_input_array = non_seq_data, example_batch.seqs_int
+
+
+# TODO Simplify loss combination weight
+# TODO Improve coordinate building speed
+# TODO should OpenMM loss be scaled by 1/(1e12)?
+# TODO is the effect seen in my recent report on overfitting related to seed at all?
+# TODO Should losses and metrics be measured distinctly for wandb?

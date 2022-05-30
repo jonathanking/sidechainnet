@@ -168,10 +168,8 @@ class AnglePredictionHelper(object):
         return angle_mse(self.sc_angs_true, self.sc_angs_pred)
 
     def angle_metrics_dict(self):
-        """Return a dictionary containing a large number of relevant angle metrics."""
-        empty_dict = {}
-        return self._compute_angle_metrics(self.sc_angs_true, self.sc_angs_pred,
-                                           empty_dict)
+        """Return a dictionary containing several relevant angle metrics (acc, etc.)."""
+        return self._compute_angle_metrics()
 
     def structure_metrics_dict(self):
         """Return a dictionary containing a large number of relevant structure metrics."""
@@ -179,7 +177,7 @@ class AnglePredictionHelper(object):
         return self._compute_angle_metrics(self.sc_angs_true, self.sc_angs_pred,
                                            empty_dict)
 
-    def _compute_structure_metrics(self, batch, sc_angs_true, sc_angs_pred, loss_dict):
+    def _compute_structure_metrics(self):
         """Compute & return loss dict with structure-based performance metrics (ie rmsd).
 
         Args:
@@ -188,16 +186,13 @@ class AnglePredictionHelper(object):
             sc_angs_pred (tensor): real-valued tensor of predicted protein angles.
             loss_dict (dict): Dictionary whose keys are metrics/losses to be recorded.
         """
+        loss_dict = {}
         loss_dict['rmsd'] = self.rmsd()
         loss_dict['drmsd'] = self.drmsd()
         loss_dict['lndrmsd'] = self.lndrmsd()
         return loss_dict
 
-    def _compute_angle_metrics(self,
-                               sc_angs_true,
-                               sc_angs_pred,
-                               loss_dict,
-                               acc_tol=np.deg2rad(20)):
+    def _compute_angle_metrics(self, acc_tol=np.deg2rad(20)):
         """Compute MAE(X1-5) and accuracy (correct within 20 deg).
 
         Args:
@@ -208,6 +203,8 @@ class AnglePredictionHelper(object):
         Returns:
             loss_dict (dict): Updated dictionary containing new keys MAE_X1...ACC.
         """
+        loss_dict = {}
+
         # Absolue Error Only (contains nans)
         abs_error = torch.abs(
             angle_diff(self.sc_angs_true_rad.detach(), self.sc_angs_pred_rad.detach()))

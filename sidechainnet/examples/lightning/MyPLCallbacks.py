@@ -49,12 +49,14 @@ class VisualizeStructuresEveryNSteps(pl.Callback):
         # Select the first protein in the batch to visualize
         p = pred_helper.batch_pred[0]
         p.numpy()
-        pdbfile = os.path.join(pl_module.save_dir, "pdbs", f"{p.id}_pred.pdb")
+        pdbfile = os.path.join(pl_module.save_dir, "pdbs",
+                               f"{pl_module.global_step:07}_{p.id}_pred.pdb")
         p.to_pdb(pdbfile)
         wandb.log({"structures/train/molecule": wandb.Molecule(pdbfile)})
 
         ptrue = pred_helper.batch_true[0]
-        ptrue_pdbfile = os.path.join(pl_module.save_dir, "pdbs", f"{p.id}_true.pdb")
+        ptrue_pdbfile = os.path.join(pl_module.save_dir, "pdbs",
+                                     f"{pl_module.global_step:07}_{p.id}_true.pdb")
         try:
             ptrue.to_pdb(ptrue_pdbfile)
         except ValueError as e:
@@ -77,12 +79,12 @@ class VisualizeStructuresEveryNSteps(pl.Callback):
         pymol.cmd.show("lines", "not (name c,o,n and not pro/n)")
         pymol.cmd.hide("cartoon", "pred")
         both_png_path = os.path.join(pl_module.save_dir, "pngs",
-                                     f"{p.id}_both_{pl_module.global_step}.png")
+                                     f"{pl_module.global_step:07}_{p.id}_both.png")
         # TODO: Ray tracing occurs despite ray=0
         with Suppressor():
             pymol.cmd.png(both_png_path, width=1000, height=1000, quiet=1, dpi=300, ray=0)
         both_pse_path = os.path.join(pl_module.save_dir, "pdbs",
-                                     f"{p.id}_both_{pl_module.global_step}.pse")
+                                     f"{pl_module.global_step:07}_{p.id}_both.pse")
         pymol.cmd.save(both_pse_path)
         wandb.save(both_pse_path, base_path=pl_module.save_dir)
         pymol.cmd.delete("all")

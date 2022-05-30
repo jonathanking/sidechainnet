@@ -70,7 +70,7 @@ class LoggingHelper(object):
                          on_step=True,
                          on_epoch=True,
                          prog_bar=True,
-                         add_dataloader_idx=True)
+                         add_dataloader_idx=False)
 
         self._log_angle_metrics(
             loss_dict, 'valid',
