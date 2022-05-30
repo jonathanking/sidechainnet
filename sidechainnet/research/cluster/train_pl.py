@@ -162,11 +162,11 @@ def create_parser():
                           default=4000,
                           help="Training step at which to begin training with"
                           " OpenMM + MSE combination loss.")
-    training.add_argument("--mse_loss_weight",
+    training.add_argument("--loss_weight_mse",
                           type=float,
                           default=1,
                           help="Scaling factor for MSE component of model loss.")
-    training.add_argument("--omm_loss_weight",
+    training.add_argument("--loss_weight_omm",
                           type=float,
                           default=1,
                           help="Scaling factor for OpenMM component of model loss.")

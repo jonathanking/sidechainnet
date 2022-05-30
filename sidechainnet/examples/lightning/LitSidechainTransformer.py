@@ -356,9 +356,9 @@ class LitSidechainTransformer(pl.LightningModule):
         loss_dict.update(pred_helper.angle_metrics_dict())
 
         # Basic structure-based losses/metrics; Computed rarely if training with MSE only
-        if ("openmm" in self.hparams.loss_name or
-                self.global_step % self.hparams.check_struct_metrics_every_n_steps
-                == 0):
+        if (("openmm" in self.hparams.loss_name and
+             self.global_step >= self.hparams.opt_begin_mse_openmm_step) or
+                self.global_step % self.hparams.check_struct_metrics_every_n_steps == 0):
             loss_dict['rmsd'] = pred_helper.rmsd()
             loss_dict['drmsd'] = pred_helper.drmsd()
             loss_dict['lndrmsd'] = pred_helper.lndrmsd()
@@ -379,21 +379,17 @@ class LitSidechainTransformer(pl.LightningModule):
                 loss_dict['loss'] = mse_loss
             else:
                 if self.global_step == self.hparams.opt_begin_mse_openmm_step:
-                    print("Starting to train with OpenMM/MSE Combination loss at step",
-                          self.global_step)
+                    self._alert_user("Starting to train with OpenMM/MSE Combination loss "
+                                     f"at step {self.global_step}.")
                 openmm_loss = pred_helper.openmm_loss()
                 if openmm_loss is None:
                     loss_dict['openmm'] = None
                     loss_dict['loss'] = None
                 else:
                     loss_dict['openmm'] = openmm_loss.detach()
-                    loss = (mse_loss * self.hparams.mse_loss_weight +
-                            openmm_loss * self.hparams.omm_loss_weight)
+                    loss = (mse_loss * self.hparams.loss_weight_mse +
+                            openmm_loss * self.hparams.loss_weight_omm)
                     loss_dict['loss'] = loss
-                    # Scale the value of the loss significantly
-                    if torch.log10(loss) - 1 > 0:
-                        loss_dict['loss'] = loss / 10**(
-                            torch.floor(torch.log10(loss) - 1))
                     loss_dict['mse_openmm'] = loss_dict['loss'].detach()
 
         return loss_dict
@@ -404,9 +400,18 @@ class LitSidechainTransformer(pl.LightningModule):
         non_seq_data = self._prepare_model_input(example_batch)[0]
         self.example_input_array = non_seq_data, example_batch.seqs_int
 
+    def _alert_user(self, msg):
+        """Print an alert to the user iff it has not been printed already."""
+        if not hasattr(self, "_sent_alerts"):
+            self._sent_alerts = set()
+        if msg in self._sent_alerts:
+            return
+        else:
+            print(msg)
+            self._sent_alerts.add(msg)
+            return
 
-# TODO Simplify loss combination weight
+
 # TODO Improve coordinate building speed
-# TODO should OpenMM loss be scaled by 1/(1e12)?
 # TODO is the effect seen in my recent report on overfitting related to seed at all?
 # TODO Should losses and metrics be measured distinctly for wandb?

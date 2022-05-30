@@ -41,7 +41,6 @@ class LoggingHelper(object):
 
     def log_validation_step(self, loss_dict, dataloader_idx):
         """Log a single validation step with the PyTorch Lightning Module's logger."""
-        print("start val step")
         for key, value in loss_dict.items():
             loss_or_metric = ("losses"
                               if key in self.pl_module.hparams.loss_name else "metrics")
@@ -50,7 +49,6 @@ class LoggingHelper(object):
                     f"{loss_or_metric}/valid/"
                     f"{self.pl_module.hparams.dataloader_name_mapping[dataloader_idx]}_rmse"
                 )
-                print(name)
                 self.log(name,
                          torch.sqrt(loss_dict['mse']),
                          on_step=False,
@@ -64,7 +62,6 @@ class LoggingHelper(object):
                     f"{loss_or_metric}/valid/"
                     f"{self.pl_module.hparams.dataloader_name_mapping[dataloader_idx]}_{key}"
                 )
-                print(name)
                 self.log(name,
                          value,
                          on_step=True,
