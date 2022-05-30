@@ -2,7 +2,6 @@ from typing import Dict
 
 import numpy as np
 import pytorch_lightning as pl
-import radam
 import sidechainnet as scn
 import torch
 from sidechainnet.examples.lightning.AnglePredictionHelper import \
@@ -204,6 +203,7 @@ class LitSidechainTransformer(pl.LightningModule):
                                    eps=eps,
                                    weight_decay=self.hparams.opt_weight_decay)
         elif self.hparams.opt_name == "radam":
+            import radam
             opt = radam.RAdam(filter(lambda x: x.requires_grad, self.parameters()),
                               lr=lr,
                               betas=betas,

@@ -92,7 +92,7 @@ def create_parser():
     data_args.add_argument("--num_workers",
                            type=int,
                            help="Number of workers for each DataLoader.",
-                           default=mp.cpu_count() // 2)
+                           default=max(mp.cpu_count() // 2, 4))
     data_args.add_argument("--shuffle",
                            type=my_bool,
                            help="If True, shuffle dataloaders (default=True).",
