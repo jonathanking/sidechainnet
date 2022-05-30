@@ -22,7 +22,13 @@ class StructureBuilder(object):
     really a terminal atom because it's tail is masked out?).
     """
 
-    def __init__(self, seq, ang=None, crd=None, device='cpu', nerf_method="standard"):
+    def __init__(self,
+                 seq,
+                 ang=None,
+                 crd=None,
+                 device='cpu',
+                 nerf_method="standard",
+                 has_hydrogens=None):
         """Initialize a StructureBuilder for a single protein. Does not build coordinates.
 
         To generate coordinates after initialization, see build().
@@ -42,6 +48,8 @@ class StructureBuilder(object):
                 the standard NeRF formulation described in many papers. "sn_nerf" uses an
                 optimized version with less vector normalizations. Defaults to
                 "standard".
+            has_hydrogens(bool, optional): True if the coordinate matrix uses a hydrogen
+                representation. If not provided, attempts to infer.
         """
         # TODO support one-hot sequences
         # Perhaps the user mistakenly passed coordinates for the angle arguments
@@ -83,13 +91,15 @@ class StructureBuilder(object):
                              f"You have provided {tuple(self.coords.shape)}.")
         if (self.coords is not None and
             (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str) and
-            (self.coords.shape[0] // NUM_COORDS_PER_RES_W_HYDROGENS) != len(self.seq_as_str)):
+            (self.coords.shape[0] // NUM_COORDS_PER_RES_W_HYDROGENS) != len(
+                self.seq_as_str)):
             raise ValueError(
                 f"The length of the coordinate matrix must match the sequence length "
                 f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
                 f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
         if self.ang is not None and (self.array_lib.isnan(self.ang)).all(axis=1).any():
-            missing_loc = self.array_lib.where((self.array_lib.isnan(self.ang)).all(axis=1))
+            missing_loc = self.array_lib.where(
+                (self.array_lib.isnan(self.ang)).all(axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "
@@ -101,10 +111,19 @@ class StructureBuilder(object):
         self.next_bb = None
         self.pdb_creator = None
         self.nerf_method = nerf_method
-        try:
-            self.has_hydrogens = self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
-        except AttributeError:
-            self.has_hydrogens = False
+        if has_hydrogens is not None:
+            self.has_hydrogens = has_hydrogens
+        else:
+            assert not (
+                self.coords.shape[0] % NUM_COORDS_PER_RES == 0 and
+                self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0), (
+                    "Coordinate tensor for protein has an ambiguous shape. Please pass a "
+                    "value to has_hydrogens for clarification.")
+            try:
+                self.has_hydrogens = self.coords.shape[
+                    0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
+            except AttributeError:
+                self.has_hydrogens = False
         self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS if self.has_hydrogens else NUM_COORDS_PER_RES
         self.terminal_atoms = None
 
@@ -305,10 +324,24 @@ class StructureBuilder(object):
         if other_protein is None:
             view.setStyle(style)
         elif other_protein is not None:
-            style1 = {'cartoon': {'color': '#599BFB'},
-                      'stick': {'radius': .07, 'color': '#599BFB'}}
-            style2 = {'cartoon': {'color': '#FB5960'},
-                      'stick': {'radius': .15, 'color': '#FB5960'}}
+            style1 = {
+                'cartoon': {
+                    'color': '#599BFB'
+                },
+                'stick': {
+                    'radius': .07,
+                    'color': '#599BFB'
+                }
+            }
+            style2 = {
+                'cartoon': {
+                    'color': '#FB5960'
+                },
+                'stick': {
+                    'radius': .15,
+                    'color': '#FB5960'
+                }
+            }
             view.setStyle({"model": 0}, style1)
             view.setStyle({"model": 1}, style2)
 

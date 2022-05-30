@@ -102,11 +102,17 @@ class SCNProtein(object):
         """Return an interactive visualization of the protein with py3DMol."""
         if self.sb is None:
             if from_angles:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.angles,
+                                                        has_hydrogens=self.has_hydrogens)
             elif self.has_hydrogens:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.hcoords,
+                                                        has_hydrogens=self.has_hydrogens)
             else:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.coords,
+                                                        has_hydrogens=self.has_hydrogens)
         return self.sb.to_3Dmol(style=style, other_protein=other_protein)
 
     def to_pdb(self, path, title=None, from_angles=False):
@@ -115,11 +121,17 @@ class SCNProtein(object):
             title = self.id
         if self.sb is None:
             if from_angles:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.angles,
+                                                        has_hydrogens=self.has_hydrogens)
             elif self.has_hydrogens:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.hcoords,
+                                                        has_hydrogens=self.has_hydrogens)
             else:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.coords,
+                                                        has_hydrogens=self.has_hydrogens)
         return self.sb.to_pdb(path, title)
 
     def to_pdbstr(self, title=None, from_angles=False, hcoords=None):
@@ -127,36 +139,56 @@ class SCNProtein(object):
         if not title:
             title = self.id
         if hcoords is not None:
-            self.sb = sidechainnet.StructureBuilder(self.seq, hcoords)
+            self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                    hcoords,
+                                                    has_hydrogens=self.has_hydrogens)
         if self.sb is None:
             if from_angles:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.angles,
+                                                        has_hydrogens=self.has_hydrogens)
             elif self.has_hydrogens:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.hcoords,
+                                                        has_hydrogens=self.has_hydrogens)
             else:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.coords,
+                                                        has_hydrogens=self.has_hydrogens)
         return self.sb.to_pdbstr(title)
 
     def to_gltf(self, path, title="test", from_angles=False):
         """Save structure to path as a gltf (3D-object) file."""
         if self.sb is None:
             if from_angles:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.angles,
+                                                        has_hydrogens=self.has_hydrogens)
             elif self.has_hydrogens:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.hcoords,
+                                                        has_hydrogens=self.has_hydrogens)
             else:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.coords,
+                                                        has_hydrogens=self.has_hydrogens)
         return self.sb.to_gltf(path, title)
 
     def to_png(self, path, from_angles=False):
         """Save structure to path as a PNG (image) file."""
         if self.sb is None:
             if from_angles:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.angles)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.angles,
+                                                        has_hydrogens=self.has_hydrogens)
             elif self.has_hydrogens:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.hcoords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.hcoords,
+                                                        has_hydrogens=self.has_hydrogens)
             else:
-                self.sb = sidechainnet.StructureBuilder(self.seq, self.coords)
+                self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                        self.coords,
+                                                        has_hydrogens=self.has_hydrogens)
         return self.sb.to_png(path)
 
     @property
@@ -179,7 +211,7 @@ class SCNProtein(object):
         if angles is None:
             angles = self.angles
         if self.sb is None:
-            self.sb = sidechainnet.StructureBuilder(self.seq, angles)
+            self.sb = sidechainnet.StructureBuilder(self.seq, angles, has_hydrogens=False)
             if add_hydrogens:
                 self.sb.add_hydrogens()
                 self.hcoords = self.sb.coords
@@ -187,7 +219,7 @@ class SCNProtein(object):
                 self.coords = self.sb.build()
                 self.hcoords = self.coords
         else:
-            print("StructureBuilder already exists. Coords not rebuilt.")
+            print(f"StructureBuilder already exists for {self.id}. Coords not rebuilt.")
 
     def add_hydrogens(self, from_angles=False, angles=None, coords=None):
         """Add hydrogens to the internal protein structure representation."""
@@ -199,14 +231,21 @@ class SCNProtein(object):
         if angles is None:
             angles = self.angles
         if from_angles:
-            self.sb = structure.StructureBuilder(self.seq, ang=angles, device=self.device)
+            self.sb = structure.StructureBuilder(self.seq,
+                                                 ang=angles,
+                                                 device=self.device,
+                                                 has_hydrogens=False)
             self.sb.build()
         elif coords is not None:
-            self.sb = structure.StructureBuilder(self.seq, crd=coords, device=self.device)
+            self.sb = structure.StructureBuilder(self.seq,
+                                                 crd=coords,
+                                                 device=self.device,
+                                                 has_hydrogens=False)
         else:
             self.sb = structure.StructureBuilder(self.seq,
                                                  crd=self.coords,
-                                                 device=self.device)
+                                                 device=self.device,
+                                                 has_hydrogens=self.has_hydrogens)
         self.sb.add_hydrogens()
         self.hcoords = self.sb.coords
         self.has_hydrogens = True
