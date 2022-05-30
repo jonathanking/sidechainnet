@@ -53,6 +53,10 @@ def create_parser():
                               default=11_731,
                               help="The random number generator seed for numpy "
                               "and torch.")
+    program_args.add_argument("--name",
+                              type=str,
+                              default=None,
+                              help="Weights and Biases run name.")
 
     # Data arguments
     data_args = parser.add_argument_group("Data")
@@ -219,11 +223,13 @@ def init_wandb(use_cluster, project, entity, model, dict_args):
     wandb_dir = "/scr/jok120/wandb" if use_cluster else os.path.expanduser("~/scr")
     if wandb_dir:
         os.makedirs(wandb_dir, exist_ok=True)
-    logger = WandbLogger(project=project,
-                         entity=entity,
-                         dir=wandb_dir,
-                         save_code=True,
-                         log_model=True)  # TODO add id='runid' to resume (e.g. 19j0mxjk)
+    logger = WandbLogger(
+        project=project,
+        entity=entity,
+        dir=wandb_dir,
+        save_code=True,
+        log_model=True,
+        name=dict_args['name'])  # TODO add id='runid' to resume (e.g. 19j0mxjk)
     logger.experiment.config.update(dict_args, allow_val_change=True)
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
