@@ -280,4 +280,4 @@ for one_letter_code in list(AA_MAP.keys()):
     AA_MAP[ONE_TO_THREE_LETTER_MAP[one_letter_code]] = AA_MAP[one_letter_code]
 
 # TODO: create VOCAB object only when needed.
-VOCAB = ProteinVocabulary()
+VOCAB = ProteinVocabulary()  # Padding idx = 20

@@ -13,24 +13,17 @@ NUM_COORDS_PER_RES_W_HYDROGENS = 26
 
 METHYL_ANGLE = torch.tensor(np.deg2rad(109.5))
 METHYL_LEN = torch.tensor(1.09)
-
 METHYLENE_ANGLE = torch.tensor(np.rad2deg(0.61656))  # Check - works
 METHYLENE_LEN = torch.tensor(1.09)
-
 SP3_LEN = torch.tensor(1.09)
-
 THIOL_ANGLE = torch.tensor(109.5)
 THIOL_LEN = torch.tensor(1.336)
 HYDROXYL_LEN = torch.tensor(0.96)
-
 AMIDE_LEN = torch.tensor(1.01)  # Backbone
 METHINE_LEN = torch.tensor(1.08)
-
 AMINE_ANGLE = torch.tensor(np.deg2rad(120))
 AMINE_LEN = torch.tensor(1.01)
-
 OXT_LEN = torch.tensor(BB_BUILD_INFO['BONDLENS']['c-oh'])
-
 RAD120TORCH = torch.tensor(2 * np.pi / 3)
 THIOL_ROT = torch.tensor(1.23045715359)
 
@@ -124,6 +117,24 @@ class HydrogenBuilder(object):
         self.stack = np.stack if self.is_numpy else torch.stack
         self.array = np.asarray if self.is_numpy else torch.tensor
         self.concatenate = np.concatenate if self.is_numpy else torch.cat
+        self.isnan = np.isnan if self.is_numpy else torch.isnan
+        self.scale = _scale_np if self.is_numpy else _scale
+
+        self.methyl_angle = METHYL_ANGLE.numpy() if self.is_numpy else METHYL_ANGLE
+        self.methyl_len = METHYL_LEN.numpy() if self.is_numpy else METHYL_LEN
+        self.methylene_angle = METHYLENE_ANGLE.numpy() if self.is_numpy else METHYLENE_ANGLE
+        self.methylene_len = METHYLENE_LEN.numpy() if self.is_numpy else METHYLENE_LEN
+        self.sp3_len = SP3_LEN.numpy() if self.is_numpy else SP3_LEN
+        self.thiol_angle = THIOL_ANGLE.numpy() if self.is_numpy else THIOL_ANGLE
+        self.thiol_len = THIOL_LEN.numpy() if self.is_numpy else THIOL_LEN
+        self.hydroxyl_len = HYDROXYL_LEN.numpy() if self.is_numpy else HYDROXYL_LEN
+        self.amide_len = AMIDE_LEN.numpy() if self.is_numpy else AMIDE_LEN
+        self.methine_len = METHINE_LEN.numpy() if self.is_numpy else METHINE_LEN
+        self.amine_angle = AMINE_ANGLE.numpy() if self.is_numpy else AMINE_ANGLE
+        self.amine_len = AMINE_LEN.numpy() if self.is_numpy else AMINE_LEN
+        self.oxt_len = OXT_LEN.numpy() if self.is_numpy else OXT_LEN
+        self.rad120torch = RAD120TORCH.numpy() if self.is_numpy else RAD120TORCH
+        self.thiol_rot = THIOL_ROT.numpy() if self.is_numpy else THIOL_ROT
 
     def build_hydrogens(self):
         """Add hydrogens to internal protein structure."""
@@ -136,8 +147,12 @@ class HydrogenBuilder(object):
         prev_res_atoms = None
         for i, (aa, crd) in enumerate(zip(self.seq, coords)):
             # Add empty hydrogen coordinates for missing residues
-            if crd.sum() == 0:
-                new_coords.append(self.ones((NUM_COORDS_PER_RES_W_HYDROGENS, 3)) * 0)
+            # TODO Check hydrogen generation with nans
+            if self.isnan(crd).all():
+                empty = self.ones((NUM_COORDS_PER_RES_W_HYDROGENS, 3)) * np.nan
+                if not self.is_numpy:
+                    empty = empty.to(self.device)
+                new_coords.append(empty)
                 prev_res_atoms = None
                 continue
             # Create an organized mapping from atom name to Catesian coordinates
@@ -155,6 +170,7 @@ class HydrogenBuilder(object):
             # Append Hydrogens immediately after heavy atoms, followed by PADs to L=26
             new_coords.append(self.concatenate((crd, hydrogen_positions)))
             prev_res_atoms = atoms
+        # TODO are these on the correct device?
         self.reduced_coords = self.concatenate(new_coords)
         return self.reduced_coords
 
@@ -164,14 +180,20 @@ class HydrogenBuilder(object):
 
         From https://stackoverflow.com/questions/6802577/rotation-of-3d-vector.
         """
-        if not posneg:
+        if not posneg and not self.is_numpy:
             rot_matrix = _M(axis.detach().cpu().numpy(), theta.detach().cpu().numpy())
             return torch.tensor(rot_matrix, device=self.device)
-        else:
+        elif not posneg and self.is_numpy:
+            rot_matrix = _M(axis, theta)
+            return rot_matrix
+        elif posneg and not self.is_numpy:
             r1, r2 = _M_posneg(axis.detach().cpu().numpy(),
                                theta.detach().cpu().numpy())
             return (torch.tensor(r1, device=self.device),
                     torch.tensor(r2, device=self.device))
+        else:
+            r1, r2 = _M_posneg(axis, theta)
+            return r1, r2
 
     def scale(self, vector, target_len, v_len=None):
         """Scale a vector to match a given target length."""
@@ -199,17 +221,22 @@ class HydrogenBuilder(object):
 
         # Define perpendicular vector
         PV = self.cross(CB, N)
-        R109 = self.M(PV, METHYL_ANGLE)  # Rotate abt PV by 109.5 (tetrahed.)
+        R109 = self.M(PV, self.methyl_angle)  # Rotate abt PV by 109.5 (tetrahed.)
 
         # Define Hydrogen extending from carbon
         H1 = self.dot(R109, -CB)  # Place Hydrogen by rotating C along perpendicular axis
-        H1 = _scale(H1, length) + carbon
+        H1 = self.scale(H1, length)
 
-        R120 = self.M(CB, RAD120TORCH)
+        R120 = self.M(CB, self.rad120torch)
         # Place 2nd Hydrogen by rotating prev H 120 deg
         H2 = self.dot(R120, self.clone(H1))
         # Place 3rd Hydrogen by rotating prev H 120 deg
         H3 = self.dot(R120, self.clone(H2))
+
+        # Return to original position
+        H1 += carbon
+        H2 += carbon
+        H3 += carbon
 
         return [H1, H2, H3]
 
@@ -240,14 +267,14 @@ class HydrogenBuilder(object):
         axis = R2 - R1
 
         # Place first hydrogen
-        ROT1, ROT2 = self.M(axis, METHYLENE_ANGLE, posneg=True)
+        ROT1, ROT2 = self.M(axis, self.methylene_angle, posneg=True)
         H1 = self.dot(ROT1, PV)
         vector_len = self.norm(H1)
-        H1 = _scale_l(vector=H1, target_len=METHYLENE_LEN, v_len=vector_len)
+        H1 = _scale_l(vector=H1, target_len=self.methylene_len, v_len=vector_len)
 
         # Place second hydrogen
         H2 = self.dot(ROT2, -PV)
-        H2 = _scale_l(vector=H2, target_len=METHYLENE_LEN, v_len=vector_len)
+        H2 = _scale_l(vector=H2, target_len=self.methylene_len, v_len=vector_len)
 
         # Return to original position
         H1 += carbon
@@ -257,14 +284,14 @@ class HydrogenBuilder(object):
 
     def get_single_sp3_hydrogen(self, center, R1, R2, R3):
         h = _get_single_sp3_hydrogen_help(center, R1, R2, R3)
-        H1 = _scale(h, SP3_LEN)
+        H1 = self.scale(h, self.sp3_len)
         return H1 + center
 
     def get_thiol_hydrogen(self, oxy_sulfur, prev1, prev2, thiol=True):
         if thiol:
-            length = THIOL_LEN
+            length = self.thiol_len
         else:
-            length = HYDROXYL_LEN
+            length = self.hydroxyl_len
 
         # Define local vectors
         OS = oxy_sulfur - prev1
@@ -275,21 +302,21 @@ class HydrogenBuilder(object):
 
         # Define rotation matrices
         # Rotate around PV by 109.5 (tetrahedral)
-        RP = self.M(PV, THIOL_ROT)
+        RP = self.M(PV, self.thiol_rot)
 
         # Define Hydrogens
         H1 = self.dot(RP, OS)  # Rotate by tetrahedral angle only
-        H1 = _scale(H1, length)
+        H1 = self.scale(H1, length)
         H1 += OS
 
         return H1 + prev1
 
     def get_amide_methine_hydrogen(self, R1, center, R2, amide=True, oxt=False):
         """Create a planar methine/amide hydrogen (or OXT) given two adjacent atoms."""
-        length = AMIDE_LEN if amide else METHINE_LEN
-        length = OXT_LEN if oxt else length
+        length = self.amide_len if amide else self.methine_len
+        length = self.oxt_len if oxt else length
 
-        H1 = _get_amide_methine_hydrogen_help(R1, center, R2, length)
+        H1 = _get_amide_methine_hydrogen_help(R1, center, R2, length, self.is_numpy)
 
         return H1
 
@@ -301,14 +328,14 @@ class HydrogenBuilder(object):
         PV = self.cross(N, P2)
 
         # Place first hydrogen
-        R = self.M(PV, -AMINE_ANGLE)  # Rotate around perpendicular axis
+        R = self.M(PV, -self.amine_angle)  # Rotate around perpendicular axis
         H1 = self.dot(R, -N)
         vector_len = self.norm(H1)
-        H1 = _scale_l(vector=H1, target_len=AMINE_LEN, v_len=vector_len)
+        H1 = _scale_l(vector=H1, target_len=self.amine_len, v_len=vector_len)
 
         # Rotate the previous vector around the same axis by another 120 degrees
         H2 = self.dot(R, self.clone(H1))
-        H2 = _scale_l(vector=H2, target_len=AMINE_LEN, v_len=vector_len)
+        H2 = _scale_l(vector=H2, target_len=self.amine_len, v_len=vector_len)
 
         H1 += nitrogen
         H2 += nitrogen
@@ -335,7 +362,7 @@ class HydrogenBuilder(object):
         hs = self.get_methyl_hydrogens(carbon=c.CB,
                                        prev1=c.CA,
                                        prev2=c.N,
-                                       length=METHYL_LEN)
+                                       length=self.methyl_len)
         return hs
 
     def arg(self, c):
@@ -459,11 +486,11 @@ class HydrogenBuilder(object):
         # HB
         hs.append(self.get_single_sp3_hydrogen(c.CB, c.CA, c.CG1, c.CG2))
         # HD11, HD12, HD13
-        hs.extend(self.get_methyl_hydrogens(c.CD1, c.CG1, c.CB, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.CD1, c.CG1, c.CB, length=self.methyl_len))
         # Methylene: HG12, HG13
         hs.extend(self.get_methylene_hydrogens(c.CB, c.CG1, c.CD1))
         # Methyl: HG21, HG22, HG23
-        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA, length=self.methyl_len))
         return hs
 
     def leu(self, c):
@@ -476,9 +503,9 @@ class HydrogenBuilder(object):
         # Methylene: [HB2, HB3]
         hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
         # Methyl: HD11, HD12, HD13
-        hs.extend(self.get_methyl_hydrogens(c.CD1, c.CG, c.CB, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.CD1, c.CG, c.CB, length=self.methyl_len))
         # Methyl: HD21, HD22, HD23
-        hs.extend(self.get_methyl_hydrogens(c.CD2, c.CG, c.CB, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.CD2, c.CG, c.CB, length=self.methyl_len))
         # SP3: HG
         hs.append(self.get_single_sp3_hydrogen(c.CG, c.CB, c.CD1, c.CD2))
         return hs
@@ -495,7 +522,7 @@ class HydrogenBuilder(object):
                                (c.CB, c.CG, c.CD)):
             hs.extend(self.get_methylene_hydrogens(r1, carbon, r2))
         # NH3: HZ1, HZ2, HZ3
-        hs.extend(self.get_methyl_hydrogens(c.NZ, c.CE, c.CD, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.NZ, c.CE, c.CD, length=self.methyl_len))
         return hs
 
     def met(self, c):
@@ -508,7 +535,7 @@ class HydrogenBuilder(object):
         # Methylene: [HB2, HB3]
         hs.extend(self.get_methylene_hydrogens(c.CA, c.CB, c.CG))
         # Methyl: HE1, HE2, HE3
-        hs.extend(self.get_methyl_hydrogens(c.CE, c.SD, c.CG, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.CE, c.SD, c.CG, length=self.methyl_len))
         # Methylene: HG2, HG3
         hs.extend(self.get_methylene_hydrogens(c.CB, c.CG, c.SD))
         return hs
@@ -567,7 +594,7 @@ class HydrogenBuilder(object):
         # Hydroxyl: HG1
         hs.append(self.get_thiol_hydrogen(c.OG1, c.CB, c.CA, thiol=False))
         # Methyl: HG21, HG22, HG23
-        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA, length=self.methyl_len))
         return hs
 
     def trp(self, c):
@@ -621,8 +648,8 @@ class HydrogenBuilder(object):
         # SP3: HB
         hs.append(self.get_single_sp3_hydrogen(c.CB, c.CA, c.CG1, c.CG2))
         # Methyl  x2: [HG11, HG12, HG13], [HG21, HG22, HG23]
-        hs.extend(self.get_methyl_hydrogens(c.CG1, c.CB, c.CA, length=METHYL_LEN))
-        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA, length=METHYL_LEN))
+        hs.extend(self.get_methyl_hydrogens(c.CG1, c.CB, c.CA, length=self.methyl_len))
+        hs.extend(self.get_methyl_hydrogens(c.CG2, c.CB, c.CA, length=self.methyl_len))
         return hs
 
     def get_hydrogens_for_res(self,
@@ -635,7 +662,7 @@ class HydrogenBuilder(object):
         hs = []
         # Special Cases
         if n_terminal:
-            h, h2, h3 = self.get_methyl_hydrogens(c.N, c.CA, c.C, length=AMINE_LEN)
+            h, h2, h3 = self.get_methyl_hydrogens(c.N, c.CA, c.C, length=self.amine_len)
             self.terminal_atoms.update({"H2": h2, "H3": h3})
             hs.append(h)  # Used as normal amine hydrogen, H
         # All amino acids except proline have an amide-hydrogen along the backbone
@@ -737,7 +764,7 @@ class AtomHolder(dict):
 ###########################################
 
 
-@njit
+# @njit
 def _M(axis: np.ndarray, theta):
     """Numba compiled function for generating rotation matrix. See HB.M()"""
     axis = axis / np.sqrt(np.dot(axis, axis))
@@ -752,7 +779,7 @@ def _M(axis: np.ndarray, theta):
     return r
 
 
-@njit
+# @njit
 def _M_posneg(axis: np.ndarray, theta):
     """Numba compiled function for generating two similar rotation matrices."""
     axis = axis / np.sqrt(np.dot(axis, axis))
@@ -773,7 +800,7 @@ def _M_posneg(axis: np.ndarray, theta):
     return r1, r2
 
 
-@torch.jit.script
+# @torch.jit.script
 def _Mt(axis, theta):
     """Torchscript compiled version of HB.M() for generating a rotation matrix."""
     axis = axis / torch.sqrt(torch.dot(axis, axis))
@@ -795,20 +822,26 @@ def _Mt(axis, theta):
     return r.double()
 
 
-@torch.jit.script
+# @torch.jit.script
 def _scale(vector, target_len):
     """Torchscript version of HydrogenBuilder._scale()."""
     v_len = torch.norm(vector)
     return vector / v_len * target_len
 
 
-@torch.jit.script
+def _scale_np(vector, target_len):
+    """Numpy version of HydrogenBuilder._scale()."""
+    v_len = np.linalg.norm(vector)
+    return vector / v_len * target_len
+
+
+# @torch.jit.script
 def _scale_l(vector, target_len, v_len):
     """Torchscript version of HydrogenBuilder._scale() with length provided."""
     return vector / v_len * target_len
 
 
-@torch.jit.script
+# @torch.jit.script
 def _get_methyl_hydrogens(carbon, prev1, prev2, length, met_angle, rad120):
     """Place methyl (H3) hydrogens on a Carbon atom. Also supports N-terminal amines.
 
@@ -833,16 +866,19 @@ def _get_methyl_hydrogens(carbon, prev1, prev2, length, met_angle, rad120):
     return [H1, H2, H3]
 
 
-@torch.jit.script
+# @torch.jit.script
 def _get_single_sp3_hydrogen_help(center, R1, R2, R3):
     """Torchscript helper for _get_single_sp3_hydrogen."""
     return -R1 - R2 - R3 + (3 * center)
 
 
-@torch.jit.script
-def _get_amide_methine_hydrogen_help(R1, center, R2, length):
+# @torch.jit.script
+def _get_amide_methine_hydrogen_help(R1, center, R2, length, is_numpy):
     """Torchscript helper for _get_amide_methine_hydrogen."""
-    return _scale(-R1 - R2 + 2*center, length) + center
+    if is_numpy:
+        return _scale_np(-R1 - R2 + 2 * center, length) + center
+    else:
+        return _scale(-R1 - R2 + 2*center, length) + center
 
 
 ATOM_MAP_H = {}

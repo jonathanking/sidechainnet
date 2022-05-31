@@ -40,10 +40,10 @@ class OpenMMEnergy(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output=None):
         """Return the negative force acting on each heavy atom."""
-        forces = ctx.forces.view(1, -1)                    # (1 x M)
-        dxh_dx = ctx.dxh_dx                                # (26L x 3 x 14L x 3)
+        forces = ctx.forces.view(1, -1)  # (1 x M)
+        dxh_dx = ctx.dxh_dx  # (26L x 3 x 14L x 3)
         a, b, c, d = dxh_dx.shape
-        dxh_dx = dxh_dx.view(a * b, c * d)                 # (M x N)
+        dxh_dx = dxh_dx.view(a * b, c * d)  # (M x N)
 
         de_dx = torch.matmul(-forces, dxh_dx).view(-1, 3)  # (1 x N) -> (14L x 3)
 
@@ -54,9 +54,9 @@ class OpenMMEnergyH(torch.autograd.Function):
     """A force-field based loss function."""
 
     @staticmethod
-    def forward(ctx, protein, hcoords, force_scaling=1):
+    def forward(ctx, protein, hcoords, force_scaling=1, force_clipping_val=1e6):
         """Compute potential energy of the protein system and save atomic forces."""
-        # Update protein's hcoords
+        # Update protein's hcoords, scaled to match OpenMM's units
         protein.update_hydrogens_for_openmm(hcoords / 10)
 
         # Compute potential energy and forces
@@ -65,6 +65,10 @@ class OpenMMEnergyH(torch.autograd.Function):
                               dtype=torch.float64,
                               device=protein.device)
         forces = protein.get_forces() / 10
+
+        # Some forces may have inf/-inf, so we clip large values to avoid nan gradients
+        forces[forces > force_clipping_val] = force_clipping_val
+        forces[forces < -force_clipping_val] = -force_clipping_val
 
         # Save context
         ctx.forces = forces
@@ -76,8 +80,8 @@ class OpenMMEnergyH(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output=None):
         """Return the negative force acting on each atom."""
-        return None, torch.tensor(-ctx.forces,
-                                  device=ctx.device) * grad_output * ctx.grad_scale, None
+        return None, torch.tensor(
+            -ctx.forces, device=ctx.device) * grad_output * ctx.grad_scale, None, None
 
 
 def _get_alias(protein):

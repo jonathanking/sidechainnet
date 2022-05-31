@@ -8,7 +8,7 @@ from pstats import Stats, SortKey
 from tqdm import tqdm
 
 import sidechainnet as scn
-from sidechainnet.utils.openmm import OpenMMEnergy, OpenMMEnergyH
+from sidechainnet.utils.openmm_loss import OpenMMEnergy, OpenMMEnergyH
 
 torch.autograd.set_detect_anomaly(True)
 torch.set_printoptions(sci_mode=False, precision=3)
@@ -121,21 +121,29 @@ def test_openmm_energy_h():
 def test_optimize_with_profiling():
     p = load_p(0, -1)
     p.add_hydrogens()
+    # p.cuda()
     to_optim = p.hcoords.detach().clone().requires_grad_(True)
     energy_loss = OpenMMEnergyH()
     opt = torch.optim.LBFGS([to_optim], lr=1e-3)
+    # opt = torch.optim.SGD([to_optim], lr=1e-4)
     losses = []
+    print(p, p.hcoords, to_optim)
 
-    for i in tqdm(range(50)):
+    for i in tqdm(range(500)):
         def closure():
             opt.zero_grad()
             loss = energy_loss.apply(p, to_optim)
             loss.backward()
             losses.append(float(loss.detach().numpy()))
             return loss
-
         opt.step(closure)
-    print(losses[0], losses[-1])
+        opt.zero_grad()
+        loss = energy_loss.apply(p, to_optim)
+        loss.backward()
+        print(loss.cpu())
+        opt.step()
+        # losses.append(float(loss.cpu().detach().numpy()))
+    # print(losses[0], losses[-1])
 
 
 def test_profile_training():
@@ -151,21 +159,23 @@ def test_profile_training():
 
 
 def test_optimize_internal():
+    torch.cuda.set_device(0)
     p = load_p(0, -1)
-    p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64, device='cpu')
+    p.angles = torch.tensor(p.angles, requires_grad=True, dtype=torch.float64, device='cuda')
     p.cuda()
     to_optim = (p.angles).detach().clone().requires_grad_(True)
-
     energy_loss = OpenMMEnergyH()
-    opt = torch.optim.SGD([to_optim], lr=1e-4)
+    opt = torch.optim.SGD([to_optim], lr=1e-10)
+
+    print(p.angles)
 
     losses = []
 
-    for i in tqdm(range(20)):
+    for i in tqdm(range(20), smoothing=0):
         # SGD
         opt.zero_grad()
         # Re-add the angles to the protein object
-        p.angles = to_optim
+        p.angles = to_optim.detach().clone().requires_grad_(True)
         # Rebuild the coordinates from the angles
         p.add_hydrogens(from_angles=True)
         # Compute the loss on the coordinates
@@ -175,10 +185,19 @@ def test_optimize_internal():
         losses.append(float(loss.cpu().detach().numpy()))
         print(loss)
 
-        torch.nn.utils.clip_grad_norm_(to_optim, 1)
+        # torch.nn.utils.clip_grad_norm_(to_optim, 1)
 
         opt.step()
 
+
+def test_nanh_01():
+    """Build hydrogens for a structure without gaps."""
+    d = scn.load("debug", scn_dir="/home/jok120/sidechainnet_data/", scn_dataset=True)
+    p = d["1BE3_d1be3k-"]
+    p.to_3Dmol()
+    p.torch()
+    p.add_hydrogens()
+    p.to_pdb("1be3.pdb")
 
 
 if __name__ == "__main__":

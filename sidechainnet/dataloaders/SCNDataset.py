@@ -12,38 +12,70 @@ SCNProteins may be iterated over or selected from the SCNDataset.
     >>> d["1HD1_1_A"]
     SCNProtein(1HD1_1_A, len=75, missing=0, split='train')
 """
+import copy
+import datetime
+import pickle
+import numpy as np
+import torch
+
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
+from sidechainnet.utils.organize import compute_angle_means, EMPTY_SPLIT_DICT
 
 
-class SCNDataset(object):
+class SCNDataset(torch.utils.data.Dataset):
     """A representation of a SidechainNet dataset."""
 
-    def __init__(self, data) -> None:
+    def __init__(self,
+                 data,
+                 split_name="",
+                 trim_edges=False,
+                 sort_by_length='ascending',
+                 overfit_batches=0,
+                 overfit_batches_small=True,
+                 complete_structures_only=False) -> None:
         """Initialize a SCNDataset from underlying SidechainNet formatted dictionary."""
         super().__init__()
         # Determine available datasplits
         self.splits = []
-        for split_name in ['train', 'valid', 'test']:
-            for k in data.keys():
-                if split_name in k:
-                    self.splits.append(k)
+        for split_label in ['train', 'valid', 'test']:
+            for existing_data_label in data.keys():
+                if split_label in existing_data_label:
+                    self.splits.append(existing_data_label)
+
+        # If only a single split was provided, prepare the data for protein construction
+        if not len(self.splits):
+            assert split_name, "Please provide a split name if providing a single split."
+            self.splits.append(split_name)
+            data = {
+                split_name: data,
+                "settings": {
+                    "angle_means":
+                        compute_angle_means(data['ang']) if data['ang'] else None
+                }
+            }
+
+        starting_length = sum([len(data[split]['seq']) for split in self.splits])
+
+        # TODO: handle more cleverly the case when no angle/other data is provided
 
         self.split_to_ids = {}
         self.ids_to_SCNProtein = {}
         self.idx_to_SCNProtein = {}
+        _unsorted_proteins = []
 
         # Create SCNProtein objects and add to data structure
-        idx = 0
         for split in self.splits:
             d = data[split]
+            count = 0
             for c, a, s, u, m, e, n, r, z, i in zip(d['crd'], d['ang'], d['seq'],
                                                     d['ums'], d['msk'], d['evo'],
                                                     d['sec'], d['res'], d['mod'],
                                                     d['ids']):
-                try:
-                    self.split_to_ids[split].append(i)
-                except KeyError:
-                    self.split_to_ids[split] = [i]
+                # This portion is simply to skip over very small proteins when ovrftng
+                if (not overfit_batches_small and overfit_batches and split == 'train' and
+                        count < len(d['seq']) // 2):
+                    count += 1
+                    continue
 
                 p = SCNProtein(coordinates=c,
                                angles=a,
@@ -56,9 +88,40 @@ class SCNDataset(object):
                                is_modified=z,
                                id=i,
                                split=split)
+                if trim_edges:
+                    p.trim_edges()
+                if complete_structures_only and "-" in p.mask:
+                    continue
+
+                p.trim_to_max_seq_len()  # TODO add an option to not do this by default
+
                 self.ids_to_SCNProtein[i] = p
-                self.idx_to_SCNProtein[idx] = p
-                idx += 1
+                _unsorted_proteins.append(p)
+                try:
+                    self.split_to_ids[split].append(i)
+                except KeyError:
+                    self.split_to_ids[split] = [i]
+
+        if sort_by_length == 'ascending':
+            argsorted = np.argsort([len(p) for p in _unsorted_proteins])
+        elif sort_by_length == 'descending':
+            argsorted = np.argsort([len(p) for p in _unsorted_proteins])[::-1]
+        sorted_idx = 0
+        for unsorted_idx in argsorted:
+            self.idx_to_SCNProtein[sorted_idx] = _unsorted_proteins[unsorted_idx]
+            sorted_idx += 1
+        del _unsorted_proteins
+
+        # Add metadata
+        self.angle_means = compute_angle_means(
+            [p.angles for p in self.ids_to_SCNProtein.values()])
+        self.lengths = np.array([len(p) for p in self])
+
+        # Report excluded entries
+        if complete_structures_only:
+            n_filtered_entries = starting_length - len(self.lengths)
+            print(f"{n_filtered_entries} ({n_filtered_entries/starting_length:.1%})"
+                  " data set entries were excluded due to missing residues.")
 
     def get_protein_list_by_split_name(self, split_name):
         """Return list of SCNProtein objects belonging to str split_name."""
@@ -76,6 +139,8 @@ class SCNDataset(object):
             start = len(self) + start if start < 0 else start
             return [self.idx_to_SCNProtein[i] for i in range(start, stop, step)]
         else:
+            if id < 0:
+                id = len(self) + id
             return self.idx_to_SCNProtein[id]
 
     def __len__(self):
@@ -84,11 +149,16 @@ class SCNDataset(object):
 
     def __iter__(self):
         """Iterate over SCNProtein objects."""
-        yield from self.ids_to_SCNProtein.values()
+        for i in range(len(self)):
+            yield self.idx_to_SCNProtein[i]
 
     def __repr__(self) -> str:
         """Represent SCNDataset as a string."""
-        return f"SCNDataset(n={len(self)})"
+        if len(self.splits) == 1:
+            split_str = f", split={self.splits[0]}"
+        else:
+            split_str = ""
+        return f"SCNDataset(n={len(self)}{split_str})"
 
     def filter_ids(self, to_keep):
         """Remove proteins whose IDs are not included in list to_keep."""
@@ -101,5 +171,88 @@ class SCNDataset(object):
             self.split_to_ids[p.split].remove(pnid)
             del self.ids_to_SCNProtein[pnid]
         self.idx_to_SCNProtein = {}
-        for i, protein in enumerate(self):
+        for i, protein in enumerate(self.ids_to_SCNProtein.values()):
             self.idx_to_SCNProtein[i] = protein
+
+    def filter(self, func, verbose=True):
+        """Filter the SCNDataset, keeping all entries where func(protein) is True.
+
+        Args:
+            func (function): A function that takes as input a single SCNProtein and
+            returns True or False.
+        """
+        starting_size = len(self)
+        to_keep = [p.id for p in filter(func, self)]
+        self.filter_ids(to_keep)
+        if verbose:
+            n_filtered_entries = starting_size - len(self)
+            print(f"{n_filtered_entries} ({n_filtered_entries/starting_size:.1%})"
+                  " data set entries were excluded by user-defined function.")
+
+    def _sort_by_length(self, reverse_sort):
+        """Sorts all data entries by sequence length."""
+        raise NotImplementedError
+        sorted_len_indices = [
+            a[0] for a in sorted(
+                enumerate(self.angs), key=lambda x: x[1].shape[0], reverse=reverse_sort)
+        ]
+        self.seqs = [self.seqs[i] for i in sorted_len_indices]
+        self.str_seqs = [self.str_seqs[i] for i in sorted_len_indices]
+        self.angs = [self.angs[i] for i in sorted_len_indices]
+        self.crds = [self.crds[i] for i in sorted_len_indices]
+        self.msks = [self.msks[i] for i in sorted_len_indices]
+        self.evos = [self.evos[i] for i in sorted_len_indices]
+        self.ids = [self.ids[i] for i in sorted_len_indices]
+        self.resolutions = [self.resolutions[i] for i in sorted_len_indices]
+        self.secs = [self.secs[i] for i in sorted_len_indices]
+        self.mods = [self.mods[i] for i in sorted_len_indices]
+
+    def pickle(self, path, description=None):
+        """Create and save a pickled Python dictionary representing the dataset.
+
+        Args:
+            path (str): Path to new file.
+        """
+        complete_dict = {
+            "date": datetime.datetime.now().strftime("%I:%M%p %b %d, %Y"),
+            "settings": {
+                "angle_means": self.angle_means
+            }
+        }
+        for split in self.splits:
+            if split not in complete_dict:
+                complete_dict[split] = copy.deepcopy(EMPTY_SPLIT_DICT)
+            for p in self.get_protein_list_by_split_name(split):
+                p.numpy()
+                complete_dict[split]["ang"].append(p.angles)
+                complete_dict[split]["seq"].append(p.seq)
+                complete_dict[split]["ids"].append(p.id)
+                complete_dict[split]["evo"].append(p.evolutionary)
+                complete_dict[split]["msk"].append(p.mask)
+                if p.has_hydrogens:
+                    p.hcoords = torch.tensor(p.hcoords)
+                    p.coords = p.hydrogenrep_to_heavyatomrep().numpy()
+                complete_dict[split]["crd"].append(p.coords)
+                complete_dict[split]["sec"].append(p.secondary_structure)
+                complete_dict[split]["res"].append(p.resolution)
+                complete_dict[split]["ums"].append(p.unmodified_seq)
+                complete_dict[split]["mod"].append(p.is_modified)
+
+        if not description:
+            description = "Pickled SCNDataset."
+        complete_dict['description'] = description
+
+        with open(path, "wb") as f:
+            pickle.dump(complete_dict, f)
+
+        return
+
+
+if __name__ == "__main__":
+    import sidechainnet as scn
+    d = scn.load("debug",
+                 scn_dataset=True,
+                 complete_structures_only=True,
+                 trim_edges=True,
+                 scn_dir="/home/jok120/sidechainnet_data")
+    d.filter(lambda p: len(p) < 50)

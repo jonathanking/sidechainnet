@@ -30,7 +30,7 @@ def compute_batch_drmsd(true_coordinates, pred_coordinates, seq, verbose=False):
         # Remove batch_padding from true coords
         batch_padding = _tile((s != 20), 0, NUM_COORDS_PER_RES)
         tc = tc[batch_padding]
-        missing_atoms = (tc == 0).all(axis=-1)
+        missing_atoms = torch.isnan(tc).all(axis=-1)
         tc = tc[~missing_atoms]
         pc = pc[~missing_atoms]
 
@@ -99,6 +99,42 @@ def pairwise_internal_dist(x):
     return res
 
 
+def angle_mse(true, pred):
+    """Return the mean squared error between two tensor batches.
+
+    Given a predicted angle tensor and a true angle tensor (batch-padded with
+    nans, and missing-item-padded with nans), this function removes all nans before
+    using torch's built-in MSE loss function.
+
+    Args:
+        pred, true (np.ndarray, torch.tensor): 3 or more dimensional tensors
+    Returns:
+        MSE loss between true and pred.
+    """
+    # # Remove batch padding
+    # ang_non_zero = true.ne(0).any(dim=2)
+    # tgt_ang_non_zero = true[ang_non_zero]
+
+    # Remove missing angles
+    ang_non_nans = ~true.isnan()
+    return torch.nn.functional.mse_loss(pred[ang_non_nans], true[ang_non_nans])
+
+
+def angle_mae(true, pred):
+    """Compute flattened MeanAbsoluteError between 2 angle(Rad) tensors with nan pads."""
+    absolute_error = torch.abs(angle_diff(true, pred))
+    return torch.nanmean(absolute_error)
+
+
+def angle_diff(true, pred):
+    """Compute signed distance between two angle tensors (does not change shape)."""
+    error = true - pred
+    # Correct for out of bounds (wrap around)
+    error[error > torch.pi] -= 2 * torch.pi
+    error[error < -torch.pi] += 2 * torch.pi
+    return error
+
+
 def _tile(a, dim, n_tile):
     # https://discuss.pytorch.org/t/how-to-tile-a-tensor/13853/4
     init_dim = a.size(dim)
@@ -108,3 +144,105 @@ def _tile(a, dim, n_tile):
     order_index = torch.LongTensor(
         np.concatenate([init_dim * np.arange(n_tile) + i for i in range(init_dim)]))
     return torch.index_select(a, dim, order_index)
+
+
+# Structure Based Losses
+
+
+def gdt_ts(true, pred):
+    """Compute GDT_TS between true (nan-padded) and predicted coordinate tensors.
+
+    Specifically, GDT_TS should be computed over the alpha carbons only.
+
+    Args:
+        true (tensor): True atomic coordinates, must be padded with nans.
+        pred (tensor): Predicted atomic coordinates.
+
+    Returns:
+        gdt_ts: Value of GDT_TS.
+    """
+    pass
+
+
+def gdc_all(true, pred, k=10):
+    """Compute GDC_ALL between true and predicted coordinate arrays.
+
+    According to the CASP definition:
+        GDC_ALL = 2*(k*GDC_P1 + (k-1)*GDC_P2 ... + 1*GDC_Pk)/(k+1)*k, k=10
+        where GDC_Pk denotes percent of atoms under distance cutoff <= 0.5kÅ
+
+        Source: https://predictioncenter.org/casp14/doc/help.html
+
+    In my interpretation, I have modified it slightly:
+        GDC_ALL = 2 * 100 *(k*GDC_P1 + (k-1)*GDC_P2 ... + 1*GDC_Pk)/((k+1)*k), k=10
+        because of the desire to have it in (0, 100] and for the denominator to match
+        https://doi.org/10.1016/j.heliyon.2017.e00235. The two are equivalent when k=10.
+
+    For comparison, GDC_SC (sidechain) exists, but uses a characteristic atom for each
+    sidechain (V.CG1,L.CD1,I.CD1,P.CG,M.CE,F.CZ,W.CH2,S.OG,T.OG1,C.SG,Y.OH,N.OD1,Q.OE1,
+    D.OD2,E.OE2,K.NZ,R.NH2,H.NE2) instead of all atoms. See doi: 10.1002/prot.22551 for
+    more discussion on GDC_SC.
+
+    Args:
+        true (array): True atomic coordinates. Must not contain padding.
+        pred (array): Predicted atomic coordinates. Must be the same shape as true.
+
+    Returns:
+        gdc_all: Value of GDC_ALL.
+    """
+    t = pr.calcTransformation(pred, true)
+    pred = t.apply(pred)
+
+    thresholds = np.arange(1, k + 1) * 0.5
+    distances = np.linalg.norm(true - pred, axis=1)
+
+    # Check if each atom was within each threshold (len(threshold) x len(distances))
+    passed_check = distances <= thresholds[:, None]
+
+    # Compute the fraction passing at each threshold
+    gdc_p = passed_check.sum(axis=1) / passed_check.shape[1]
+
+    # Compute GDC_ALL according to the CASP definition
+    gdc_all = (np.arange(1, k + 1)[::-1] * gdc_p).sum()
+    gdc_all = 2 * 100 * gdc_all / ((k + 1) * k)
+
+    return gdc_all
+
+
+def tm_score(true, pred):
+    """Compute TM Score between true and predicted coordinate arrays.
+
+    See original paper for formulation: https://zhanggroup.org/TM-score/TM-score.pdf,
+    DOI: 10.1002/prot.20264. Similar to GDT_TS, but is independent of protein length.
+
+    Args:
+        true (array): True atomic coordinates. Must not contain padding.
+        pred (array): Predicted atomic coordinates. Must be the same shape as true.
+
+    Returns:
+        tm_score: Value of TM Score.
+    """
+    t = pr.calcTransformation(pred, true)  # TODO Measure TM during training
+    pred = t.apply(pred)
+    distances = np.linalg.norm(true - pred, axis=1)
+
+    L = len(true)
+    d0 = 1.24 * numpy_safe_cbrt(L - 15) - 1.8
+
+    def frac(di):
+        return 1 / (1 + (di / d0)**2)
+
+    fractions = frac(distances)
+
+    tm_score = (1 / L) * fractions.sum()
+
+    return tm_score
+
+
+def numpy_safe_cbrt(a):
+    """Compute the cube root of a number in a way that numpy allows.
+
+    Numpy complains when taking the cube root of a negative number, even though it is
+    defined. See https://stackoverflow.com/a/45384691/2780645.
+    """
+    return np.sign(a) * (np.abs(a))**(1 / 3)

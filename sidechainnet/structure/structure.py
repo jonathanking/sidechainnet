@@ -95,8 +95,6 @@ def standard_nerf(a, b, c, l, theta, chi):
         torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
         placement using points a, b, c, and several parameters.
     """
-    if not (-np.pi <= theta <= np.pi):
-        raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
 
     # calculate unit vectors AB and BC
     W_hat = torch.nn.functional.normalize(b - a, dim=0)
@@ -124,7 +122,7 @@ def standard_nerf(a, b, c, l, theta, chi):
     return res.squeeze()
 
 
-@torch.jit.script
+# @torch.jit.script
 def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
     """Return coordinates for point d given previous points & parameters. Optimized NeRF.
 
@@ -166,7 +164,7 @@ def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
         ]).to(torch.float32).unsqueeze(1)).squeeze() + c
 
 
-@njit
+# @njit
 def sn_nerf_numpy(a, b, c, l_cd, theta, chi, l_bc):
     """Return coordinates for point d given previous points & parameters. Optimized NeRF.
 
@@ -224,7 +222,7 @@ def deg2rad(angle):
     return angle * np.pi / 180.
 
 
-def inverse_trig_transform(t):
+def inverse_trig_transform(t, n_angles=NUM_ANGLES):
     """Compute the atan2 of the last 2 dimensions of a given tensor.
 
     Given a (BATCH x L X NUM_PREDICTED_ANGLES ) tensor, returns (BATCH X
@@ -238,7 +236,7 @@ def inverse_trig_transform(t):
         torch.tensor: Tensor of angles with the last two dimensions reduced
         via atan2.
     """
-    t = t.view(t.shape[0], -1, NUM_ANGLES, 2)
+    t = t.view(t.shape[0], -1, n_angles, 2)
     t_cos = t[:, :, :, 0]
     t_sin = t[:, :, :, 1]
     t = torch.atan2(t_sin, t_cos)
@@ -257,7 +255,7 @@ def trig_transform(t):
     Returns:
         torch.tensor: Angle tensor with shape (batch x L x num_angle x 2).
     """
-    new_t = torch.zeros(*t.shape, 2)
+    new_t = torch.zeros(*t.shape, 2, device=t.device)
     if len(new_t.shape) == 4:
         new_t[:, :, :, 0] = torch.cos(t)
         new_t[:, :, :, 1] = torch.sin(t)

@@ -2,7 +2,6 @@
 
 import numpy as np
 import sidechainnet as scn
-from sidechainnet.dataloaders.collate import pad_for_batch
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.sequence import VOCAB
 
@@ -138,7 +137,8 @@ class BatchedStructureBuilder(object):
 
     def _missing_residue_error(self, structure_idx):
         """Raise a ValueError describing missing residues."""
-        missing_loc = np.where((self.ang_or_crd_batch[structure_idx] == 0).all(axis=-1))
+        missing_loc = np.where(
+            (np.isnan(self.ang_or_crd_batch[structure_idx])).all(axis=-1))
         raise ValueError(f"Building atomic coordinates from angles is not supported "
                          f"for structures with missing residues. Missing residues = "
                          f"{list(missing_loc[0])}. Protein structures with missing "

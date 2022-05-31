@@ -3,6 +3,8 @@
 import multiprocessing
 import os
 import pickle
+from time import sleep
+import numpy as np
 import pkg_resources
 from glob import glob
 import re
@@ -17,7 +19,8 @@ import sidechainnet.utils.errors as errors
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
 
-MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
+# TODO Make max seq len argument
+MAX_SEQ_LEN = 750  # An arbitrarily large upper-bound on sequence lengths
 
 VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
 VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]
@@ -33,7 +36,6 @@ D_AMINO_ACID_CODES = [
 ]
 ASTRAL_ID_MAPPING = None
 PROTEIN_DSSP_DATA = None
-
 
 def _reinit_global_valid_splits(new_splits):
     """Reinitialize global validation split variables when customizing dataset splits."""
@@ -70,7 +72,8 @@ def download_sidechain_data(pnids,
                             limit,
                             proteinnet_in,
                             regenerate_scdata=False,
-                            output_name=None):
+                            output_name=None,
+                            num_cores=multiprocessing.cpu_count()):
     """Download the sidechain data for the corresponding ProteinNet IDs.
 
     Args:
@@ -127,7 +130,7 @@ def download_sidechain_data(pnids,
               " processed.")
 
     # Download the sidechain data as a dictionary and report errors.
-    sc_data, pnids_errors = get_sidechain_data(new_pnids, limit)
+    sc_data, pnids_errors = get_sidechain_data(new_pnids, limit, num_cores)
     for p in already_parsed_ids:
         sc_data[p] = existing_data[p]
     save_data(sc_data, output_path)
@@ -140,7 +143,7 @@ def download_sidechain_data(pnids,
     return sc_data, output_path
 
 
-def get_sidechain_data(pnids, limit):
+def get_sidechain_data(pnids, limit, num_cores=multiprocessing.cpu_count()):
     """Acquires sidechain data for specified ProteinNet IDs.
 
     Args:
@@ -180,24 +183,25 @@ def get_sidechain_data(pnids, limit):
     # First, we take a set of pnids with unique PDB IDs. These can be simultaneously
     # downloaded.
     results = []
-    remaining_pnids = [_ for _ in pnids]
+    remaining_pnids = [_ for _ in pnids[:limit]]
     pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
-    while len(remaining_pnids) > multiprocessing.cpu_count():
+    while len(pnids_ok_parallel) > num_cores:
         print(f"{len(pnids_ok_parallel)} IDs OK for parallel downloading.")
-        with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+        with multiprocessing.Pool(num_cores) as p:
             results.extend(
                 list(
-                    tqdm.tqdm(p.imap(process_id, pnids_ok_parallel[:limit]),
-                              total=len(pnids_ok_parallel[:limit]),
+                    tqdm.tqdm(p.imap(process_id, pnids_ok_parallel),
+                              total=len(pnids_ok_parallel),
                               dynamic_ncols=True,
                               smoothing=0)))
         pnids_ok_parallel, remaining_pnids = get_parallel_sequential(remaining_pnids)
 
     # Next, we can download the remaining pnids in sequential order safely.
+    remaining_pnids += pnids_ok_parallel
     print("Downloading remaining", len(remaining_pnids), " sequentially.")
 
     pbar = tqdm.tqdm(pnids,
-                     total=len(remaining_pnids[:limit]),
+                     total=len(remaining_pnids),
                      dynamic_ncols=True,
                      smoothing=0)
     for pnid in remaining_pnids:
@@ -498,6 +502,7 @@ def get_resolution_from_pdbid(pdbid):
     Args:
         pdbid (string): RCSB PDB identifier.
     """
+    sleep(np.random.randint(0, 3))
     query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
                     "\"){pdbx_vrpt_summary{PDB_resolution}}}")
     r = requests.get(query_string, headers={"User-Agent": "Mozilla/5.0"})
@@ -526,7 +531,7 @@ def get_sequence_from_pdbid(pdbid, chain):
     r = requests.get(query_string)
     if r.status_code != 200:
         res = None
-    while True:
+    while True and entity < 1000:
         query_string = (
             f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdbid}/{entity}")
         r = requests.get(query_string)

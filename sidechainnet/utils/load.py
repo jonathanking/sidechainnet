@@ -89,7 +89,7 @@ def _load_dict(local_path):
 
 
 def load(casp_version=12,
-         thinning=30,
+         casp_thinning=30,
          scn_dir="./sidechainnet_data",
          force_download=False,
          with_pytorch=None,
@@ -105,7 +105,8 @@ def load(casp_version=12,
          complete_structures_only=False,
          local_scn_path=None,
          scn_dataset=False,
-         shuffle=True):
+         shuffle=True,
+         **kwargs):
     #: Okay
     """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
 
@@ -120,11 +121,11 @@ def load(casp_version=12,
 
     Args:
         casp_version (int, optional): CASP version to load (7-12). Defaults to 12.
-        thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A thinning
-            represents the minimum sequence similarity each protein sequence must have to
-            all other sequences in the same thinning. The 100 thinning contains all of the
-            protein entries in SidechainNet, while the 30 thinning has a much smaller
-            amount. Defaults to 30.
+        casp_thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A
+            thinning represents the minimum sequence similarity each protein sequence must
+            have to all other sequences in the same thinning. The 100 thinning contains
+            all of the protein entries in SidechainNet, while the 30 thinning has a much
+            smaller amount. Defaults to 30.
         scn_dir (str, optional): Path where SidechainNet data will be stored locally.
             Defaults to "./sidechainnet_data".
         force_download (bool, optional): If true, download SidechainNet data from the web
@@ -255,31 +256,37 @@ def load(casp_version=12,
                 ....    prediction = model(sequence, pssm)
                 ....    ...
     """
+    # TODO Make scndataset loading default
     if local_scn_path:
         local_path = local_scn_path
     else:
-        local_path = _get_local_sidechainnet_path(casp_version, thinning, scn_dir)
+        local_path = _get_local_sidechainnet_path(casp_version, casp_thinning, scn_dir)
         if not local_path:
-            print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
+            print(f"SidechainNet{(casp_version, casp_thinning)} was not found in "
+                  "{scn_dir}.")
     if not local_path or force_download:
         # Download SidechainNet if it does not exist locally, or if requested
-        local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
+        local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
 
-    scn_dict = _load_dict(local_path)
+    try:
+        scn_dict = _load_dict(local_path)
+    except pickle.UnpicklingError:
+        print("Redownloading due to Pickle file error.")
+        local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
+        scn_dict = _load_dict(local_path)
 
     # Patch for removing 1GJJ_1_A, see Issue #38
     scn_dict = scn.utils.manual_adjustment._repair_1GJJ_1_A(scn_dict)
 
     scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
-    if complete_structures_only:
-        scn_dict = filter_dictionary_by_missing_residues(scn_dict)
 
     # By default, the load function returns a dictionary
     if not with_pytorch and not scn_dataset:
         return scn_dict
     elif not with_pytorch and scn_dataset:
-        return SCNDataset(scn_dict)
-
+        return SCNDataset(scn_dict,
+                          complete_structures_only=complete_structures_only,
+                          trim_edges=True)
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
             scn_dict,
@@ -291,7 +298,8 @@ def load(casp_version=12,
             dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
             train_eval_downsample=train_eval_downsample,
-            shuffle=shuffle)
+            shuffle=shuffle,
+            complete_structures_only=complete_structures_only)
 
     return
 
@@ -475,7 +483,7 @@ BOXURLS = {
 
     # CASP 7
     "sidechainnet_casp7_30.pkl":
-        "https://pitt.box.com/shared/static/hjblmbwei2dkwhfjatttdmamznt1k9ef.pkl",
+        "https://pitt.box.com/shared/static/krprccxr3sv9tpfu1r7xrtaulg0qucy7.pkl",
     "sidechainnet_casp7_50.pkl":
         "https://pitt.box.com/shared/static/4pw56huei1123a5rd6g460886kg0pex7.pkl",
     "sidechainnet_casp7_70.pkl":
@@ -489,5 +497,5 @@ BOXURLS = {
 
     # Other
     "sidechainnet_debug.pkl":
-        "https://pitt.box.com/shared/static/tevlb6nuii6kk520vi4x0u7li0eoxuep.pkl"
+        "https://pitt.box.com/shared/static/1w087htft56umnedlgp9yo4frnhmaakt.pkl"
 }

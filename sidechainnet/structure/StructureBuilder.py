@@ -1,8 +1,11 @@
 """A class for generating/visualizing protein atomic coordinates from measured angles."""
 
+import copy
 from io import UnsupportedOperation
 import numpy as np
+import prody as pr
 import torch
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
@@ -19,7 +22,13 @@ class StructureBuilder(object):
     really a terminal atom because it's tail is masked out?).
     """
 
-    def __init__(self, seq, ang=None, crd=None, device='cpu', nerf_method="sn_nerf"):
+    def __init__(self,
+                 seq,
+                 ang=None,
+                 crd=None,
+                 device='cpu',
+                 nerf_method="standard",
+                 has_hydrogens=None):
         """Initialize a StructureBuilder for a single protein. Does not build coordinates.
 
         To generate coordinates after initialization, see build().
@@ -39,6 +48,8 @@ class StructureBuilder(object):
                 the standard NeRF formulation described in many papers. "sn_nerf" uses an
                 optimized version with less vector normalizations. Defaults to
                 "standard".
+            has_hydrogens(bool, optional): True if the coordinate matrix uses a hydrogen
+                representation. If not provided, attempts to infer.
         """
         # TODO support one-hot sequences
         # Perhaps the user mistakenly passed coordinates for the angle arguments
@@ -70,6 +81,7 @@ class StructureBuilder(object):
             self.is_numpy = False if isinstance(self.coords, torch.Tensor) else True
         else:
             self.is_numpy = False if isinstance(self.ang, torch.Tensor) else True
+        self.array_lib = np if self.is_numpy else torch
 
         if self.ang is not None and self.ang.shape[-1] != NUM_ANGLES:
             raise ValueError(f"Angle matrix dimensions must match (L x {NUM_ANGLES}). "
@@ -78,13 +90,16 @@ class StructureBuilder(object):
             raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
                              f"You have provided {tuple(self.coords.shape)}.")
         if (self.coords is not None and
-            (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str)):
+            (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str) and
+            (self.coords.shape[0] // NUM_COORDS_PER_RES_W_HYDROGENS) != len(
+                self.seq_as_str)):
             raise ValueError(
                 f"The length of the coordinate matrix must match the sequence length "
                 f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
                 f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
-        if self.ang is not None and (self.ang == 0).all(axis=1).any():
-            missing_loc = np.where((self.ang == 0).all(axis=1))
+        if self.ang is not None and (self.array_lib.isnan(self.ang)).all(axis=1).any():
+            missing_loc = self.array_lib.where(
+                (self.array_lib.isnan(self.ang)).all(axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "
@@ -96,8 +111,20 @@ class StructureBuilder(object):
         self.next_bb = None
         self.pdb_creator = None
         self.nerf_method = nerf_method
-        self.has_hydrogens = False
-        self.atoms_per_res = NUM_COORDS_PER_RES
+        if has_hydrogens is not None:
+            self.has_hydrogens = has_hydrogens
+        else:
+            assert not (
+                self.coords.shape[0] % NUM_COORDS_PER_RES == 0 and
+                self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0), (
+                    "Coordinate tensor for protein has an ambiguous shape. Please pass a "
+                    "value to has_hydrogens for clarification.")
+            try:
+                self.has_hydrogens = self.coords.shape[
+                    0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
+            except AttributeError:
+                self.has_hydrogens = False
+        self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS if self.has_hydrogens else NUM_COORDS_PER_RES
         self.terminal_atoms = None
 
     def __len__(self):
@@ -174,7 +201,7 @@ class StructureBuilder(object):
         if not self.is_numpy:
             self.coords = torch.stack(self.coords).double()
         else:
-            self.coords = np.stack(self.coords)
+            self.coords = np.stack([c.detach().numpy() for c in self.coords])
 
         return self.coords
 
@@ -235,7 +262,21 @@ class StructureBuilder(object):
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_gltf(path, title)
 
-    def to_3Dmol(self, style=None, **kwargs):
+    def to_png(self, path):
+        """Save protein structure as PNG, showing sidechains if available. Requires pdb.
+
+        Args:
+            path (str): Path to save file. 
+        """
+        import pymol
+        assert ".png" in path, "requested filepath must end with '.png'."
+        pymol.cmd.load(path.replace(".png", ".pdb"))
+        pymol.cmd.select("sidechain")
+        pymol.cmd.show("lines")
+        pymol.cmd.png(path, width=800, height=800, quiet=0, dpi=200, ray=0)
+        pymol.cmd.delete("all")
+
+    def to_3Dmol(self, style=None, other_protein=None, **kwargs):
         """Generate protein structure & return interactive py3Dmol.view for visualization.
 
         Args:
@@ -247,13 +288,63 @@ class StructureBuilder(object):
                 settings.
         """
         import py3Dmol
-        if not style:
-            style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
 
         view = py3Dmol.view(**kwargs)
         view.addModel(self.to_pdbstr(), 'pdb', {'keepH': True})
-        if style:
+
+        # If we have another protein to compare, align the other protein and add to viz
+        if other_protein is not None:
+            # Create copies and nan-masks of coordinate data
+            other_protein.numpy()
+            other_protein_copy = other_protein.copy()
+            other_protein_mask = np.isnan(other_protein_copy.coords)
+            other_protein_copy.coords[other_protein_mask] = 0
+            if torch.is_tensor(self.coords):
+                self.coords = self.coords.detach().cpu().numpy()
+            coords_copy = copy.deepcopy(self.coords)
+            coords_mask = np.isnan(self.coords)
+            coords_copy[coords_mask] = 0
+            # Perform alignment
+            t = pr.calcTransformation(other_protein_copy.coords, coords_copy)
+            aligned_coords = t.apply(other_protein_copy.coords)
+            # Update coords in other protein
+            other_protein_copy.coords = aligned_coords
+            if other_protein_copy.has_hydrogens:
+                other_protein_copy.hcoords = t.apply(other_protein_copy.hcoords)
+                other_protein_copy.coords = other_protein_copy.hcoords
+            # Replace nans
+            other_protein_copy.coords[other_protein_mask] = np.nan
+            coords_copy[coords_mask] = np.nan
+            # Add viz to model
+            view.addModel(other_protein_copy.to_pdbstr())
+
+        # Set visualization style
+        if not style:
+            style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
+        if other_protein is None:
             view.setStyle(style)
+        elif other_protein is not None:
+            style1 = {
+                'cartoon': {
+                    'color': '#599BFB'
+                },
+                'stick': {
+                    'radius': .07,
+                    'color': '#599BFB'
+                }
+            }
+            style2 = {
+                'cartoon': {
+                    'color': '#FB5960'
+                },
+                'stick': {
+                    'radius': .15,
+                    'color': '#FB5960'
+                }
+            }
+            view.setStyle({"model": 0}, style1)
+            view.setStyle({"model": 1}, style2)
+
         view.zoomTo()
         return view
 
@@ -302,7 +393,8 @@ class ResidueBuilder(object):
         self.bb = []
         self.sc = []
         self.coords = []
-        self.coordinate_padding = torch.zeros(3, requires_grad=True, device=self.device)
+        self.coordinate_padding = torch.ones(3, requires_grad=True,
+                                             device=self.device) * GLOBAL_PAD_CHAR
 
     @property
     def AA(self):
@@ -481,10 +573,15 @@ def _get_residue_build_iter(res, build_dictionary, device):
         (sidechainnet.structure.structure.nerf).
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
-    bond_vals = (torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"])
-    pbond_vals = [torch.tensor(BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32, device=device)
-                 ] + [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]][:-1]
-    angle_vals = (torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"])
+    bond_vals = (
+        torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"])
+    pbond_vals = [
+        torch.tensor(
+            BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32, device=device)
+    ] + [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]
+        ][:-1]
+    angle_vals = (
+        torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"])
     torsion_vals = (torch.tensor(t, dtype=torch.float32, device=device)
                     if t not in ["p", "i"] else t for t in r["torsion-vals"])
     return iter(
@@ -513,13 +610,17 @@ def _convert_seq_to_str(seq):
     return seq_as_str
 
 
-@torch.jit.script
+# @torch.jit.script
 def _init_bb_helper(BB_n_ca: float, ang3: torch.Tensor, BB_ca_c: float, device: str):
     """Torchscript friendly helper for _init_bb. Currently unused."""
     n = torch.tensor([0.0, 0.0, 0.001], requires_grad=True, device=device)
     ca = n + torch.tensor([BB_n_ca, 0.0, 0.0], requires_grad=True, device=device)
     pi_minus_ang3 = np.pi - ang3
-    c = ca + (torch.stack([torch.cos(np.pi - ang3), torch.sin(pi_minus_ang3), torch.tensor(0.0, device=device)])*BB_ca_c).float()
+    c = ca + (torch.stack([
+        torch.cos(np.pi - ang3),
+        torch.sin(pi_minus_ang3),
+        torch.tensor(0.0, device=device)
+    ]) * BB_ca_c).float()
     return n, ca, c
 
 

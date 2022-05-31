@@ -45,8 +45,8 @@ setup(
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     url='https://github.com/jonathanking/sidechainnet',  # Website
     install_requires=[
-        'ProDy>=2.0', 'numpy', 'scipy', 'torch>=1.7', 'biopython', 'tqdm', 'py3Dmol',
-        'requests', 'setuptools', 'pandas'
+        'ProDy>=2.0', 'numpy', 'scipy', 'biopython', 'tqdm', 'py3Dmol',
+        'requests', 'setuptools', 'pandas', 'numba'
     ],  # Required packages, pulls from pip if needed; do not use for Conda deployment
     tests_require=['pytest'],
     # platforms=['Linux',

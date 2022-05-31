@@ -7,7 +7,7 @@ import sidechainnet as scn
 from sidechainnet.structure.build_info import NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError, NonStandardAminoAcidError, NoneStructureError, SequenceError
 
-GLOBAL_PAD_CHAR = 0
+GLOBAL_PAD_CHAR = np.nan
 ALLOWED_NONSTD_RESIDUES = {
     "ASX": "ASP",
     "GLX": "GLU",
@@ -24,13 +24,16 @@ ALLOWED_NONSTD_RESIDUES = {
     "XLE": "LEU",
     "4FB": "PRO",
     "MLY": "LYS",  # N-dimethyl-lysine
-    "AIB": "ALA",  # alpha-methyl-alanine, not included during generation on 1/23/22
-    "MK8": "MET"   # 2-methyl-L-norleucine, added 3/16/21
+    "MK8": "MET",  # 2-methyl-L-norleucine, added 3/16/21
+    "CME": "CYS",  # S,S-(2-HYDROXYETHYL)THIOCYSTEINE, see PDB 1A1V, added 2/7/22
+    # "AIB": "ALA",  # alpha-methyl-alanine,removed due to poor rep for 1AMT structure
 }
 
 
 def angle_list_to_sin_cos(angs, reshape=True):
-    """Given a list of angles, returns a new list where those angles have been turned into
+    """Turn list of angles from radians into sin/cos values, increasing dimensionality.
+
+    Given a list of angles, returns a new list where those angles have been turned into
     their sines and cosines. If reshape is False, a new dim. is added that can hold the
     sine and cosine of each angle, i.e. (len x #angs)
 
@@ -50,7 +53,7 @@ def angle_list_to_sin_cos(angs, reshape=True):
 
 
 def check_standard_continuous(residue, prev_res_num):
-    """Asserts that the residue is standard and that the chain is continuous."""
+    """Assert that the residue is standard and that the chain is continuous."""
     if not residue.isstdaa:
         raise NonStandardAminoAcidError("Found a non-std AA.")
     if residue.getResnum() != prev_res_num:
@@ -68,7 +71,7 @@ def determine_sidechain_atomnames(_res):
 
 
 def compute_sidechain_dihedrals(residue, prev_residue, next_res):
-    """Computes all angles to predict for a given residue.
+    """Compute all angles to predict for a given residue.
 
     If the residue is the first in the protein chain, a fictitious C atom is
     placed before the first N. This is used to compute a [ C-1, N, CA, CB]
@@ -227,8 +230,18 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
             prev_coords = coords[res_id - 1] if res_id > 0 else None
             next_coords = coords[res_id + 1] if res_id + 1 < len(coords) else None
             prev_ang = dihedrals[res_id - 1] if res_id > 0 else None
-            res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
-                                      prev_ang)
+            # TODO remove prints for release
+            try:
+                res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
+                                          prev_ang)
+            except ValueError:
+                print("STANDARDIZE_RESIDUE")
+                print(chain)
+                print(res)
+                print(all_res_angles)
+                print(prev_coords)
+                print(next_coords)
+                print(prev_ang)
 
     dihedrals_np = np.asarray(dihedrals)
     coords_np = np.concatenate(coords)

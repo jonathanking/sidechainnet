@@ -1,4 +1,5 @@
 #include <torch/extension.h>
+#include <torch/torch.h>
 
 #include <cmath>
 #include <iostream>
@@ -10,6 +11,7 @@
 #include <pybind11/stl_bind.h>
 
 using namespace std;
+using namespace torch::autograd;
 
 unsigned NUM_COORDS_PER_RES = 14;
 unsigned SC_ANGLES_START_POS = 6;
@@ -383,6 +385,32 @@ torch::Tensor& make_backbone(torch::Tensor& M) {
     return M;
 }
 
+//stores each iteration for use in backwards
+torch::Tensor make_backbone_save(torch::Tensor& input) {
+    unsigned N = input.size(0);
+    auto device = input.device();
+//    unsigned bit_length = std::bit_width(N);  //c++20
+    unsigned bit_length = 0;
+    unsigned n = N;
+    while(n) { n >>= 1; bit_length++;}
+    
+    auto indices = torch::arange(0,(int16_t)N,device);
+    torch::Tensor ret = torch::zeros({bit_length,N,4,4},device);
+
+    auto M = input.clone();
+    
+    for(unsigned i = 0; i < bit_length; i++) {
+        auto dstmask = (((1<<i)&indices) != 0).to(torch::kBool);
+        auto srci = ((-1<<i)&indices)-1;
+        auto src = M.index({srci.index({dstmask})});
+        auto dst = M.index({dstmask});
+        M.index_put_({dstmask}, torch::matmul(src,dst));
+        ret[i] = M;
+    }
+    return ret;
+}
+
+
 // Make transformation matrices given angles/lens.  Uses device of ctheta.
 torch::Tensor makeTmats(long N, const torch::Tensor& ctheta, 
                     const torch::Tensor& stheta, 
@@ -409,6 +437,72 @@ torch::Tensor makeTmats(long N, const torch::Tensor& ctheta,
     mats.index_put_({Slice(),3,3}, 1.0);
 
     return mats;
+}
+
+// functions for autograd maketmats; gets dimension/device from ctheta
+torch::Tensor makeTmats_forward(
+      const torch::Tensor& ctheta, 
+      const torch::Tensor& stheta, 
+      const torch::Tensor& cchi, 
+      const torch::Tensor& schi, 
+      const torch::Tensor& lens) {
+    using namespace torch::indexing;
+          
+    torch::Tensor mats = torch::zeros({ctheta.size(0),4,4},ctheta.device());
+    
+    mats.index_put_({Slice(),0,0}, ctheta);
+    mats.index_put_({Slice(),0,1}, -stheta);
+    mats.index_put_({Slice(),0,3}, ctheta*lens);
+    
+    mats.index_put_({Slice(),1,0}, cchi*stheta);
+    mats.index_put_({Slice(),1,1}, ctheta*cchi);
+    mats.index_put_({Slice(),1,2}, schi);
+    mats.index_put_({Slice(),1,3}, cchi*lens*stheta);
+
+    mats.index_put_({Slice(),2,0}, -stheta*schi);
+    mats.index_put_({Slice(),2,1}, -ctheta*schi);
+    mats.index_put_({Slice(),2,2}, cchi);
+    mats.index_put_({Slice(),2,3}, -lens*stheta*schi);
+    
+    mats.index_put_({Slice(),3,3}, 1.0);
+
+    return mats;
+}
+
+tensor_list makeTmats_backward(torch::Tensor grad_outputs,
+      const torch::Tensor& ctheta, 
+      const torch::Tensor& stheta, 
+      const torch::Tensor& cchi, 
+      const torch::Tensor& schi, 
+      const torch::Tensor& lens) {
+    using namespace torch::indexing;
+
+
+    auto grad = grad_outputs;  // N x 4 x 4
+    auto grad_ctheta = grad.index({Slice(),0,0}) + 
+                        lens*grad.index({Slice(),0,3}) +
+                        cchi*grad.index({Slice(),1,1}) + 
+                        -schi*grad.index({Slice(),2,1});
+    auto grad_stheta = -grad.index({Slice(),0,1}) +
+                        cchi*grad.index({Slice(),1,0}) +
+                        cchi*lens*grad.index({Slice(),1,3}) +
+                        -schi*grad.index({Slice(),2,0}) +
+                        -lens*schi*grad.index({Slice(),2,3});
+    auto grad_cchi = stheta*grad.index({Slice(),1,0}) +
+                        ctheta*grad.index({Slice(),1,1}) +
+                        lens*stheta*grad.index({Slice(),1,3}) +
+                        grad.index({Slice(),2,2});
+    auto grad_schi = grad.index({Slice(),1,2}) +
+                        -stheta*grad.index({Slice(),2,0}) +
+                        -ctheta*grad.index({Slice(),2,1}) +
+                        -lens*stheta*grad.index({Slice(),2,3});
+    //lengths are typically constant.. should we check requires grad?
+    auto grad_lens = ctheta*grad.index({Slice(),0,3}) +
+                    cchi*stheta*grad.index({Slice(),1,3}) +
+                    -stheta*schi*grad.index({Slice(),2,3});
+
+
+    return {grad_ctheta, grad_stheta, grad_cchi, grad_schi, grad_lens};
 }
 
 //create coordinates for sequence seq using angles angles
@@ -583,7 +677,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 
     
     m.def("make_backbone", &make_backbone, "make_backbone"); 
+    m.def("make_backbone_save", &make_backbone_save, "make_backbone_save"); 
     m.def("makeTmats", &makeTmats, "makeTmats");
+    m.def("makeTmats_forward", &makeTmats_forward, "makeTmats_forward");
+    m.def("makeTmats_backward", &makeTmats_backward, "makeTmats_backward");
     m.def("make_coords", &make_coords, "Create coordinates from sequence and angles.");
     m.attr("NUM_COORDS_PER_RES") = py::int_(NUM_COORDS_PER_RES);
     m.attr("SC_ANGLES_START_POS") = py::int_(SC_ANGLES_START_POS);
