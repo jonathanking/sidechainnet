@@ -280,7 +280,7 @@ def make_sidechain_coords(backbone, seq_aa_index, ang, build_info):
     sources = build_info['sources'][seq_aa_index].to(device)
     
     MAX = bond_lengths.shape[1]
-    sccoords = torch.zeros(L,MAX,3,device=device,dtype=dtype)    
+    sccoords = torch.full((L,MAX,3),torch.nan,device=device,dtype=dtype)    
     vec = torch.tensor([0.0,0,0,1],device=device,dtype=dtype)
     
     matrices = []

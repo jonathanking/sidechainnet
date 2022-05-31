@@ -213,6 +213,8 @@ class SCNProtein(object):
         if self.sb is None:
             self.sb = sidechainnet.StructureBuilder(self.seq, angles, has_hydrogens=False)
             if add_hydrogens:
+                if self.sb.coords == None:
+                    self.coords = self.sb.build()
                 self.sb.add_hydrogens()
                 self.hcoords = self.sb.coords
             else:
