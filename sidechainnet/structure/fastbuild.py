@@ -20,13 +20,14 @@ aa2num = {a:i for i,a in enumerate(aa)}
 #Zero is start of sidechain atoms/angles.
 def _make_sc_ha_tensors():
     NC = NUM_COORDS_PER_RES-4
-    sc_source_atom = torch.zeros(20,NC)
+    sc_source_atom = torch.zeros(20,NC,dtype=torch.long)
     sc_bond_length =  torch.zeros(20,NC)
     sc_ctheta =  torch.zeros(20,NC)
     sc_stheta =  torch.zeros(20,NC)
     sc_cchi =  torch.zeros(20,NC)
     sc_schi =  torch.zeros(20,NC)
-    sc_type =  torch.zeros(20,NC) # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
+    sc_offset = torch.zeros(20,NC)
+    sc_type =  torch.zeros(20,NC,dtype=torch.long) # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
     #index of chi is same as atom index, unless offset torsion in which case it is one before
 
     for a in range(20):
@@ -44,6 +45,7 @@ def _make_sc_ha_tensors():
                     sc_type[a][i] = 1
                 elif t == 'i':
                     sc_type[a][i] = 2
+                    sc_offset[a][i] = np.pi
                 else:
                     sc_type[a][i] = 3
                     sc_cchi[a][i] = np.cos(2*np.pi-t)
@@ -56,13 +58,13 @@ def _make_sc_ha_tensors():
                     sc_source_atom[a][i] = -1
     return {
         'bond_lengths': sc_bond_length,
-        'source_atoms': sc_source_atom,
         'cthetas': sc_ctheta,
         'sthetas': sc_stheta,
         'cchis': sc_cchi,
         'schis': sc_schi,
         'types': sc_type,
-        'sources': sc_source_atom 
+        'offsets': sc_offset,
+        'sources': sc_source_atom
         }
 
 #we specify geometries for atoms building off of N, CA, and C, but only
@@ -83,6 +85,7 @@ sc_heavy_atom_build_info = {
         'cchis': _x20(0.),
         'schis': _x20(0.),
         'types': _x20(1),
+        'offsets': _x20(0.),
         'sources': _x20(-1)
     }
 }
@@ -95,6 +98,7 @@ sc_all_atom_build_info = {
         'cchis': _x20(0.),
         'schis': _x20(0.),
         'types': _x20(1),
+        'offsets': _x20(0.),        
         'sources': _x20(-1)
     }, 
     'CA': _make_sc_ha_tensors(), ### TODO TODO TODO - add hydrogens
@@ -106,6 +110,7 @@ sc_all_atom_build_info = {
         'cchis': _x20(0.),
         'schis': _x20(0.),
         'types': _x20(1),
+        'offsets': _x20(0.),        
         'sources': _x20(-1)
     }
 }
@@ -276,6 +281,7 @@ def make_sidechain_coords(backbone, seq_aa_index, ang, build_info):
     sthetas =  build_info['sthetas'][seq_aa_index].to(device).type(dtype)
     cchis =  build_info['cchis'][seq_aa_index].to(device).type(dtype)
     schis =  build_info['schis'][seq_aa_index].to(device).type(dtype)
+    offsets = build_info['offsets'][seq_aa_index].to(device).type(dtype)
     types = build_info['types'][seq_aa_index].to(device)
     sources = build_info['sources'][seq_aa_index].to(device)
     
@@ -315,8 +321,10 @@ def make_sidechain_coords(backbone, seq_aa_index, ang, build_info):
 
         invmask = types[:,i] == 2
         if invmask.any():
-            cchi[invmask[seqmask]] = -coss[invmask,i-1]
-            schi[invmask[seqmask]] = -sins[invmask,i-1]        
+            #re-used dihedral should always be positioned right after source position
+            offang = ang[invmask,sources[invmask,i]+1]+offsets[invmask,i]
+            cchi[invmask[seqmask]] = torch.cos(offang)
+            schi[invmask[seqmask]] = torch.sin(offang)        
 
         #check if any atoms need matrix from farther back
         if (sources[:,i] != i-1).any():
