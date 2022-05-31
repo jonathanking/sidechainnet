@@ -114,12 +114,12 @@ class StructureBuilder(object):
         if has_hydrogens is not None:
             self.has_hydrogens = has_hydrogens
         else:
-            assert not (
+            try:            
+                assert not (
                 self.coords.shape[0] % NUM_COORDS_PER_RES == 0 and
                 self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0), (
                     "Coordinate tensor for protein has an ambiguous shape. Please pass a "
                     "value to has_hydrogens for clarification.")
-            try:
                 self.has_hydrogens = self.coords.shape[
                     0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
             except AttributeError:
