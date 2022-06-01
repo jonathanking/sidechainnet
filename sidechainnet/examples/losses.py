@@ -222,7 +222,7 @@ def tm_score(true, pred):
     Returns:
         tm_score: Value of TM Score.
     """
-    t = pr.calcTransformation(pred, true)  # TODO Measure TM during training
+    t = pr.calcTransformation(pred, true)
     pred = t.apply(pred)
     distances = np.linalg.norm(true - pred, axis=1)
 
@@ -237,6 +237,26 @@ def tm_score(true, pred):
     tm_score = (1 / L) * fractions.sum()
 
     return tm_score
+
+
+def get_gdcall_tmscore(true, pred, k=10):
+    """Compute GDC_ALL and TM Score for true and predicted coordinate matrices.
+
+    Args:
+        true (array): True atomic coordinates. Must not contain padding.
+        pred (array): Predicted atomic coordinates. Must be the same shape as true.
+        k (int, optional): Used to define bins for GDC_ALL. Defaults to 10.
+
+    Returns:
+        gdcall_tmscore (tuple): Tuple of (GDC_ALL, TM_Score).
+    """
+    raise NotImplementedError
+    # TODO Implement a combined GDC_ALL/TM Score function to redudce duplication of effort
+    # t = pr.calcTransformation(pred, true)
+    # pred = t.apply(pred)
+
+    # thresholds = np.arange(1, k + 1) * 0.5
+    # distances = np.linalg.norm(true - pred, axis=1)
 
 
 def numpy_safe_cbrt(a):
