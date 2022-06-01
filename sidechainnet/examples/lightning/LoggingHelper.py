@@ -19,18 +19,16 @@ class LoggingHelper(object):
     def log_training_step(self, loss_dict, batch):
         """Log a single training step with the PyTorch Lightning Module's logger."""
         for key, value in loss_dict.items():
-            loss_or_metric = ("losses"
-                              if key in self.pl_module.hparams.loss_name else "metrics")
             if key == 'mse':
-                self.log(f'{loss_or_metric}/train/rmse',
+                self.log('train/rmse',
                          torch.sqrt(value),
                          on_step=True,
                          on_epoch=True,
                          prog_bar=True)
-            elif key in ['loss', 'angle_metrics']:
+            elif key in ['angle_metrics']:
                 continue
             else:
-                self.log(f'{loss_or_metric}/train/{key}',
+                self.log(f'train/{key}',
                          value,
                          on_step=True,
                          on_epoch=True,
@@ -42,11 +40,9 @@ class LoggingHelper(object):
     def log_validation_step(self, loss_dict, dataloader_idx):
         """Log a single validation step with the PyTorch Lightning Module's logger."""
         for key, value in loss_dict.items():
-            loss_or_metric = ("losses"
-                              if key in self.pl_module.hparams.loss_name else "metrics")
             if key == 'mse':
                 name = (
-                    f"{loss_or_metric}/valid/"
+                    "valid/"
                     f"{self.pl_module.hparams.dataloader_name_mapping[dataloader_idx]}_rmse"
                 )
                 self.log(name,
@@ -55,11 +51,11 @@ class LoggingHelper(object):
                          on_epoch=True,
                          prog_bar=name == self.pl_module.hparams.opt_lr_scheduling_metric,
                          add_dataloader_idx=False)
-            elif key in ['loss', 'angle_metrics']:
+            elif key in ['angle_metrics']:
                 continue
             else:
                 name = (
-                    f"{loss_or_metric}/valid/"
+                    "valid/"
                     f"{self.pl_module.hparams.dataloader_name_mapping[dataloader_idx]}_{key}"
                 )
                 self.log(name,
@@ -76,10 +72,8 @@ class LoggingHelper(object):
     def log_test_step(self, loss_dict):
         """Log a single test step with the PyTorch Lightning Module's logger."""
         for key, value in loss_dict.items():
-            loss_or_metric = ("losses"
-                              if key in self.pl_module.hparams.loss_name else "metrics")
             if key == 'mse':
-                self.log(f'{loss_or_metric}/test/rmse',
+                self.log('test/rmse',
                          torch.sqrt(value),
                          on_step=False,
                          on_epoch=True,
@@ -87,7 +81,7 @@ class LoggingHelper(object):
             elif key in ['loss', 'angle_metrics']:
                 continue
             else:
-                self.log(f'{loss_or_metric}/test/{key}',
+                self.log('test/{key}',
                          value,
                          on_step=False,
                          on_epoch=True,
@@ -99,14 +93,14 @@ class LoggingHelper(object):
         """Check for presence of OpenMM loss values in loss_dict before logging."""
         # If OpenMM loss was measured, record it
         if "openmm" in loss_dict and loss_dict['openmm'] is not None:
-            self.log(f"losses/{split}/openmm",
+            self.log(f"{split}/openmm",
                      loss_dict['openmm'].detach(),
                      on_step=split == 'train',
                      on_epoch=True,
                      prog_bar=True)
         # If mse_openmm loss was measured, record it
         if "mse_openmm" in loss_dict and loss_dict['mse_openmm'] is not None:
-            self.log(f"losses/{split}/openmm",
+            self.log(f"{split}/openmm",
                      loss_dict['mse_openmm'].detach(),
                      on_step=split == 'train',
                      on_epoch=True,
@@ -117,7 +111,7 @@ class LoggingHelper(object):
         dl_name_str = dataloader_name + "_" if dataloader_name else ""
 
         angle_metrics_dict = {
-            f"metrics/{split}/{dl_name_str}{k}": loss_dict['angle_metrics'][k]
+            f"{split}/{dl_name_str}{k}": loss_dict['angle_metrics'][k]
             for k in loss_dict['angle_metrics'].keys()
         }
         self.log_dict(angle_metrics_dict,
