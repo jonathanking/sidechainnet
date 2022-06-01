@@ -1,7 +1,8 @@
 """A class that helps manipulate a set of angle structure predictions for analysis."""
 import numpy as np
 import torch
-from sidechainnet.examples.losses import angle_diff, angle_mse, drmsd, gdc_all, rmsd, tm_score
+from sidechainnet.examples.losses import (angle_diff, angle_mse, drmsd, gdc_all, lddt_all,
+                                          rmsd, tm_score)
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP, NUM_SC_ANGLES
 from sidechainnet.structure.structure import inverse_trig_transform
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
@@ -145,11 +146,13 @@ class AnglePredictionHelper(object):
 
     def drmsd(self):
         """Compute DRMSD over all pairs of coordinates in the predicted batch."""
-        return torch.mean(self.map_over_coords(drmsd))
+        with torch.no_grad():
+            return torch.mean(self.map_over_coords(drmsd))
 
     def lndrmsd(self):
         """Compute len-normalized DRMSD over all coord pairs in the predicted batch."""
-        return torch.mean(self.map_over_coords(drmsd, len_normalize=True))
+        with torch.no_grad():
+            return torch.mean(self.map_over_coords(drmsd, len_normalize=True))
 
     def gdc_all(self):
         """Compute GDC_ALL over all coord pairs in the predicted batch."""
@@ -158,6 +161,11 @@ class AnglePredictionHelper(object):
     def tm_score(self):
         """Compute tm_score over all coord pairs in the predicted batch."""
         return torch.mean(self.map_over_coords(tm_score, make_numpy=True))
+
+    def lddt_all(self):
+        """Compute the lDDT_all score over all coord pairs in the predicted batch."""
+        with torch.no_grad():
+            return torch.mean(self.map_over_coords(lddt_all, remove_padding=False))
 
     def openmm_loss(self):
         """Compute OpenMMEnergyH loss for predicted structures."""

@@ -149,6 +149,120 @@ def _tile(a, dim, n_tile):
 # Structure Based Losses
 
 
+def lddt_all(true, pred):
+    """Compute lDDT_all between true and predicted coordinate arrays.
+
+    See original paper for formulation: https://doi.org/10.1002/prot.23177
+    Essentially the same as GDT_HA, but performed on DRMSD-like local interaction metrics.
+
+    1. Compute all pairwise interactions.
+    2. Note those that are less than 5 A away from each atom in the true structure but NOT
+        from the same residue.
+    3. Calculate the average fraction of interactions less than .5, 1, 2, 4 A away from
+        their correct value.
+
+    Note from the paper: "It must be noted that residues with ambiguous nomenclature for
+    chemically equivalent atoms, for which the choice of atom nomenclature could influence
+    the final score, were dealt with by computing a score using all possible
+    nomenclatures, and by choosing the one giving the highest value. Technically, lDDT_all
+    score should be computed for all."
+
+    Args:
+        true (array): True atomic coordinates. MUST contain padding/be the shape of
+            (NUM_COORDS_PER_RES x L) x 3.
+        pred (array): Predicted atomic coordinates. Must be the same shape as true.
+
+    Returns:
+        lddt_all_score: Value of lDDT_all.
+    """
+    # Compute all pairwise interactions for the true and pred structures
+    true_pairwise = pairwise_internal_dist(true)  # (N x N matrix, N = number of atoms)
+    pred_pairwise = pairwise_internal_dist(pred)
+
+    def atomic_distances_of_the_same_residue_mask():
+        n = len(true)  # number of atoms, must be a multiple of 14 aka heavy atom rep
+        assert n // NUM_COORDS_PER_RES, "The coordinates for lDDT must be padded."
+        # Make an empty mask matrix for the distance matrix
+        nc = NUM_COORDS_PER_RES
+        btwn_same_res_mask = torch.zeros((n, n), dtype=bool)
+        # Distances between atoms in the same residue can be found in blocks along the
+        # diagonal (every NUM_COORDS_PER_RES positions).
+        for i in range(len(true) // NUM_COORDS_PER_RES):
+            btwn_same_res_mask[i * nc:(i + 1) * nc, i * nc:(i + 1) * nc] = 1
+        return btwn_same_res_mask
+
+    # In the true structure, make a note of all interactions less than 5A away
+    true_pairwise_lt5_interation_mask = true_pairwise <= 5
+    # Make a mask of all the atoms that are NOT part of the same residue
+    not_the_same_residue_mask = ~atomic_distances_of_the_same_residue_mask()
+    # Create a mask that obscures the duplicated distances in an NxN distance matrix
+    triu_mask = torch.ones(*true_pairwise.shape, dtype=torch.bool).triu(diagonal=1)
+
+    # Select out the relevant interaction distances
+    true_interactions = true_pairwise[triu_mask & true_pairwise_lt5_interation_mask &
+                                      not_the_same_residue_mask]
+    pred_interactions = pred_pairwise[triu_mask & true_pairwise_lt5_interation_mask &
+                                      not_the_same_residue_mask]
+
+    # Compare the interactions
+    interaction_diff = torch.abs(true_interactions - pred_interactions)
+
+    # Check if each interaction was within each threshold (4 x len(interactions))
+    thresholds = torch.tensor([.5, 1, 2, 4])
+    passed_check = interaction_diff <= thresholds[:, None]
+
+    # Compute the fraction passing at each threshold
+    fractions = passed_check.sum(axis=1) / passed_check.shape[1]
+
+    # Compute lDDT_all according to the paper definition
+    lddt_all_score = torch.mean(fractions)
+
+    return lddt_all_score
+
+
+def quasi_lddt_all(true, pred):
+    """Compute quasi-lDDT_all between true and predicted coordinate arrays.
+
+    Includes atomic distances between atoms of the same residue. See lddt_all for the
+    more complete implementation and documentation. lddt_all excludes distances between
+    atoms in the same residue. This function does not require padding.
+
+    Args:
+        true (array): True atomic coordinates. Must NOT contain padding.
+        pred (array): Predicted atomic coordinates. Must be the same shape as true.
+
+    Returns:
+        lddt_all_score: Value of lDDT_all.
+    """
+    # Compute all pairwise interactions for the true and pred structures
+    true_pairwise = pairwise_internal_dist(true)  # (N x N matrix, N = number of atoms)
+    pred_pairwise = pairwise_internal_dist(pred)
+
+    # In the true structure, make a note of all interactions less than 5A away
+    true_pairwise_lt5_interation_mask = true_pairwise <= 5
+    # Create a mask that obscures the duplicated distances in an NxN distance matrix
+    triu_mask = torch.ones(*true_pairwise.shape, dtype=torch.bool).triu(diagonal=1)
+
+    # Select out the relevant interaction distances
+    true_interactions = true_pairwise[triu_mask & true_pairwise_lt5_interation_mask]
+    pred_interactions = pred_pairwise[triu_mask & true_pairwise_lt5_interation_mask]
+
+    # Compare the interactions
+    interaction_diff = torch.abs(true_interactions - pred_interactions)
+
+    # Check if each interaction was within each threshold (4 x len(interactions))
+    thresholds = torch.tensor([.5, 1, 2, 4])
+    passed_check = interaction_diff <= thresholds[:, None]
+
+    # Compute the fraction passing at each threshold
+    fractions = passed_check.sum(axis=1) / passed_check.shape[1]
+
+    # Compute lDDT_all according to the paper definition
+    lddt_all_score = torch.mean(fractions)
+
+    return lddt_all_score
+
+
 def gdt_ts(true, pred):
     """Compute GDT_TS between true (nan-padded) and predicted coordinate tensors.
 

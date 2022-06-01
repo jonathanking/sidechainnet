@@ -364,6 +364,7 @@ class LitSidechainTransformer(pl.LightningModule):
             loss_dict['lndrmsd'] = pred_helper.lndrmsd()
             loss_dict['gdc_all'] = pred_helper.gdc_all()
             loss_dict['tm_score'] = pred_helper.tm_score()
+            loss_dict['lddt_all'] = pred_helper.lddt_all()
 
         # More advanced measuring of OpenMM/MSE losses
         if self.hparams.loss_name == "mse":
