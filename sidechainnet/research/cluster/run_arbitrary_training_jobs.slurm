@@ -6,14 +6,14 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=dept_gpu
 #SBATCH --exclude=g122
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220530/%A_%6a.out"
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/%A_%6a.out"
 #SBATCH -c 24
 
 ############################
 ##       Description      ##
 ############################
 # This slurm script simply accesses python/wandb/ML training commands from a file and runs
-# them. They must include complete paths to the python file and the python interpreter.
+# them. They must include references to the Python/script variables listed below.
 echo "Running job ${SLURM_JOB_ID} on node ${SLURMD_NODENAME}."
 
 ############################
