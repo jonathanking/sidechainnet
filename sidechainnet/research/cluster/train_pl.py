@@ -91,8 +91,8 @@ def create_parser():
                            help="Path to directory holding SidechainNet data files.")
     data_args.add_argument("--num_workers",
                            type=int,
-                           help="Number of workers for each DataLoader.",
-                           default=max(mp.cpu_count() // 2, 4))
+                           help="Number of workers for the Train DataLoader.",
+                           default=4)
     data_args.add_argument("--shuffle",
                            type=my_bool,
                            help="If True, shuffle dataloaders (default=True).",
