@@ -107,7 +107,7 @@ def prepare_dataloaders(data,
                 split_name=vsplit,
                 trim_edges=True,
                 sort_by_length='ascending'),
-                                                       num_workers=num_workers,
+                                                       num_workers=1,
                                                        batch_size=batch_size,
                                                        collate_fn=collate_fn)
             valid_loaders[vsplit] = valid_loader
@@ -118,7 +118,7 @@ def prepare_dataloaders(data,
                                                          split_name='test',
                                                          trim_edges=True,
                                                          sort_by_length='ascending'),
-                                              num_workers=num_workers,
+                                              num_workers=1,
                                               batch_size=batch_size,
                                               collate_fn=collate_fn)
 
