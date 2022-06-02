@@ -166,6 +166,10 @@ def create_parser():
                           default=4000,
                           help="Training step at which to begin training with"
                           " OpenMM + MSE combination loss.")
+    training.add_argument('--opt_reset_on_step',
+                          type=int,
+                          default=-1,
+                          help="Training step at which to completely reset optimizer.")
     training.add_argument("--loss_weight_mse",
                           type=float,
                           default=1,
@@ -333,6 +337,8 @@ def main():
     if dict_args['loss_name'] == 'mse_openmm':
         my_callbacks.append(
             ResetOptimizersOnGlobalStep(dict_args['opt_begin_mse_openmm_step']))
+    if dict_args['opt_reset_on_step'] > 0:
+        my_callbacks.append(ResetOptimizersOnGlobalStep(dict_args['opt_reset_on_step']))
     if dict_args['viz_structures_every_n_steps'] != -1:
         my_callbacks.append(
             VisualizeStructuresEveryNSteps(dict_args['viz_structures_every_n_steps']))
