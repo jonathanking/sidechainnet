@@ -21,6 +21,9 @@ echo "Running job ${SLURM_JOB_ID} on node ${SLURMD_NODENAME}."
 ############################
 CONDA_ENV="sidechainnetv2"
 GIT_BRANCH="research_openmm"
+SCN_PYTHON="/net/pulsar/home/koes/jok120/anaconda3/envs/sidechainnetv2/bin/python"
+TRAIN_PL="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/train_pl.py"
+SCN_DATA1="/net/pulsar/home/koes/jok120/scnmin220519/scn_minimized.pkl"
 
 ############################
 ##       Environment      ##
@@ -48,7 +51,7 @@ echo "Updated repo."
 ############################
 ##     Array Job Exec.    ##
 ############################
-cmd=`sed "${SLURM_ARRAY_TASK_ID}q;d" /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220530/overfit_omm-only_cmds.txt`
+cmd=`sed "${SLURM_ARRAY_TASK_ID}q;d" /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/overfit_scale_cmds.txt`
 echo "Running ${cmd}"
 eval $cmd
 
