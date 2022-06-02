@@ -81,7 +81,7 @@ class LoggingHelper(object):
             elif key in ['loss', 'angle_metrics']:
                 continue
             else:
-                self.log('test/{key}',
+                self.log(f'test/{key}',
                          value,
                          on_step=False,
                          on_epoch=True,
