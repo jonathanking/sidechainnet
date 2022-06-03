@@ -273,8 +273,8 @@ def main():
         if args.gradient_clip_algorithm is None else args.gradient_clip_algorithm,
         auto_select_gpus=True,
     )
-    # dict_args.pop('gradient_clip_val')
-    # dict_args.pop('gradient_clip_algorithm')
+    # Disable progress bar for SLURM jobs
+    dict_args['enable_progress_bar'] = "SLURM_JOBID" not in os.eviron
 
     # Prepare torch
     pl.seed_everything(args.seed)
