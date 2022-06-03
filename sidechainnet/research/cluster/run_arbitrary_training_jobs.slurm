@@ -52,9 +52,14 @@ echo "Updated repo."
 ##     Array Job Exec.    ##
 ############################
 cmd=`sed "${SLURM_ARRAY_TASK_ID}q;d" /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/overfit_scale_cmds.txt`
-# Because our commands will have variables (like SCN_PYTHON, TRAIN_PL), we substitute them
-cmd=$(eval echo "$cmd")
-echo "Running ${cmd}"
-eval $cmd
+
+if [ "$cmd" != "" ]; then 
+    # Because our commands will have variables (like SCN_PYTHON, TRAIN_PL), we substitute them
+    cmd=$(eval echo "$cmd")
+    echo "Running ${cmd}"
+    eval $cmd;
+else
+    echo "Line $SLURM_ARRAY_TASK_ID is empty in /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/overfit_scale_cmds.txt."
+fi 
 
 exit 0
