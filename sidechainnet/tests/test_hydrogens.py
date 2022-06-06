@@ -17,7 +17,6 @@ np.set_printoptions(precision=3)
 
 def test_add_hydrogen_numpy():
     d = scn.load("debug",
-                 scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
                  scn_dataset=True)
     p = d['40#2BDS_1_A']  # Starts with 2 Alanines
     p.coords = p.coords[:28, :]
@@ -27,7 +26,6 @@ def test_add_hydrogen_numpy():
 
 def test_add_hydrogen_torch():
     d = scn.load("debug",
-                 scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
                  scn_dataset=True)
     p = d['40#2BDS_1_A']  # Starts with 2 Alanines
     p.coords = torch.tensor(p.coords[:28, :])
@@ -37,7 +35,6 @@ def test_add_hydrogen_torch():
 
 def test_nterminal():
     d = scn.load("debug",
-                 scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
                  scn_dataset=True)
     ex = d["40#2BDS_1_A"]
     print(ex.get_energy_difference())
@@ -46,7 +43,6 @@ def test_nterminal():
 
 def test_energy_backwards():
     d = scn.load("debug",
-                 scn_dir="/home/jok120/openmm_loss/sidechainnet_data",
                  scn_dataset=True)
     p = d["1HD1_1_A"]
     p.angles = torch.tensor(p.angles, requires_grad=True)
@@ -66,9 +62,8 @@ def get_alias(protein):
 
 
 def load_p(start=0, l=2):
-    d = scn.load("debug", scn_dir="/home/jok120/sidechainnet_data", scn_dataset=True, complete_structures_only=True, filter_by_resolution=True)
-    # p = d["1HD1_1_A"]
-    p = d[0]  # much longer, len 216
+    d = scn.load("debug",  scn_dataset=True)
+    p = d["1HD1_1_A"]
     if l > 0:
         p.seq = p.seq[start:start+l]
         p.coords = p.coords[start*14:start*14 + 14*l]
