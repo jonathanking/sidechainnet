@@ -1,6 +1,6 @@
 """Utilities for building structures using sublinear algorithms."""
 
-from .build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
+from .build_info import ANGLE_NAME_TO_IDX_MAP, SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
 import numpy as np
 import torch
 
@@ -247,8 +247,9 @@ def make_backbone_save(M):
 
     Make backbone matrices from individual transformation matrices using log(N) parallel
     matrix multiplies. Does not modify in place. Not very memory efficient in the
-    interest of simplicity. Returns transformation matrices at each interation (last is
-    final result).
+    interest of simplicity.
+
+    Returns transformation matrices at each iteration (last is final result).
     """
     N = len(M)
     bit_length = N.bit_length()
@@ -421,18 +422,29 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
     L = len(seq)
     device = angles.device
     dtype = angles.dtype
-    ang = torch.zeros((L + 1, SC_ANGLES_START_POS), device=device, dtype=dtype)
-    ang[1:] = angles[:L, :SC_ANGLES_START_POS]
-    ang[:, 3:] = np.pi - ang[:, 3:]      # theta
-    ang[:, :3] = 2 * np.pi - ang[:, :3]  # chi
 
+    ang_name_map = ANGLE_NAME_TO_IDX_MAP
+
+    # Construct an angle tensor populated with relevant backbone (BB) angles;
+    # First: create a zero-filled angle tensor with shape (L+1 x NUM_BB_ANGS)
+    ang = torch.zeros((L + 1, SC_ANGLES_START_POS), device=device, dtype=dtype)
+    # Next: fill in the backbone angles, with pos 0 still zero
+    ang[1:] = angles[:L, :SC_ANGLES_START_POS]
+    # TODO why modify angle values? Why 2 * pi - ang? why is pos 0 zero?
+    ang[:, :3] = 2 * np.pi - ang[:, :3]  # backbone torsion angles, aka 'chi' for NeRF
+    ang[:, 3:] = np.pi - ang[:, 3:]      # backbone bond angles, aka 'theta; for NeRF
+
+    # Construct sin/cos representations of BB angle tensors
     sins = torch.sin(ang)
     coss = torch.cos(ang)
+
+    # Construct flattenned tensors describing chi and theta angles for BB NeRF (L*3,).
     schi = sins[:, :3].flatten()[1:-2]
     cchi = coss[:, :3].flatten()[1:-2]
     stheta = sins[:, 3:].flatten()[1:-2]
     ctheta = coss[:, 3:].flatten()[1:-2]
 
+    # Construct flattenned tensor describing lens between BB atoms (L*3,) for all N-CA-C.
     lens = torch.tensor([
         BB_BUILD_INFO['BONDLENS']['c-n'], BB_BUILD_INFO['BONDLENS']['n-ca'],
         BB_BUILD_INFO['BONDLENS']['ca-c']
@@ -440,27 +452,33 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
                         device=device).repeat(L)
     lens[0] = 0  # first atom starts at origin
 
+    # Construct relative transformation matrices (TMats) per BB atom
     ncacM = MakeTMats.apply(ctheta, stheta, cchi, schi, lens)
+    # Construct global TMats per BB atom by applying local TMats
     ncacM = MakeBackbone.apply(ncacM)
 
-    # backbone coords
+    # Initialize origin coordinate vector onto which TMats will be applied
     vec = torch.tensor([0.0, 0, 0, 1], device=device, dtype=dtype)
+    # Construct N-CA-C BB coordinates by multiplying BB TMats and origin coordinate vec
     ncac = (ncacM @ vec)[:, :3].reshape(L, 3, 3)
 
-    # convert sequence to aa index
+    # Convert sequence to fixed AA index
     seq_aa_index = torch.tensor([aa2num[a] for a in seq], device=device)
 
-    # =O
-    oang = (np.pi + ang[1:, 1]).unsqueeze(-1)
+    # Construct carbonyl oxygens (C=O) along backbone;
+    # First: Select relevant angle (np.pi + psi)
+    oang = (np.pi + ang[1:, ang_name_map['psi']]).unsqueeze(-1)
+    # Next: Use the oang angle tensor and C-atom relevant info to place all oxygens
     ocoords = make_sidechain_coords(ncacM[2::3], seq_aa_index, oang, build_info['C'])
 
+    # Create hydrogens for nitrogens
     if build_info['N']:  # nH
-        nang = (np.pi + ang[:L, 0]).unsqueeze(-1)
+        nang = (np.pi + ang[:L, ang_name_map['phi']]).unsqueeze(-1)
         ncoords = make_sidechain_coords(ncacM[0::3], seq_aa_index, nang, build_info['N'])
     else:
         ncoords = torch.zeros(L, 0, 3, dtype=dtype, device=device)
 
-    # make sidechains off of CA
+    # Construct all sidechain atoms by iteratively applying TMats starting from CA
     scang = (2 * np.pi - angles.to(device)[:, SC_ANGLES_START_POS:])
     sccoords = make_sidechain_coords(ncacM[1::3], seq_aa_index, scang, build_info['CA'])
 
