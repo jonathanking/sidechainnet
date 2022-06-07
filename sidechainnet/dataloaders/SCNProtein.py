@@ -34,6 +34,7 @@ from openmm.openmm import LangevinMiddleIntegrator
 from openmm.unit import kelvin, nanometer, picosecond, picoseconds
 
 import sidechainnet
+from sidechainnet.structure.fastbuild import make_coords
 from sidechainnet.utils.download import MAX_SEQ_LEN
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
@@ -72,7 +73,7 @@ class SCNProtein(object):
         self.int_mask = [1 if m == "+" else 0 for m in self.mask]
         dssp_vocab = DSSPVocabulary()
         self.int_secondary = dssp_vocab.str2ints(self.secondary_structure,
-                                                 add_sos_eos=self.add_sos_eos)
+                                                 add_sos_eos=self.add_sos_eos) if self.secondary_structure is not None else None
 
         self.sb = None
         self.atoms_per_res = NUM_COORDS_PER_RES
@@ -205,6 +206,15 @@ class SCNProtein(object):
         """Represent an SCNProtein as a string."""
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
+
+    def fastbuild(self, add_hydrogens=False):
+        """Build protein coordinates from angles. Does not update coords."""
+        if not add_hydrogens:
+            coords = make_coords(self.seq, self.angles)
+        else:
+            raise NotImplementedError
+        
+        return coords
 
     def build_coords_from_angles(self, angles=None, add_hydrogens=False):
         """Build protein coordinates iff no StructureBuilder already exists."""
