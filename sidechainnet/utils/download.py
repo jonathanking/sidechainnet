@@ -646,9 +646,9 @@ def download_complete_proteinnet(user_dir=None):
             "sidechainnet", "resources/proteinnet_parsed.zip")
 
     if not os.path.isdir(os.path.join(dir_path, "proteinnet_parsed", "targets")):
-        print("Downloading pre-parsed ProteinNet data from Box (~3.5 GB compressed).")
+        print("Downloading pre-parsed ProteinNet data (~3.5 GB compressed).")
         _download(
-            "https://pitt.box.com/shared/static/nzsglfxdetnrpd4d6lomqh5102upa65a.zip",
+            "http://bits.csb.pitt.edu/~jok120/sidechainnet_data/resources/proteinnet_parsed.zip",
             zip_file_path)
 
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
