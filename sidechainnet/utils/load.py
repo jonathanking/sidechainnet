@@ -66,15 +66,15 @@ def _download(url, file_name):
 def _download_sidechainnet(casp_version, thinning, scn_dir):
     """Download the specified version of Sidechainnet."""
     # Prepare destination paths for downloading
-    if format_sidechainnet_path(casp_version, thinning) not in BOXURLS:
+    if format_sidechainnet_path(casp_version, thinning) not in SCN_URLS:
         raise FileNotFoundError(
             "The requested file is currently unavailable. Please check back later.")
     outfile_path = os.path.join(scn_dir, format_sidechainnet_path(casp_version, thinning))
     os.makedirs(os.path.dirname(outfile_path), exist_ok=True)
-    print("Downloading from", BOXURLS[format_sidechainnet_path(casp_version, thinning)])
+    print("Downloading from", SCN_URLS[format_sidechainnet_path(casp_version, thinning)])
 
-    # Use a data-agnostic tool for downloading URL data from Box to a specified local file
-    _download(BOXURLS[format_sidechainnet_path(casp_version, thinning)], outfile_path)
+    # Use a data-agnostic tool for downloading URL data from web to a specified local file
+    _download(SCN_URLS[format_sidechainnet_path(casp_version, thinning)], outfile_path)
     print(f"Downloaded SidechainNet to {outfile_path}.")
 
     return outfile_path
@@ -410,92 +410,56 @@ def filter_dictionary_by_missing_residues(raw_data):
     return raw_data
 
 
-BOXURLS = {
+_base_url = "http://bits.csb.pitt.edu/~jok120/sidechainnet_data/"
+SCN_URLS = {
     # CASP 12
-    "sidechainnet_casp12_30.pkl":
-        "https://pitt.box.com/shared/static/hbatd2a750tx8e27yizwinc3hsceeeui.pkl",
-    "sidechainnet_casp12_50.pkl":
-        "https://pitt.box.com/shared/static/7cng5zdi2s4doruh1m512d281w2cmk0z.pkl",
-    "sidechainnet_casp12_70.pkl":
-        "https://pitt.box.com/shared/static/xfaktrj8ole0eqktxi5fa4qp9efum8f2.pkl",
-    "sidechainnet_casp12_90.pkl":
-        "https://pitt.box.com/shared/static/nh7vybjjm224m1nezrgmnywxsa4st2uk.pkl",
-    "sidechainnet_casp12_95.pkl":
-        "https://pitt.box.com/shared/static/wcz1kex8idnpy8zx7a59r3h6e216tlq1.pkl",
-    "sidechainnet_casp12_100.pkl":
-        "https://pitt.box.com/shared/static/ey5xh6l4p8iwzrxtxwpxt7oeg70eayl4.pkl",
+    "sidechainnet_casp12_30.pkl":  _base_url + "sidechainnet_casp12_30.pkl",
+    "sidechainnet_casp12_50.pkl":  _base_url + "sidechainnet_casp12_50.pkl",
+    "sidechainnet_casp12_70.pkl":  _base_url + "sidechainnet_casp12_70.pkl",
+    "sidechainnet_casp12_90.pkl":  _base_url + "sidechainnet_casp12_90.pkl",
+    "sidechainnet_casp12_95.pkl":  _base_url + "sidechainnet_casp12_95.pkl",
+    "sidechainnet_casp12_100.pkl": _base_url + "sidechainnet_casp12_100.pkl",
 
     # CASP 11
-    "sidechainnet_casp11_30.pkl":
-        "https://pitt.box.com/shared/static/fzil4bgxt4fqpp416xw0e3y0ew4c7yct.pkl",
-    "sidechainnet_casp11_50.pkl":
-        "https://pitt.box.com/shared/static/rux3p18k523y8zbo40u1l856826buvui.pkl",
-    "sidechainnet_casp11_70.pkl":
-        "https://pitt.box.com/shared/static/tl51ym0hzjdvq4qs5f5shsj0sl9mkvd0.pkl",
-    "sidechainnet_casp11_90.pkl":
-        "https://pitt.box.com/shared/static/iheqs3vqszoxsdq46nkzf5kylt8ecjbx.pkl",
-    "sidechainnet_casp11_95.pkl":
-        "https://pitt.box.com/shared/static/gbme2a5yifpugtmthwu2989xxyg5b8i6.pkl",
-    "sidechainnet_casp11_100.pkl":
-        "https://pitt.box.com/shared/static/3cfx02k2yw4ux2mrbvwrrj91zsftcpbj.pkl",
+    "sidechainnet_casp11_30.pkl":  _base_url + "sidechainnet_casp11_30.pkl",
+    "sidechainnet_casp11_50.pkl":  _base_url + "sidechainnet_casp11_50.pkl",
+    "sidechainnet_casp11_70.pkl":  _base_url + "sidechainnet_casp11_70.pkl",
+    "sidechainnet_casp11_90.pkl":  _base_url + "sidechainnet_casp11_90.pkl",
+    "sidechainnet_casp11_95.pkl":  _base_url + "sidechainnet_casp11_95.pkl",
+    "sidechainnet_casp11_100.pkl": _base_url + "sidechainnet_casp11_100.pkl",
 
     # CASP 10
-    "sidechainnet_casp10_30.pkl":
-        "https://pitt.box.com/shared/static/fe0hpjrldi2y1g374mgdzfpdipajd6s4.pkl",
-    "sidechainnet_casp10_50.pkl":
-        "https://pitt.box.com/shared/static/tsnt6s07txas0h37cpzepck580yme9vv.pkl",
-    "sidechainnet_casp10_70.pkl":
-        "https://pitt.box.com/shared/static/awmzr4jj68p61ab031smixryt69p8ykm.pkl",
-    "sidechainnet_casp10_90.pkl":
-        "https://pitt.box.com/shared/static/it6zcugy997c1550kima3m3fu8kamnh8.pkl",
-    "sidechainnet_casp10_95.pkl":
-        "https://pitt.box.com/shared/static/q6ld9h276kobhmmtvdq581qnm61oevup.pkl",
-    "sidechainnet_casp10_100.pkl":
-        "https://pitt.box.com/shared/static/fpixgzh9n86xyzpwtlc74lle4fd3p5es.pkl",
+    "sidechainnet_casp10_30.pkl":  _base_url + "sidechainnet_casp10_30.pkl",
+    "sidechainnet_casp10_50.pkl":  _base_url + "sidechainnet_casp10_50.pkl",
+    "sidechainnet_casp10_70.pkl":  _base_url + "sidechainnet_casp10_70.pkl",
+    "sidechainnet_casp10_90.pkl":  _base_url + "sidechainnet_casp10_90.pkl",
+    "sidechainnet_casp10_95.pkl":  _base_url + "sidechainnet_casp10_95.pkl",
+    "sidechainnet_casp10_100.pkl": _base_url + "sidechainnet_casp10_100.pkl",
 
     # CASP 9
-    "sidechainnet_casp9_30.pkl":
-        "https://pitt.box.com/shared/static/j1h3181d2mibqvc7jrqm17dprzj6pxmc.pkl",
-    "sidechainnet_casp9_50.pkl":
-        "https://pitt.box.com/shared/static/l363lu9ztpdmcybthtytwnrvvkib2228.pkl",
-    "sidechainnet_casp9_70.pkl":
-        "https://pitt.box.com/shared/static/4uh1yggpdhm0aoeisomnyfuac4j20qzc.pkl",
-    "sidechainnet_casp9_90.pkl":
-        "https://pitt.box.com/shared/static/scv7l6qfr2j93pn4cu40ouhmxbns6k7x.pkl",
-    "sidechainnet_casp9_95.pkl":
-        "https://pitt.box.com/shared/static/tqpugpr7wamvmkyrtd8tqnzft6u53zha.pkl",
-    "sidechainnet_casp9_100.pkl":
-        "https://pitt.box.com/shared/static/jjtubu2lxwlv1aw8tfc7u27vcf2yz39v.pkl",
+    "sidechainnet_casp9_30.pkl":  _base_url + "sidechainnet_casp9_30.pkl",
+    "sidechainnet_casp9_50.pkl":  _base_url + "sidechainnet_casp9_50.pkl",
+    "sidechainnet_casp9_70.pkl":  _base_url + "sidechainnet_casp9_70.pkl",
+    "sidechainnet_casp9_90.pkl":  _base_url + "sidechainnet_casp9_90.pkl",
+    "sidechainnet_casp9_95.pkl":  _base_url + "sidechainnet_casp9_95.pkl",
+    "sidechainnet_casp9_100.pkl": _base_url + "sidechainnet_casp9_100.pkl",
 
     # CASP 8
-    "sidechainnet_casp8_30.pkl":
-        "https://pitt.box.com/shared/static/1hx2n3y2gn3flnlsw2wb1e4l4nlru5mz.pkl",
-    "sidechainnet_casp8_50.pkl":
-        "https://pitt.box.com/shared/static/4u8tuqkm5pv34hm139uw9dqc4ieebsue.pkl",
-    "sidechainnet_casp8_70.pkl":
-        "https://pitt.box.com/shared/static/vj58yaeph55zjb04jezmqams66mn4bil.pkl",
-    "sidechainnet_casp8_90.pkl":
-        "https://pitt.box.com/shared/static/1ry2j47lde7zk5fxzvuffv05k1gq29oh.pkl",
-    "sidechainnet_casp8_95.pkl":
-        "https://pitt.box.com/shared/static/9uaw2tv61xyfd8gtw9n8e3hfcken4t4x.pkl",
-    "sidechainnet_casp8_100.pkl":
-        "https://pitt.box.com/shared/static/crk59vz6dw9cbbvne10owa450zgv1j79.pkl",
+    "sidechainnet_casp8_30.pkl":  _base_url + "sidechainnet_casp8_30.pkl",
+    "sidechainnet_casp8_50.pkl":  _base_url + "sidechainnet_casp8_50.pkl",
+    "sidechainnet_casp8_70.pkl":  _base_url + "sidechainnet_casp8_70.pkl",
+    "sidechainnet_casp8_90.pkl":  _base_url + "sidechainnet_casp8_90.pkl",
+    "sidechainnet_casp8_95.pkl":  _base_url + "sidechainnet_casp8_95.pkl",
+    "sidechainnet_casp8_100.pkl": _base_url + "sidechainnet_casp8_100.pkl",
 
     # CASP 7
-    "sidechainnet_casp7_30.pkl":
-        "https://pitt.box.com/shared/static/krprccxr3sv9tpfu1r7xrtaulg0qucy7.pkl",
-    "sidechainnet_casp7_50.pkl":
-        "https://pitt.box.com/shared/static/4pw56huei1123a5rd6g460886kg0pex7.pkl",
-    "sidechainnet_casp7_70.pkl":
-        "https://pitt.box.com/shared/static/afyow2ki9mwuoago0bzlsp5ame8dq12g.pkl",
-    "sidechainnet_casp7_90.pkl":
-        "https://pitt.box.com/shared/static/phsbdw8bj1oiv61d6hps0j62324820f3.pkl",
-    "sidechainnet_casp7_95.pkl":
-        "https://pitt.box.com/shared/static/2lgbtdw6c5df0qpe7dtnlaawowy9ic5r.pkl",
-    "sidechainnet_casp7_100.pkl":
-        "https://pitt.box.com/shared/static/6qipxz2z2n12a06vln5ucmzu4dcyw5ee.pkl",
+    "sidechainnet_casp7_30.pkl":  _base_url + "sidechainnet_casp7_30.pkl",
+    "sidechainnet_casp7_50.pkl":  _base_url + "sidechainnet_casp7_50.pkl",
+    "sidechainnet_casp7_70.pkl":  _base_url + "sidechainnet_casp7_70.pkl",
+    "sidechainnet_casp7_90.pkl":  _base_url + "sidechainnet_casp7_90.pkl",
+    "sidechainnet_casp7_95.pkl":  _base_url + "sidechainnet_casp7_95.pkl",
+    "sidechainnet_casp7_100.pkl": _base_url + "sidechainnet_casp7_100.pkl",
 
     # Other
-    "sidechainnet_debug.pkl":
-        "https://pitt.box.com/shared/static/1w087htft56umnedlgp9yo4frnhmaakt.pkl"
+    "sidechainnet_debug.pkl":     _base_url + "sidechainnet_debug.pkl",
 }
