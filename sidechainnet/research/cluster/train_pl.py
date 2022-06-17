@@ -60,8 +60,8 @@ def create_parser():
     program_args.add_argument("--tags",
                               type=str,
                               default="",
-                              help="Tags to use on weights and biases, split only by
-                              commas, e.g. 'baseline,dropout0'.")
+                              help="Tags to use on weights and biases, split only by"
+                              "commas, e.g. 'baseline,dropout0'.")
 
     # Data arguments
     data_args = parser.add_argument_group("Data")

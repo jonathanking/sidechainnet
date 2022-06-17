@@ -6,7 +6,7 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=dept_gpu
 #SBATCH --exclude=g122
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/%A_%6a.out"
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220617/%A_%6a.out"
 #SBATCH -c 24
 
 ############################
@@ -51,7 +51,7 @@ echo "Updated repo."
 ############################
 ##     Array Job Exec.    ##
 ############################
-cmd=`sed "${SLURM_ARRAY_TASK_ID}q;d" /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/overfit_scale_cmds.txt`
+cmd=`sed "${SLURM_ARRAY_TASK_ID}q;d" /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220617/cmds.txt`
 
 if [ "$cmd" != "" ]; then 
     # Because our commands will have variables (like SCN_PYTHON, TRAIN_PL), we substitute them
@@ -59,7 +59,7 @@ if [ "$cmd" != "" ]; then
     echo "Running ${cmd}"
     eval $cmd
 else
-    echo "Line $SLURM_ARRAY_TASK_ID is empty in /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/overfit_scale_cmds.txt."
+    echo "Line $SLURM_ARRAY_TASK_ID is empty in input file."
 fi 
 
 exit 0
