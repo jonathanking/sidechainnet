@@ -232,6 +232,7 @@ class SCNProtein(object):
                 self.hcoords = self.coords
         else:
             print(f"StructureBuilder already exists for {self.id}. Coords not rebuilt.")
+        return self.hcoords
 
     def add_hydrogens(self, from_angles=False, angles=None, coords=None):
         """Add hydrogens to the internal protein structure representation."""

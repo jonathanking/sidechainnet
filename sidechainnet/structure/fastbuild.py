@@ -1,15 +1,20 @@
 """Utilities for building structures using sublinear algorithms."""
 
+from sidechainnet.structure.HydrogenBuilder import NUM_COORDS_PER_RES_W_HYDROGENS
 from .build_info import ANGLE_NAME_TO_IDX_MAP, SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
 import numpy as np
 import torch
 
-# setup tensor based residue information
-aa = np.array([
+#################################################################################
+# Data structures for describing how to build all the atoms of each residue
+# For each datum, we have shape: residue_alphabet x max_num_sc_atoms == (20 x 10)
+#################################################################################
+
+AA = np.array([
     'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T',
     'V', 'W', 'Y'
 ])
-aa3to1 = {
+AA3to1 = {
     'ALA': 'A',
     'ARG': 'R',
     'ASN': 'N',
@@ -31,21 +36,30 @@ aa3to1 = {
     'TYR': 'Y',
     'VAL': 'V'
 }
-aa1to3 = {v: k for (k, v) in aa3to1.items()}
-num2aa = {i: a for i, a in enumerate(aa)}
-aa2num = {a: i for i, a in enumerate(aa)}
+AA1to3 = {v: k for (k, v) in AA3to1.items()}
+NUM2AA = {i: a for i, a in enumerate(AA)}
+AA2NUM = {a: i for i, a in enumerate(AA)}
 
 
-# For every sidechain atom, need to know:
-#   1) what atom it is building off of (<NUM_COORDS_PER_RES=14),
-#   2) the bond length,
-#   3) the theta bond angle, and
-#   4) the chi torsion angle.
-# For atoms where the torsion angles are inputs, need to specify angle source index.
-# Index should should start from zero as it is assumed that only relevant angles will be
-# passed in. Zero is start of sidechain atoms/angles.
+def _make_sc_heavy_atom_tensors():
+    """Create a dict mapping build_info (lens, angs, types) to vals per residue identity.
 
-def _make_sc_ha_tensors():
+        For every sidechain atom, we need to know:
+            1) what atom it is building off of (<NUM_COORDS_PER_RES=14),
+            2) the bond length,
+            3) the theta bond angle,
+            4) the chi torsion angle, and
+            5) whether or not the torsion angle is defined as being offset from another
+                angle (as in the case of branching atoms).
+
+        For atoms where the torsion angles are inputs, we must specify angle source index.
+        Index should should start from zero as it is assumed that only relevant angles
+        will be passed in. Zero is start of sidechain atoms/angles.
+
+    Returns:
+        A dictionary mapping data names (the data nessary to compute NeRF and extend
+        sidechains) to the data itself.
+    """
     NC = NUM_COORDS_PER_RES - 4
     sc_source_atom = torch.zeros(20, NC, dtype=torch.long)
     sc_bond_length = torch.zeros(20, NC)
@@ -57,11 +71,11 @@ def _make_sc_ha_tensors():
 
     # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
     sc_type = torch.zeros(20, NC, dtype=torch.long)
-    # chi idx is same as atom idx, unless offset torsion in which case it is one before
+    # chi idx is same as atom idx, unless offset torsion in which case it is one before # TODO what is this?
 
     for a in range(20):
-        A = aa[a]
-        a3 = aa1to3[A]
+        A = AA[a]
+        a3 = AA1to3[A]
         info = SC_BUILD_INFO[a3]
         for i in range(NUM_COORDS_PER_RES - 4):
             if i < len(info['torsion-vals']):
@@ -70,11 +84,16 @@ def _make_sc_ha_tensors():
                 sc_stheta[a][i] = np.sin(np.pi - info['angles-vals'][i])
 
                 t = info['torsion-vals'][i]
+                # Declare type of torsion angle
+                # Type 0: No atom and no angle (no change from sc_type value of 0)
+                # Type 1: Normal, predicted/measured torsion angle
                 if t == 'p':
                     sc_type[a][i] = 1
+                # Type 2: Inferred torsion angle (offset from previous angle by pi)
                 elif t == 'i':
                     sc_type[a][i] = 2
                     sc_offset[a][i] = np.pi
+                # Type 3: Constant angle, transformed by 2pi - t.
                 else:
                     sc_type[a][i] = 3
                     sc_cchi[a][i] = np.cos(2 * np.pi - t)
@@ -87,29 +106,35 @@ def _make_sc_ha_tensors():
                     sc_source_atom[a][i] = -1
     return {
         'bond_lengths': sc_bond_length,  # Each of these is a matrix containing relevant
-        'cthetas': sc_ctheta,            # build info for all atoms in all residues.
+        'cthetas': sc_ctheta,  # build info for all atoms in all residues.
         'sthetas': sc_stheta,
-        'cchis': sc_cchi,                # For this reason, each is a (20 x 10) matrix,
-        'schis': sc_schi,                # Where 20 is the number of different residues
-        'types': sc_type,                # we may be building, and 10 is the maximum
-        'offsets': sc_offset,            # number of atoms we may extend from the CA.
-        'sources': sc_source_atom        # e.g. Tryptophan has 10 sidechain atoms.
+        'cchis': sc_cchi,  # For this reason, each is a (20 x 10) matrix,
+        'schis': sc_schi,  # Where 20 is the number of different residues
+        'types': sc_type,  # we may be building, and 10 is the maximum
+        'offsets': sc_offset,  # number of atoms we may extend from the CA.
+        'sources': sc_source_atom  # e.g. Tryptophan has 10 sidechain atoms.
     }
-
-
-# we specify geometries for atoms building off of N, CA, and C, but only
-# CA has variable angles;  these are heavy atom only, but can be easily
-# extended to hydrogen
 
 
 def _x20(v):  # make 20 copies as tensor
     return torch.Tensor([v]).repeat(20).reshape(20, 1)
 
 
+# In the dictionaries below, we specify geometries for atoms building off of N, CA, and C.
+# Only CA has angles that vary by residue identity. The other atoms (N, C) have identical
+# build data for every residue. CA atom build info is organized into a data with data
+# labels as keys, and vectors of values ordered by residue identity.
+
 sc_heavy_atom_build_info = {
+    # Nothing extends from Nitrogen, so no data is needed here.
     'N': None,
-    'CA': _make_sc_ha_tensors(),
-    # =O off of C
+    # Many atoms potentially extend from alpha Carbons. Data is organized by res identity.
+    # i.e. 'bond_lengths' : 20 x 10,  'types' : 20 x 10
+    # Items are meant to be selected from this dictionary to match the sequence that will
+    # be built.
+    'CA': _make_sc_heavy_atom_tensors(),
+    # Carbonyl carbons are built off of the backbone C. Each residue builds this oxygen
+    # in the same way, so we simply repeat the relevant build info data per res identity.
     'C': {
         'bond_lengths': _x20(BB_BUILD_INFO["BONDLENS"]["c-o"]),
         'cthetas': _x20(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
@@ -121,6 +146,8 @@ sc_heavy_atom_build_info = {
         'sources': _x20(-1)
     }
 }
+
+# This dict is nearly identical to the one above but adds information for H building.
 
 sc_all_atom_build_info = {
     'N': {
@@ -133,7 +160,7 @@ sc_all_atom_build_info = {
         'offsets': _x20(0.),
         'sources': _x20(-1)
     },
-    'CA': _make_sc_ha_tensors(),  # TODO TODO TODO - add hydrogens
+    'CA': _make_sc_heavy_atom_tensors(),  # TODO TODO TODO - add hydrogens
     # =O off of C
     'C': {
         'bond_lengths': _x20(BB_BUILD_INFO["BONDLENS"]["c-o"]),
@@ -146,6 +173,7 @@ sc_all_atom_build_info = {
         'sources': _x20(-1)
     }
 }
+
 
 ###################################################
 # Transformation Matrices Creation
@@ -312,22 +340,23 @@ class MakeBackbone(torch.autograd.Function):
 # Coordinates
 ###################################################
 
+def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
+    """Create sidechain coordinates from backbone matrices given relevant auxilliary data.
 
-def make_sidechain_coords(backbone, seq_aa_index, ang, build_info):
-    """Create sidechain coordinates from backbone matrices given relevant auxilliary info.
-
-    Given relevant backbone atom matrices, map from sequence to residue type, relevant
-    variable angles, and  build info for chain of atoms off of residue,create coordinates.
+    Our goal is to generate arrays for each datum (bond length, thetas, chis) necessary
+    for building the next atom for every residue in the sequence.
+    Once we have the data arrays, we convert these into transformation matrices.
+    Finally, the transformation matrices can be applied to generate coordinates.
     """
     dtype = ang.dtype
     device = ang.device
     L = len(seq_aa_index)
 
+    # We take the sin/cos vals of the angs for simplicity (they are used in making TMats)
     sins = torch.sin(ang)
     coss = torch.cos(ang)
 
-    # select out angles/bonds/etc for full seq
-
+    # Select out necessary build info for all atoms (up to 10) in all residues (up to L)
     bond_lengths = build_info['bond_lengths'][seq_aa_index].to(device).type(dtype)  # Lx10
     cthetas = build_info['cthetas'][seq_aa_index].to(device).type(dtype)
     sthetas = build_info['sthetas'][seq_aa_index].to(device).type(dtype)
@@ -337,64 +366,90 @@ def make_sidechain_coords(backbone, seq_aa_index, ang, build_info):
     types = build_info['types'][seq_aa_index].to(device)
     sources = build_info['sources'][seq_aa_index].to(device)
 
-    MAX = bond_lengths.shape[1]
+    # TODO modify the first and last residues (index 0 and -1 in above arrays) to add
+    # TODO support for CB generation w/fictitious residue as well as terminal hydrogens.
+
+    # Create empty sidechain coordinate tensor and starting coordinate at origin
+    MAX = bond_lengths.shape[1]  # always equal to the maximum num sidechain atoms per res
     sccoords = torch.full((L, MAX, 3), torch.nan, device=device, dtype=dtype)
     vec = torch.tensor([0.0, 0, 0, 1], device=device, dtype=dtype)
 
     matrices = []
     masks = []
 
-    # first iteration: build from CA
-    prevmask = types[:, 0].bool()  # no G
-    prevmats = backbone[prevmask]
+    # On our 1st iteration, we build CB from CA and must initialize 'previous' values.
+    # We 1st identify the residues in the seq that are building an atom on this level i=0.
+    # True if type of 0th atom is not 0 (aka an atom is being built, not true for Glycine)
+    prevbuildmask = types[:, 0].bool()
+    # We then select BB transformation matrices for the residues that will build an atom
+    prevmats = backbone_mats[prevbuildmask]
 
+    # Now, iterate through each level of the sidechain, from 0 to the max number of atoms
     for i in range(MAX):
+        # Identify all of the residues in the sequence that must build an atom at level i
+        buildmask = types[:, i].bool()
 
-        seqmask = types[:, i].bool()
-        lens = bond_lengths[seqmask, i]
+        # Produce all of the bond lengths for the atoms to be built at level i
+        lens = bond_lengths[buildmask, i]
+
+        # If we have no atoms to build at level i, we are done.
         N = len(lens)
         if N == 0:
             break
-        # theta always constant
-        ctheta = cthetas[seqmask, i]
-        stheta = sthetas[seqmask, i]
 
-        # set to constant
-        cchi = cchis[seqmask, i]
-        schi = schis[seqmask, i]
+        # Produce thetas, (non-torsional bond angs along sidechain not measured/predicted)
+        ctheta = cthetas[buildmask, i]
+        stheta = sthetas[buildmask, i]
 
-        # unless not
-        regmask = types[:, i] == 1  # regular chi
-        if regmask.any():
-            cchi[regmask[seqmask]] = coss[regmask, i]
-            schi[regmask[seqmask]] = sins[regmask, i]
+        # Initialize chis, (torsional bond angs, set to predetermined constant, Type 3)
+        cchi = cchis[buildmask, i]
+        schi = schis[buildmask, i]
 
-        invmask = types[:, i] == 2
-        if invmask.any():
+        # Fill in Type 1 chis (measured/predicted to build next atom, most common)
+        type1mask = types[:, i] == 1
+        if type1mask.any():
+            # Of the chi angles for level i that are Type 1 (type1mask),
+            # and of the residues that are building an atom at level i (buildmask),
+            # Change those chi vals from constant to the vals that are measured/predicted.
+
+            # Note that since type1mask is 'raw' and cchi is buildmask-ed, we apply
+            # buildmask to type1mask before updating cchi.
+            cchi[type1mask[buildmask]] = coss[type1mask, i]
+            schi[type1mask[buildmask]] = sins[type1mask, i]
+
+        # Fill in Type 2 chis, (defined by an offset, i.e. branches)
+        type2mask = types[:, i] == 2
+        if type2mask.any():
+            # TODO what does this mean? is it pointing to the angle AFTER this angle? why?
             # re-used dihedral should always be positioned right after source position
-            offang = ang[invmask, sources[invmask, i] + 1] + offsets[invmask, i]
-            cchi[invmask[seqmask]] = torch.cos(offang)
-            schi[invmask[seqmask]] = torch.sin(offang)
+            # Update the angle to be its offset plus the angle @ source pos + 1
+            offang = ang[type2mask, sources[type2mask, i] + 1] + offsets[type2mask, i]
+            cchi[type2mask[buildmask]] = torch.cos(offang)
+            schi[type2mask[buildmask]] = torch.sin(offang)
 
-        # check if any atoms need matrix from farther back
+        # Construct all necessary transformation matrices to build all atoms on level i
+        tmats_for_level_i = MakeTMats.apply(ctheta, stheta, cchi, schi, lens)
+
+        # Check if any atoms need a TMat that is from level lower (LL) than i - 1
         if (sources[:, i] != i - 1).any():
             prevmats = prevmats.clone()
-
             for k in range(i - 2, -1, -1):
-                srcmask = (sources[:, i] == k) & seqmask
-                if srcmask.any():  # change prevmat to earlier matrix
-                    prevmats[srcmask[prevmask]] = matrices[k][srcmask[masks[k]]]
+                LLmask = (sources[:, i] == k) & buildmask
+                if LLmask.any():
+                    # change prevmat to earlier matrix
+                    prevmats[LLmask[prevbuildmask]] = matrices[k][LLmask[masks[k]]]
 
-        mats = MakeTMats.apply(ctheta, stheta, cchi, schi, lens)
+        # We can finally update the globally-referenced TMats through multiplication
+        prevmats = prevmats[buildmask[prevbuildmask]] @ tmats_for_level_i
 
-        prevmats = prevmats[seqmask[prevmask]] @ mats
-
+        # Then produce the corresponding coordinates given all the global TMats
         c = prevmats @ vec
-        sccoords[seqmask, i] = c[:, :3]
+        sccoords[buildmask, i] = c[:, :3]
 
+        # Record the global TMats and buildmasks for the next round of extension
         matrices.append(prevmats)
-        masks.append(seqmask)
-        prevmask = seqmask
+        masks.append(buildmask)
+        prevbuildmask = buildmask
 
     return sccoords
 
@@ -424,15 +479,17 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
     dtype = angles.dtype
 
     ang_name_map = ANGLE_NAME_TO_IDX_MAP
+    angles_cp = angles.clone()  # TODO still needed?
 
     # Construct an angle tensor populated with relevant backbone (BB) angles;
     # First: create a zero-filled angle tensor with shape (L+1 x NUM_BB_ANGS)
     ang = torch.zeros((L + 1, SC_ANGLES_START_POS), device=device, dtype=dtype)
     # Next: fill in the backbone angles, with pos 0 still zero
     ang[1:] = angles[:L, :SC_ANGLES_START_POS]
-    # TODO why modify angle values? Why 2 * pi - ang? why is pos 0 zero?
+    # Because the first backbone angle is undefined (it has no phi), we replace nan with 0
+    ang[1, 0] = 0
     ang[:, :3] = 2 * np.pi - ang[:, :3]  # backbone torsion angles, aka 'chi' for NeRF
-    ang[:, 3:] = np.pi - ang[:, 3:]      # backbone bond angles, aka 'theta; for NeRF
+    ang[:, 3:] = np.pi - ang[:, 3:]  # backbone bond angles, aka 'theta' for NeRF
 
     # Construct sin/cos representations of BB angle tensors
     sins = torch.sin(ang)
@@ -450,7 +507,7 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
         BB_BUILD_INFO['BONDLENS']['ca-c']
     ],
                         device=device).repeat(L)
-    lens[0] = 0  # first atom starts at origin
+    lens[0] = 0  # first atom starts at origin and has no previous C atom len definition
 
     # Construct relative transformation matrices (TMats) per BB atom
     ncacM = MakeTMats.apply(ctheta, stheta, cchi, schi, lens)
@@ -463,7 +520,7 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
     ncac = (ncacM @ vec)[:, :3].reshape(L, 3, 3)
 
     # Convert sequence to fixed AA index
-    seq_aa_index = torch.tensor([aa2num[a] for a in seq], device=device)
+    seq_aa_index = torch.tensor([AA2NUM[a] for a in seq], device=device)
 
     # Construct carbonyl oxygens (C=O) along backbone;
     # First: Select relevant angle (np.pi + psi)
@@ -479,7 +536,9 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
         ncoords = torch.zeros(L, 0, 3, dtype=dtype, device=device)
 
     # Construct all sidechain atoms by iteratively applying TMats starting from CA
-    scang = (2 * np.pi - angles.to(device)[:, SC_ANGLES_START_POS:])
+    scang = (2 * np.pi - angles_cp.to(device)[:, SC_ANGLES_START_POS:])
+    # We set the first x0 to be 0, since it is completely arbitrary
+    # scang[0, 0] = 0  #-2 / 3 * np.pi
     sccoords = make_sidechain_coords(ncacM[1::3], seq_aa_index, scang, build_info['CA'])
 
     return torch.concat([ncac, ocoords, sccoords, ncoords], dim=1)
