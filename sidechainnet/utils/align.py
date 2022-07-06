@@ -292,7 +292,7 @@ def binary_mask_to_str(m):
     m = list(map(lambda x: "-" if x == 0 else "+", m))
     return "".join(m)
 
-
+# TODO update coordinate measurement and iteration to bake in residue size into coord dim
 def coordinate_iterator(coords, atoms_per_res):
     """Iterates over coordinates in a numpy array grouped by residue.
 

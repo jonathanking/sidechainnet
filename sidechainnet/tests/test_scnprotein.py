@@ -4,7 +4,7 @@ from sidechainnet.dataloaders.SCNProtein import SCNProtein
 from sidechainnet.structure.build_info import NUM_ANGLES, NUM_COORDS_PER_RES
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
-
+# TODO update test so that coordinate dims are L x ncoords x 3.
 def test_trim_edges():
     seq = "THISISATESTPRQTEIN"  # L = 18
     msk = "-------++++-------"

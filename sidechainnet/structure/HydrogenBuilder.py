@@ -4,12 +4,15 @@ import math
 import numpy as np
 from numba import njit
 import torch
-from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_BUILD_INFO, SC_HBUILD_INFO
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
-NUM_COORDS_PER_RES_W_HYDROGENS = 26
+# ARG has 20 sc atoms (including hydrogens) + 4 bb + up to 2 terminal hydrogens + HA
+# TODO Recount maximum residue size w/terminal residues
+NUM_COORDS_PER_RES_W_HYDROGENS = NUM_COORDS_PER_RES + 6 + 4 + 2 + 2
+
 
 METHYL_ANGLE = torch.tensor(np.deg2rad(109.5))
 METHYL_LEN = torch.tensor(1.09)
@@ -49,6 +52,29 @@ HYDROGEN_NAMES = {
     'TRP': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HE3', 'HH2', 'HZ2', 'HZ3'],
     'TYR': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'],
     'VAL': ['H', 'HA', 'HB', 'HG11', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23']
+}
+
+HYDROGEN_TYPES = {
+    'ALA': ['H', 'H1', 'HC', 'HC', 'HC'],
+    'ARG': ['H', 'H1', 'HC', 'HC', 'H1', 'H1', 'HC', 'HC', 'H', 'H', 'H', 'H', 'H'],
+    'ASN': ['H', 'H1', 'HC', 'HC', 'H', 'H'],
+    'ASP': ['H', 'H1', 'HC', 'HC'],
+    'CYS': ['H', 'H1', 'H1', 'H1', 'HS'],
+    'GLN': ['H', 'H1', 'HC', 'HC', 'HC', 'HC', 'H', 'H'],
+    'GLU': ['H', 'H1', 'HC', 'HC', 'HC', 'HC'],
+    'GLY': ['H', 'H1', 'H1'],
+    'HIS': ['H', 'H1', 'HC', 'HC', 'H5', 'H4', 'H'],
+    'ILE': ['H', 'H1', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC'],
+    'LEU': ['H', 'H1', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC'],
+    'LYS': ['H', 'H1', 'HC', 'HC', 'HC', 'HC', 'HP', 'HP', 'HC', 'HC', 'H', 'H', 'H'],
+    'MET': ['H', 'H1', 'HC', 'HC', 'H1', 'H1', 'H1', 'H1', 'H1'],
+    'PHE': ['H', 'H1', 'HC', 'HC', 'HA', 'HA', 'HA', 'HA', 'HA'],
+    'PRO': ['H1', 'HC', 'HC', 'H1', 'H1', 'HC', 'HC'],
+    'SER': ['H', 'H1', 'H1', 'H1', 'HO'],
+    'THR': ['H', 'H1', 'H1', 'HO', 'HC', 'HC', 'HC'],
+    'TRP': ['H', 'H1', 'HC', 'HC', 'H4', 'H', 'HA', 'HA', 'HA', 'HA'],
+    'TYR': ['H', 'H1', 'HC', 'HC', 'HA', 'HA', 'HA', 'HA', 'HO'],
+    'VAL': ['H', 'H1', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC', 'HC']
 }
 
 HYDROGEN_PARTNERS = {  # Lists the atom each hydrogen (from list above) is connected to
@@ -122,7 +148,8 @@ class HydrogenBuilder(object):
 
         self.methyl_angle = METHYL_ANGLE.numpy() if self.is_numpy else METHYL_ANGLE
         self.methyl_len = METHYL_LEN.numpy() if self.is_numpy else METHYL_LEN
-        self.methylene_angle = METHYLENE_ANGLE.numpy() if self.is_numpy else METHYLENE_ANGLE
+        self.methylene_angle = METHYLENE_ANGLE.numpy(
+        ) if self.is_numpy else METHYLENE_ANGLE
         self.methylene_len = METHYLENE_LEN.numpy() if self.is_numpy else METHYLENE_LEN
         self.sp3_len = SP3_LEN.numpy() if self.is_numpy else SP3_LEN
         self.thiol_angle = THIOL_ANGLE.numpy() if self.is_numpy else THIOL_ANGLE
@@ -187,10 +214,10 @@ class HydrogenBuilder(object):
             rot_matrix = _M(axis, theta)
             return rot_matrix
         elif posneg and not self.is_numpy:
-            r1, r2 = _M_posneg(axis.detach().cpu().numpy(),
-                               theta.detach().cpu().numpy())
-            return (torch.tensor(r1, device=self.device),
-                    torch.tensor(r2, device=self.device))
+            r1, r2 = _M_posneg(axis.detach().cpu().numpy(), theta.detach().cpu().numpy())
+            return (torch.tensor(r1,
+                                 device=self.device), torch.tensor(r2,
+                                                                   device=self.device))
         else:
             r1, r2 = _M_posneg(axis, theta)
             return r1, r2
@@ -791,8 +818,8 @@ def _M_posneg(axis: np.ndarray, theta):
     diag1 = a + cc - bb - dd
     diag2 = aa + dd - bb - cc
     r1 = np.array([[diag0, 2 * (bc + ad), 2 * (bd - ac)],
-                  [2 * (bc - ad), diag1, 2 * (cd + ab)],
-                  [2 * (bd + ac), 2 * (cd - ab), diag2]])
+                   [2 * (bc - ad), diag1, 2 * (cd + ab)],
+                   [2 * (bd + ac), 2 * (cd - ab), diag2]])
     r2 = np.array([[diag0, 2 * (bc - ad), 2 * (bd + ac)],
                    [2 * (bc + ad), diag1, 2 * (cd - ab)],
                    [2 * (bd - ac), 2 * (cd + ab), diag2]])
@@ -878,13 +905,10 @@ def _get_amide_methine_hydrogen_help(R1, center, R2, length, is_numpy):
     if is_numpy:
         return _scale_np(-R1 - R2 + 2 * center, length) + center
     else:
-        return _scale(-R1 - R2 + 2*center, length) + center
+        return _scale(-R1 - R2 + 2 * center, length) + center
 
 
 ATOM_MAP_H = {}
-for one_letter, three_letter in ONE_TO_THREE_LETTER_MAP.items():
-    ATOM_MAP_H[one_letter] = ["N", "CA", "C", "O"] + list(
-        SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
-    ATOM_MAP_H[one_letter].extend(HYDROGEN_NAMES[three_letter])
-    ATOM_MAP_H[one_letter].extend(
-        ["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[one_letter])))
+for a, aaa in ONE_TO_THREE_LETTER_MAP.items():
+    ATOM_MAP_H[a] = ["N", "CA", "C", "O", "H"] + list(SC_HBUILD_INFO[aaa]["atom-names"])
+    ATOM_MAP_H[a].extend(["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[a])))

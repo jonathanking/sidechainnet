@@ -34,7 +34,7 @@ from openmm.openmm import LangevinMiddleIntegrator
 from openmm.unit import kelvin, nanometer, picosecond, picoseconds
 
 import sidechainnet
-from sidechainnet.structure.fastbuild import make_coords
+import sidechainnet.structure.fastbuild as fastbuild
 from sidechainnet.utils.download import MAX_SEQ_LEN
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
@@ -72,11 +72,11 @@ class SCNProtein(object):
         self.int_seq = VOCAB.str2ints(self.seq, add_sos_eos=self.add_sos_eos)
         self.int_mask = [1 if m == "+" else 0 for m in self.mask]
         dssp_vocab = DSSPVocabulary()
-        self.int_secondary = dssp_vocab.str2ints(self.secondary_structure,
-                                                 add_sos_eos=self.add_sos_eos) if self.secondary_structure is not None else None
+        self.int_secondary = dssp_vocab.str2ints(
+            self.secondary_structure, add_sos_eos=self.add_sos_eos
+        ) if self.secondary_structure is not None else None
 
         self.sb = None
-        self.atoms_per_res = NUM_COORDS_PER_RES
         self.has_hydrogens = False
         self.openmm_initialized = False
         self.is_numpy = isinstance(self.coords, np.ndarray)
@@ -209,11 +209,8 @@ class SCNProtein(object):
 
     def fastbuild(self, add_hydrogens=False):
         """Build protein coordinates from angles. Does not update coords."""
-        if not add_hydrogens:
-            coords = make_coords(self.seq, self.angles)
-        else:
-            raise NotImplementedError
-        
+        coords = fastbuild.make_coords(self.seq, self.angles, add_hydrogens=add_hydrogens)
+        self.has_hydrogens = add_hydrogens
         return coords
 
     def build_coords_from_angles(self, angles=None, add_hydrogens=False):
@@ -262,7 +259,6 @@ class SCNProtein(object):
         self.sb.add_hydrogens()
         self.hcoords = self.sb.coords
         self.has_hydrogens = True
-        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
         if self.positions is None:
             self.initialize_openmm()
         self.update_positions()
@@ -312,7 +308,6 @@ class SCNProtein(object):
         mask = self.get_hydrogen_coord_mask()
         self.hcoords = hcoords * mask
         self.has_hydrogens = True
-        self.atoms_per_res = hy.NUM_COORDS_PER_RES_W_HYDROGENS
         self.update_positions()
 
     def update_hydrogens_for_openmm(self, hcoords):
@@ -358,7 +353,7 @@ class SCNProtein(object):
         chain = self.topology.addChain()
         hcoords = self.hcoords.cpu().detach().numpy(
         ) if not self.is_numpy else self.hcoords
-        coord_gen = coord_generator(hcoords, self.atoms_per_res)
+        coord_gen = coord_generator(hcoords)
         self.has_missing_atoms = False
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
@@ -528,7 +523,7 @@ class SCNProtein(object):
             all_atom_name_list.append(atom_names)
 
         if pprint:
-            _size = self.atoms_per_res if not heavy_only else NUM_COORDS_PER_RES
+            _size = self.coords.shape[1]
             nums = list(range(_size))
             print(" ".join([f"{n: <4}" for n in nums]))
             for ans in all_atom_name_list:
@@ -711,11 +706,10 @@ class SCNProtein(object):
             if data is not None:
                 setattr(self, at, data[n_removed_left:n_removed_right])
         # Trim coordinate data
-        end_point = n_removed_right * self.atoms_per_res if n_removed_right is not None else None
         if self.coords is not None:
-            self.coords = self.coords[n_removed_left * self.atoms_per_res:end_point]
+            self.coords = self.coords[n_removed_left:n_removed_right]
         if self.hcoords is not None:
-            self.hcoords = self.hcoords[n_removed_left * self.atoms_per_res:end_point]
+            self.hcoords = self.hcoords[n_removed_left:n_removed_right]
         # Trim unmodified seq
         if self.unmodified_seq is not None:
             assert isinstance(self.unmodified_seq, str)
@@ -738,7 +732,7 @@ class SCNProtein(object):
             if data is not None:
                 setattr(self, at, data[:n_removed_right])
         # Trim coordinate data
-        end_point = n_removed_right * self.atoms_per_res
+        end_point = n_removed_right
         if self.coords is not None:
             self.coords = self.coords[:end_point]
         if self.hcoords is not None:

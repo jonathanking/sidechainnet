@@ -291,19 +291,16 @@ def debug_example():
     sb.build()
 
 
-def coord_generator(coords, atoms_per_res=14, remove_padding=False, seq=""):
-    """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
+def coord_generator(coords, remove_padding=False, seq=""):
+    """Return a generator to iteratively yield one residue at a time."""
+    assert not remove_padding, "Cannot remove padding from coord generator."
     if remove_padding and not seq:
         raise ValueError("A sequence (1-letter code) must be provided to remove padding.")
-    coord_idx = 0
-    while coord_idx < coords.shape[0]:
-        _slice = coords[coord_idx:coord_idx + atoms_per_res]
-        if remove_padding:
-            resname = ONE_TO_THREE_LETTER_MAP[seq[coord_idx // atoms_per_res]]
-            n_atoms = len(["N", "CA", "C", "O"] + SC_BUILD_INFO[resname]["atom-names"])
-            _slice = _slice[0:n_atoms]
-        yield _slice
-        coord_idx += atoms_per_res
+    i = 0
+    while i < coords.shape[0]:
+        yield coords[i]
+        i += 1
+
 
 
 if __name__ == '__main__':

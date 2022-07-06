@@ -5,7 +5,7 @@ from io import UnsupportedOperation
 import numpy as np
 import prody as pr
 import torch
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.utils.measure import GLOBAL_PAD_CHAR, compute_fictious_atom_for_res1
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
@@ -90,13 +90,11 @@ class StructureBuilder(object):
             raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
                              f"You have provided {tuple(self.coords.shape)}.")
         if (self.coords is not None and
-            (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str) and
-            (self.coords.shape[0] // NUM_COORDS_PER_RES_W_HYDROGENS) != len(
-                self.seq_as_str)):
+            (self.coords.shape[0]) != len(self.seq_as_str) and
+            (self.coords.shape[0]) != len(self.seq_as_str)):
             raise ValueError(
-                f"The length of the coordinate matrix must match the sequence length "
-                f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
-                f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
+                f"The length of the coordinate matrix must match the sequence length. "
+                f"You have provided coords.shape[0] = {self.coords.shape[0]}.")
         if self.ang is not None and (self.array_lib.isnan(self.ang)).all(axis=1).any():
             missing_loc = self.array_lib.where(
                 (self.array_lib.isnan(self.ang)).all(axis=1))
@@ -114,17 +112,16 @@ class StructureBuilder(object):
         if has_hydrogens is not None:
             self.has_hydrogens = has_hydrogens
         else:
-            try:            
+            try:
                 assert not (
-                self.coords.shape[0] % NUM_COORDS_PER_RES == 0 and
-                self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0), (
-                    "Coordinate tensor for protein has an ambiguous shape. Please pass a "
+                    self.coords.shape[0] % NUM_COORDS_PER_RES == 0 and
+                    self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
+                ), ("Coordinate tensor for protein has an ambiguous shape. Please pass a "
                     "value to has_hydrogens for clarification.")
                 self.has_hydrogens = self.coords.shape[
                     0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
             except AttributeError:
                 self.has_hydrogens = False
-        self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS if self.has_hydrogens else NUM_COORDS_PER_RES
         self.terminal_atoms = None
 
     def __len__(self):
@@ -147,21 +144,16 @@ class StructureBuilder(object):
         first_res = ResidueBuilder(first_resname,
                                    first_ang,
                                    prev_res=None,
-                                   next_res=None,
                                    nerf_method=self.nerf_method,
                                    device=self.device)
         second_res = ResidueBuilder(second_resname,
                                     second_ang,
                                     prev_res=first_res,
-                                    next_res=None,
                                     nerf_method=self.nerf_method,
                                     device=self.device)
 
-        # After building both backbones use the second residue's N to build the first's CB
-        first_res.build_bb()
+        first_res.build()
         second_res.build()
-        first_res.next_res = second_res
-        first_res.build_sc()
 
         return first_res, second_res
 
@@ -191,7 +183,6 @@ class StructureBuilder(object):
             res = ResidueBuilder(resname,
                                  ang,
                                  prev_res=prev_res,
-                                 next_res=None,
                                  is_last_res=i + 2 == len(self.seq_as_str) - 1,
                                  nerf_method=self.nerf_method,
                                  device=self.device)
@@ -214,13 +205,13 @@ class StructureBuilder(object):
             if self.is_numpy:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
                                               self.coords,
-                                              self.atoms_per_res,
-                                              terminal_atoms=self.terminal_atoms)
+                                              terminal_atoms=self.terminal_atoms,
+                                              has_hydrogens=self.has_hydrogens)
             else:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
                                               self.coords.cpu().detach().numpy(),
-                                              self.atoms_per_res,
-                                              terminal_atoms=self.terminal_atoms)
+                                              terminal_atoms=self.terminal_atoms,
+                                              has_hydrogens=self.has_hydrogens)
 
     def add_hydrogens(self):
         """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
@@ -230,7 +221,6 @@ class StructureBuilder(object):
         self.hb = HydrogenBuilder(self.seq_as_str, self.coords, self.device)
         self.coords = self.hb.build_hydrogens()
         self.has_hydrogens = True
-        self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS
         self.terminal_atoms = self.hb.terminal_atoms
 
     def to_pdb(self, path, title="pred"):
@@ -297,25 +287,24 @@ class StructureBuilder(object):
             # Create copies and nan-masks of coordinate data
             other_protein.numpy()
             other_protein_copy = other_protein.copy()
-            other_protein_mask = np.isnan(other_protein_copy.coords)
-            other_protein_copy.coords[other_protein_mask] = 0
+            # Remove rows with nans
+            other_protein_copy_coords_nonans = other_protein_copy.coords[
+                ~np.isnan(other_protein_copy.coords).any(axis=1)]
             if torch.is_tensor(self.coords):
                 self.coords = self.coords.detach().cpu().numpy()
             coords_copy = copy.deepcopy(self.coords)
-            coords_mask = np.isnan(self.coords)
-            coords_copy[coords_mask] = 0
-            # Perform alignment
-            t = pr.calcTransformation(other_protein_copy.coords, coords_copy)
+            coords_copy_nonans = coords_copy[~np.isnan(coords_copy).any(axis=1)]
+            # Perform alignment between non-nan coords
+            t = pr.calcTransformation(other_protein_copy_coords_nonans,
+                                      coords_copy_nonans)
             aligned_coords = t.apply(other_protein_copy.coords)
             # Update coords in other protein
             other_protein_copy.coords = aligned_coords
             if other_protein_copy.has_hydrogens:
                 other_protein_copy.hcoords = t.apply(other_protein_copy.hcoords)
                 other_protein_copy.coords = other_protein_copy.hcoords
-            # Replace nans
-            other_protein_copy.coords[other_protein_mask] = np.nan
-            coords_copy[coords_mask] = np.nan
             # Add viz to model
+            other_protein_copy.sb = None
             view.addModel(other_protein_copy.to_pdbstr())
 
         # Set visualization style
@@ -356,7 +345,6 @@ class ResidueBuilder(object):
                  name,
                  angles,
                  prev_res,
-                 next_res,
                  is_last_res=False,
                  device=torch.device("cpu"),
                  nerf_method="standard"):
@@ -385,7 +373,6 @@ class ResidueBuilder(object):
         self.name = name
         self.ang = angles.squeeze()
         self.prev_res = prev_res
-        self.next_res = next_res
         self.device = device
         self.is_last_res = is_last_res
         self.nerf_method = nerf_method
@@ -493,18 +480,18 @@ class ResidueBuilder(object):
         assert len(self.bb) > 0, "Backbone must be built first."
         self.atom_names = ["N", "CA", "C", "O"]
         self.pts = {"N": self.bb[0], "CA": self.bb[1], "C": self.bb[2]}
-        if self.next_res:
-            self.pts["N+"] = self.next_res.bb[0]
-        else:
+        if self.prev_res:
             self.pts["C-"] = self.prev_res.bb[2]
+        else:
+            self.pts["C-"] = compute_fictious_atom_for_res1(self.pts["N"],
+                                                             self.pts["CA"],
+                                                             self.pts["C"])
 
         last_torsion = None
         for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
                 _get_residue_build_iter(self.name, SC_BUILD_INFO, self.device)):
             # Select appropriate 3 points to build from
-            if self.next_res and i == 0:
-                a, b, c = self.pts["N+"], self.pts["C"], self.pts["CA"]
-            elif i == 0:
+            if i == 0:
                 a, b, c = self.pts["C-"], self.pts["N"], self.pts["CA"]
             else:
                 a, b, c = (self.pts[an] for an in atom_names[:-1])

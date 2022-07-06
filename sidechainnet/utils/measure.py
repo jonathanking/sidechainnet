@@ -2,9 +2,10 @@
 
 import numpy as np
 import prody as pr
+import torch
 
 import sidechainnet as scn
-from sidechainnet.structure.build_info import NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
 from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError, NonStandardAminoAcidError, NoneStructureError, SequenceError
 
 GLOBAL_PAD_CHAR = np.nan
@@ -70,7 +71,7 @@ def determine_sidechain_atomnames(_res):
         raise NonStandardAminoAcidError
 
 
-def compute_sidechain_dihedrals(residue, prev_residue, next_res):
+def compute_sidechain_dihedrals(residue, prev_residue):
     """Compute all angles to predict for a given residue.
 
     If the residue is the first in the protein chain, a fictitious C atom is
@@ -87,16 +88,25 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
         return (NUM_ANGLES -
                 (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES)) * [GLOBAL_PAD_CHAR]
 
-    # Compute CB dihedral, which may depend on the previous or next residue for placement
+    # Compute CB dihedral, which may depend on a fictitious atom for placement
     try:
         if prev_residue:
             cb_dihedral = compute_single_dihedral(
                 (prev_residue.select("name C"),
                  *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])))
         else:
-            cb_dihedral = compute_single_dihedral(
-                (next_res.select("name N"),
-                 *(residue.select(f"name {an}") for an in ["C", "CA", "CB"])))
+            atoms = [residue.select(f"name {an}") for an in ["N", "N", "CA", "CB"]]
+            # Make a ficticious atom, X, that is extended from N.
+            atoms[0] = atoms[0].copy()
+            atoms[0].setNames(['X'])
+            # Compute the coordinates of the fictitious atom
+            fict_coords = compute_fictious_atom_for_res1(
+                n=atoms[1].getCoords(),
+                ca=atoms[2].getCoords(),
+                c=residue.select("name C").getCoords())
+            atoms[0].setCoords(fict_coords)
+            cb_dihedral = compute_single_dihedral(atoms)
+
     except AttributeError:
         cb_dihedral = GLOBAL_PAD_CHAR
 
@@ -114,6 +124,34 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
 
     return res_dihedrals + (NUM_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) -
                             len(res_dihedrals)) * [GLOBAL_PAD_CHAR]
+
+
+def compute_fictious_atom_for_res1(n, ca, c):
+    """Compute the coords of a fictitious atom laying in the plane of N, Ca, C.
+
+                          Cb
+                           |
+                           |
+                          Ca
+                         /  `
+                       /     `
+              X <--- N        `C
+
+    X = (-1 * (NCa + NC)),
+    X = X / ||X||,
+    X = N + X,               where Nca and NC are vectors.
+
+    """
+    with torch.no_grad():
+        # Define NCA and NC vectors
+        nca_vec = ca - n
+        nc_vec = c - n
+        # Compute the consistent but arbitrarily defined vector from NCa and NC
+        fict_vec = -1 * (nca_vec + nc_vec)
+        fict_vec = fict_vec * BB_BUILD_INFO['BONDLENS']['c-n'] / np.linalg.norm(fict_vec)
+        # Compute the coorindates of the fictitious atom
+        fict_coords = n + fict_vec
+        return fict_coords
 
 
 def get_atom_coords_by_names(residue, atom_names):
@@ -199,7 +237,6 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
     if chain.nonstdaa and replace_nonstd:
         all_residues, unmodified_sequence, is_nonstd = replace_nonstdaas(all_residues)
     prev_res = None
-    next_res = all_residues[1]
 
     for res_id, (res, is_modified) in enumerate(zip(all_residues, is_nonstd)):
         if res.getResname() == "XAA":  # Treat unknown amino acid as missing
@@ -213,7 +250,7 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
 
         # Measure sidechain angles
         all_res_angles = bb_angles + bond_angles + compute_sidechain_dihedrals(
-            res, prev_res, next_res)
+            res, prev_res)
 
         # Measure coordinates
         rescoords = measure_res_coordinates(res)

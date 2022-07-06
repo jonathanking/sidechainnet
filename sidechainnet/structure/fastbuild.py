@@ -1,9 +1,11 @@
 """Utilities for building structures using sublinear algorithms."""
 
-from sidechainnet.structure.HydrogenBuilder import NUM_COORDS_PER_RES_W_HYDROGENS
-from .build_info import ANGLE_NAME_TO_IDX_MAP, SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS
 import numpy as np
 import torch
+from sidechainnet.structure.fastbuild_matrices import MakeBackbone, MakeTMats
+from sidechainnet.structure.HydrogenBuilder import NUM_COORDS_PER_RES_W_HYDROGENS
+from .build_info import (ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO, NUM_COORDS_PER_RES,
+                         SC_ANGLES_START_POS, SC_BUILD_INFO, SC_HBUILD_INFO)
 
 #################################################################################
 # Data structures for describing how to build all the atoms of each residue
@@ -71,7 +73,6 @@ def _make_sc_heavy_atom_tensors():
 
     # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
     sc_type = torch.zeros(20, NC, dtype=torch.long)
-    # chi idx is same as atom idx, unless offset torsion in which case it is one before # TODO what is this?
 
     for a in range(20):
         A = AA[a]
@@ -116,6 +117,123 @@ def _make_sc_heavy_atom_tensors():
     }
 
 
+def _make_sc_all_atom_tensors():
+    """Create a dict to map all-atom build_info (lens/angs/etc) to vals per res identity.
+
+        For every sidechain atom, we need to know:
+            1) what atom it is building off of (<NUM_COORDS_PER_RES=14),
+            2) the bond length,
+            3) the theta bond angle,
+            4) the chi torsion angle, and
+            5) whether or not the torsion angle is defined as being offset from another
+                angle (as in the case of branching atoms).
+
+        This is true for heavy atoms as well as hydrogens. First, we build the heavy atom
+        arrays as in the function above. Then we append hydrogen information.
+
+    Returns:
+        A dictionary mapping data names (the data nessary to compute NeRF and extend
+        sidechains) to the data itself.
+    """
+    NC = NUM_COORDS_PER_RES_W_HYDROGENS - 6  # TODO Make a new variable to describe this
+    sc_source_atom = torch.zeros(20, NC, dtype=torch.long)
+    sc_bond_length = torch.zeros(20, NC)
+    sc_ctheta = torch.zeros(20, NC)
+    sc_stheta = torch.zeros(20, NC)
+    sc_cchi = torch.zeros(20, NC)
+    sc_schi = torch.zeros(20, NC)
+    sc_offset = torch.zeros(20, NC)
+    sc_atom_name = [[] for _ in range(20)]  # Just for notekeeping
+    sc_chi = torch.zeros(20, NC)
+
+    # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
+    sc_type = torch.zeros(20, NC, dtype=torch.long)
+
+    for a in range(20):
+        A = AA[a]
+        a3 = AA1to3[A]
+        info = SC_HBUILD_INFO[a3]
+        # First we add array data cooresponding to heavy atoms defined in SCBUILDINFO[RES]
+        i = 0
+        for i in range(NC):
+            if i < len(info['torsion-vals']):
+                an = info['atom-names'][i]
+                sc_atom_name[a].append(an)
+                sc_bond_length[a][i] = info['bonds-vals'][i]
+                sc_ctheta[a][i] = np.cos(np.pi - info['angles-vals'][i])
+                sc_stheta[a][i] = np.sin(np.pi - info['angles-vals'][i])
+
+                src = info['bonds-names'][i].split('-')[0]
+                if src != 'CA':
+                    sc_source_atom[a][i] = info['atom-names'].index(src)
+                else:
+                    sc_source_atom[a][i] = -1
+
+                t = info['torsion-vals'][i]
+                # Declare type of torsion angle
+                # Type 0: No atom and no angle (no change from sc_type value of 0)
+                # Type 1: Normal, predicted/measured torsion angle
+                if t == 'p':
+                    sc_type[a][i] = 1
+                # Type 2: Inferred torsion angle (offset from previous angle by pi)
+                elif t == 'i':
+                    sc_type[a][i] = 2
+                    sc_offset[a][i] = np.pi
+                # Type 3: Constant float-valued angle, transformed by 2pi - t.
+                elif not isinstance(t, tuple):
+                    sc_type[a][i] = 3
+                    sc_cchi[a][i] = np.cos(2 * np.pi - t)
+                    sc_schi[a][i] = np.sin(2 * np.pi - t)
+                    sc_chi[a][i] = 2 * np.pi - t
+
+                # The following types describe hydrogens using the tuple format:
+                # ('hi', SRCATM, OFFSETVAL)
+
+                elif isinstance(t, tuple):
+                    # This is a hydrogen placed relative to an earlier angle/atom
+                    # Both the relative atom and the atom that needs plcmnt have same src
+                    _, rel_atom, offset = t
+                    rel_atom_idx = info['atom-names'].index(rel_atom)
+                    atom_src = sc_source_atom[a][rel_atom_idx]
+                    assert atom_src == sc_source_atom[a][i], f"{atom_src}, {sc_source_atom[a][i]}, {t}"
+                    # if atom_src == -1:
+                    #     # The source is CA, this means this is HA and should be rel to CB
+                    #     assert an == 'HA' and rel_atom == 'CB', "Atom must be HA and relative to CB."
+                    if info['torsion-vals'][rel_atom_idx] == 'p':
+                        # Type 4: Inferred H angle dependent on predicted angle
+                        # cchi and schi must be filled in later once pred angle is known
+                        sc_type[a][i] = 4
+                        sc_offset[a][i] = offset
+                    elif (info['torsion-vals'][rel_atom_idx] != 'p' and
+                          isinstance(info['torsion-vals'][rel_atom_idx], float)):
+                        # Type 5:  Inferred H angle dependent on constant angle
+                        # This means relative angle is constant and can be computed now
+                        sc_type[a][i] = 5
+                        src_atom_idx = sc_source_atom[a][i]
+                        sc_offset[a][i] = offset
+                        sc_cchi[a][i] = np.cos(sc_chi[a][src_atom_idx] + offset)
+                        sc_schi[a][i] = np.sin(sc_chi[a][src_atom_idx] + offset)
+
+                else:
+                    raise ValueError('Unknown type for torsion value. ' +
+                                     str(info['torsion-vals'][sc_source_atom[a][i]]))
+
+            else:
+                break
+
+    return {
+        'bond_lengths': sc_bond_length,  # Each of these is a matrix containing relevant
+        'cthetas': sc_ctheta,  # build info for all atoms in all residues.
+        'sthetas': sc_stheta,
+        'cchis': sc_cchi,  # For this reason, each is a (20 x 10) matrix,
+        'schis': sc_schi,  # Where 20 is the number of different residues
+        'types': sc_type,  # we may be building, and 10 is the maximum
+        'offsets': sc_offset,  # number of atoms we may extend from the CA.
+        'sources': sc_source_atom,  # e.g. Tryptophan has 10 sidechain atoms.
+        'names': sc_atom_name  # list of lists of atom names per residue (convenience)
+    }
+
+
 def _x20(v):  # make 20 copies as tensor
     return torch.Tensor([v]).repeat(20).reshape(20, 1)
 
@@ -125,7 +243,7 @@ def _x20(v):  # make 20 copies as tensor
 # build data for every residue. CA atom build info is organized into a data with data
 # labels as keys, and vectors of values ordered by residue identity.
 
-sc_heavy_atom_build_info = {
+SC_HEAVY_ATOM_BUILD_INFO = {
     # Nothing extends from Nitrogen, so no data is needed here.
     'N': None,
     # Many atoms potentially extend from alpha Carbons. Data is organized by res identity.
@@ -133,6 +251,7 @@ sc_heavy_atom_build_info = {
     # Items are meant to be selected from this dictionary to match the sequence that will
     # be built.
     'CA': _make_sc_heavy_atom_tensors(),
+    'HA': None,
     # Carbonyl carbons are built off of the backbone C. Each residue builds this oxygen
     # in the same way, so we simply repeat the relevant build info data per res identity.
     'C': {
@@ -143,24 +262,38 @@ sc_heavy_atom_build_info = {
         'schis': _x20(0.),
         'types': _x20(1),
         'offsets': _x20(0.),
-        'sources': _x20(-1)
+        'sources': _x20(-1),
+        # 'names': [['O'] for _ in range(20)]
     }
 }
 
 # This dict is nearly identical to the one above but adds information for H building.
 
-sc_all_atom_build_info = {
+SC_ALL_ATOM_BUILD_INFO = {
     'N': {
         'bond_lengths': _x20(1.01),
-        'cthetas': _x20(np.cos(np.deg2rad(-60))),
-        'sthetas': _x20(np.sin(np.deg2rad(-60))),
+        'cthetas': _x20(np.cos(np.deg2rad(60))),
+        'sthetas': _x20(np.sin(np.deg2rad(60))),
         'cchis': _x20(0.),
         'schis': _x20(0.),
         'types': _x20(1),
         'offsets': _x20(0.),
-        'sources': _x20(-1)
+        'sources': _x20(-1),
     },
-    'CA': _make_sc_heavy_atom_tensors(),  # TODO TODO TODO - add hydrogens
+    'CA': _make_sc_all_atom_tensors(),
+    # HA is the atom that builds of CA for all residues but Proline
+    # 'HA': {
+    #     'bond_lengths': _x20(1.090),
+    #     # 'cthetas': _x20(np.cos(2*np.pi/6)),  # ??
+    #     # 'sthetas': _x20(np.sin(2*np.pi/6)),  # ??
+    #     'cthetas': _x20(np.cos(np.deg2rad(109.5))),  # ??
+    #     'sthetas': _x20(np.sin(np.deg2rad(109.5))),  # ??
+    #     'cchis': _x20(0.),
+    #     'schis': _x20(0.),
+    #     'types': _x20(2),
+    #     'offsets': _x20(- 2 * np.pi / 3),
+    #     'sources': _x20(-1).long(),
+    # },
     # =O off of C
     'C': {
         'bond_lengths': _x20(BB_BUILD_INFO["BONDLENS"]["c-o"]),
@@ -170,177 +303,19 @@ sc_all_atom_build_info = {
         'schis': _x20(0.),
         'types': _x20(1),
         'offsets': _x20(0.),
-        'sources': _x20(-1)
+        'sources': _x20(-1),
     }
 }
-
-
-###################################################
-# Transformation Matrices Creation
-###################################################
-
-
-def makeTmats(ctheta, stheta, cchi, schi, lens):
-    """Make transformation matrices given angles/lens.
-
-    ctheta is used to determine device and number of matrices.
-    """
-    N = ctheta.shape[0]
-    mats = torch.zeros((N, 4, 4), device=ctheta.device, dtype=ctheta.dtype)
-
-    mats[:, 0, 0] = ctheta
-    mats[:, 0, 1] = -stheta
-    mats[:, 0, 3] = ctheta * lens
-
-    mats[:, 1, 0] = cchi * stheta
-    mats[:, 1, 1] = ctheta * cchi
-    mats[:, 1, 2] = schi
-    mats[:, 1, 3] = cchi * lens * stheta
-
-    mats[:, 2, 0] = -stheta * schi
-    mats[:, 2, 1] = -ctheta * schi
-    mats[:, 2, 2] = cchi
-    mats[:, 2, 3] = -lens * stheta * schi
-
-    mats[:, 3, 3] = 1.0
-
-    return mats
-
-
-def makeTmats_backward(grad_outputs, ctheta, stheta, cchi, schi, lens):
-    """Backwards function for makeTmats."""
-    # yapf: disable
-    grad = grad_outputs
-    grad_ctheta = grad[:,0,0] + lens*grad[:,0,3] + cchi*grad[:,1,1] + -schi*grad[:,2,1]
-    grad_stheta = -grad[:,0,1] + cchi*grad[:,1,0] + cchi*lens*grad[:,1,3] - schi*grad[:,2,0] - lens*schi*grad[:,2,3]
-    grad_cchi = stheta*grad[:,1,0] + ctheta*grad[:,1,1] + lens*stheta*grad[:,1,3] + grad[:,2,2]
-    grad_schi = grad[:,1,2] + -stheta*grad[:,2,0] - ctheta*grad[:,2,1] - lens*stheta*grad[:,2,3]
-    # lengths are typically constant.. should we check requires grad?
-    grad_lens = ctheta*grad[:,0,3] + cchi*stheta*grad[:,1,3] - stheta*schi*grad[:,2,3]
-    # yapf: enable
-
-    return grad_ctheta, grad_stheta, grad_cchi, grad_schi, grad_lens
-
-
-class MakeTMats(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, ctheta, stheta, cchi, schi, lens):
-        ctx.save_for_backward(ctheta, stheta, cchi, schi, lens)
-        return makeTmats(ctheta, stheta, cchi, schi, lens)
-
-    @staticmethod
-    def backward(ctx, grad):
-        return makeTmats_backward(grad, *ctx.saved_tensors)
-
-
-###################################################
-# Backbone
-###################################################
-
-
-def make_backbone_serial(ncacM):
-    """Make backbone matrices from indiv. transformation matrices by multiplying in order.
-
-    Modifies in-place.
-    """
-    for i in range(1, len(ncacM)):
-        ncacM[i] = ncacM[i - 1] @ ncacM[i]
-    return ncacM
-
-
-def make_backbone_(M):
-    """Make backbone matrices from indiv. transformation matrices using log(N) multiplies.
-
-    Backbone matrices are created from inidividual transformation matrices via log(N)
-    parallel matrix multiplies operations. Modifies in place.
-    """
-    N = len(M)
-    indices = torch.arange(0, N, device=M.device)
-
-    for i in range(N.bit_length()):
-        dstmask = ((1 << i) & indices) != 0
-        srci = ((-1 << i) & indices) - 1
-
-        src = M[srci[dstmask]]
-        dst = M[dstmask]
-
-        M[dstmask] = src @ dst
-
-    return M
-
-
-def make_backbone_save(M):
-    """Make backbone matrices from indiv. transformation matrices using log(N) multiplies.
-
-    Make backbone matrices from individual transformation matrices using log(N) parallel
-    matrix multiplies. Does not modify in place. Not very memory efficient in the
-    interest of simplicity.
-
-    Returns transformation matrices at each iteration (last is final result).
-    """
-    N = len(M)
-    bit_length = N.bit_length()
-
-    indices = torch.arange(0, N, device=M.device)
-    ret = torch.zeros(bit_length, N, 4, 4, device=M.device, dtype=M.dtype)
-
-    for i in range(N.bit_length()):
-        ret[i] = M
-        dstmask = ((1 << i) & indices) != 0
-        srci = ((-1 << i) & indices) - 1
-
-        src = M[srci[dstmask]]
-        dst = M[dstmask]
-
-        M = M.clone()
-        M[dstmask] = src @ dst
-
-    return M, ret
-
-
-def make_backbone_backward(grad, M, saved):
-    """Compute gradient of M."""
-    N = len(M)
-    indices = torch.arange(0, N, device=grad.device)
-    grad = grad.clone()  # make sure contiguous
-    for i in range(N.bit_length() - 1, -1, -1):
-        dstmask = ((1 << i) & indices) != 0
-        srci = ((-1 << i) & indices) - 1
-        srcmask = srci[dstmask]
-        src = saved[i][srcmask]
-        dst = saved[i][dstmask]
-
-        srcgrad = grad[dstmask] @ dst.transpose(1, 2)  # src grad
-        grad[dstmask] = src.transpose(1, 2) @ grad[dstmask]
-
-        index = srcmask[:, None, None].repeat(1, 4, 4)
-        grad.scatter_add_(0, index, srcgrad)
-
-    return grad
-
-
-class MakeBackbone(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, ncac):
-        if ncac.requires_grad:
-            M, saved = make_backbone_save(ncac)
-            ctx.save_for_backward(ncac, saved)
-            return M
-        else:
-            return make_backbone_(ncac.clone())
-
-    @staticmethod
-    def backward(ctx, grad):
-        return make_backbone_backward(grad, *ctx.saved_tensors)
-
+# Because proline does not have a hydrogen on CA, we set the build type for that atom to 0
+# SC_ALL_ATOM_BUILD_INFO['HA']['types'][AA2NUM['P']] = 0
+# Because Glycine has two hydrogens on CA that are slightly different than other res
 
 ###################################################
 # Coordinates
 ###################################################
 
-def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
+
+def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info, bb_angs=None):
     """Create sidechain coordinates from backbone matrices given relevant auxilliary data.
 
     Our goal is to generate arrays for each datum (bond length, thetas, chis) necessary
@@ -365,6 +340,7 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
     offsets = build_info['offsets'][seq_aa_index].to(device).type(dtype)
     types = build_info['types'][seq_aa_index].to(device)
     sources = build_info['sources'][seq_aa_index].to(device)
+    names = [build_info['names'][idx] for idx in seq_aa_index] if 'names' in build_info else None
 
     # TODO modify the first and last residues (index 0 and -1 in above arrays) to add
     # TODO support for CB generation w/fictitious residue as well as terminal hydrogens.
@@ -383,9 +359,14 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
     prevbuildmask = types[:, 0].bool()
     # We then select BB transformation matrices for the residues that will build an atom
     prevmats = backbone_mats[prevbuildmask]
+    matrices.append(prevmats)
 
     # Now, iterate through each level of the sidechain, from 0 to the max number of atoms
     for i in range(MAX):
+        # Select atom names to be built (convenience)
+        if names is not None:
+            anames = [anlist[i] if i < len(anlist) else None for anlist in names]
+
         # Identify all of the residues in the sequence that must build an atom at level i
         buildmask = types[:, i].bool()
 
@@ -401,7 +382,7 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
         ctheta = cthetas[buildmask, i]
         stheta = sthetas[buildmask, i]
 
-        # Initialize chis, (torsional bond angs, set to predetermined constant, Type 3)
+        # Initialize chis, (torsional bond angs, set to predetermined constant, Types 3&5)
         cchi = cchis[buildmask, i]
         schi = schis[buildmask, i]
 
@@ -417,15 +398,24 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
             cchi[type1mask[buildmask]] = coss[type1mask, i]
             schi[type1mask[buildmask]] = sins[type1mask, i]
 
-        # Fill in Type 2 chis, (defined by an offset, i.e. branches)
+        # Fill in Type 2 chis (defined by an offset, i.e. branches)
+        # type2mask = torch.logical_or(types[:, i] == 2, types[:, i] == 4)
         type2mask = types[:, i] == 2
         if type2mask.any():
-            # TODO what does this mean? is it pointing to the angle AFTER this angle? why?
             # re-used dihedral should always be positioned right after source position
             # Update the angle to be its offset plus the angle @ source pos + 1
             offang = ang[type2mask, sources[type2mask, i] + 1] + offsets[type2mask, i]
             cchi[type2mask[buildmask]] = torch.cos(offang)
             schi[type2mask[buildmask]] = torch.sin(offang)
+
+        # Fill in Type 4 chis, (Hydrogens defined by an offset from a predicted atom)
+        type4mask = types[:, i] == 4
+        if type4mask.any():
+            # re-used dihedral should always be positioned right after source position
+            # Update the angle to be its offset plus the angle @ source pos + 1
+            offang = ang[type4mask, sources[type4mask, i] + 1] + offsets[type4mask, i]
+            cchi[type4mask[buildmask]] = torch.cos(offang)
+            schi[type4mask[buildmask]] = torch.sin(offang)
 
         # Construct all necessary transformation matrices to build all atoms on level i
         tmats_for_level_i = MakeTMats.apply(ctheta, stheta, cchi, schi, lens)
@@ -433,11 +423,13 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
         # Check if any atoms need a TMat that is from level lower (LL) than i - 1
         if (sources[:, i] != i - 1).any():
             prevmats = prevmats.clone()
-            for k in range(i - 2, -1, -1):
+            for k in range(i - 2, -2, -1):
                 LLmask = (sources[:, i] == k) & buildmask
                 if LLmask.any():
                     # change prevmat to earlier matrix
-                    prevmats[LLmask[prevbuildmask]] = matrices[k][LLmask[masks[k]]]
+                    # We select the matrix from k+1 because when k==-1,
+                    # we want the first matrix in the list
+                    prevmats[LLmask[prevbuildmask]] = matrices[k+1][LLmask[masks[k]]]
 
         # We can finally update the globally-referenced TMats through multiplication
         prevmats = prevmats[buildmask[prevbuildmask]] @ tmats_for_level_i
@@ -454,26 +446,12 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info):
     return sccoords
 
 
-class MakeSCCoords(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, backbone, seq_aa_index, ang, build_info):
-        ctx.save_for_backward(backbone, ang)
-        ctx.build_info = build_info
-        ctx.seq_aa_index = seq_aa_index
-        return make_sidechain_coords(backbone, seq_aa_index, ang, build_info)
-
-    @staticmethod
-    def backward(ctx, grad):
-        # implementing this can make make_coords 3X faster
-        raise NotImplementedError
-
-
-def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
+def make_coords(seq, angles, add_hydrogens=False):
     """Create coordinates from sequence and angles using torch operations.
 
     build_info describes what atoms to make and how.
     """
+    build_info = SC_HEAVY_ATOM_BUILD_INFO if not add_hydrogens else SC_ALL_ATOM_BUILD_INFO
     L = len(seq)
     device = angles.device
     dtype = angles.dtype
@@ -487,6 +465,7 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
     # Next: fill in the backbone angles, with pos 0 still zero
     ang[1:] = angles[:L, :SC_ANGLES_START_POS]
     # Because the first backbone angle is undefined (it has no phi), we replace nan with 0
+    # This avoids improper generation of backbone TMats
     ang[1, 0] = 0
     ang[:, :3] = 2 * np.pi - ang[:, :3]  # backbone torsion angles, aka 'chi' for NeRF
     ang[:, 3:] = np.pi - ang[:, 3:]  # backbone bond angles, aka 'theta' for NeRF
@@ -530,15 +509,16 @@ def make_coords(seq, angles, build_info=sc_heavy_atom_build_info):
 
     # Create hydrogens for nitrogens
     if build_info['N']:  # nH
-        nang = (np.pi + ang[:L, ang_name_map['phi']]).unsqueeze(-1)
+        nang = (np.pi + ang[:L, ang_name_map['omega']]).unsqueeze(-1)
         ncoords = make_sidechain_coords(ncacM[0::3], seq_aa_index, nang, build_info['N'])
     else:
         ncoords = torch.zeros(L, 0, 3, dtype=dtype, device=device)
 
     # Construct all sidechain atoms by iteratively applying TMats starting from CA
     scang = (2 * np.pi - angles_cp.to(device)[:, SC_ANGLES_START_POS:])
-    # We set the first x0 to be 0, since it is completely arbitrary
-    # scang[0, 0] = 0  #-2 / 3 * np.pi
-    sccoords = make_sidechain_coords(ncacM[1::3], seq_aa_index, scang, build_info['CA'])
+    sccoords = make_sidechain_coords(ncacM[1::3], seq_aa_index, scang, build_info['CA'],
+                                     bb_angs=ang[1:].clone())
 
-    return torch.concat([ncac, ocoords, sccoords, ncoords], dim=1)
+    # When present, we place the H and HAs atom (attached to N and CA) after the backbone
+    # This allows the tail end of all residue representations to contain PADs only.
+    return torch.concat([ncac, ocoords, ncoords, sccoords], dim=1)

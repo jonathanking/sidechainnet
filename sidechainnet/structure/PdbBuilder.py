@@ -21,8 +21,8 @@ class PdbBuilder(object):
     def __init__(self,
                  seq,
                  coords,
-                 atoms_per_res=NUM_COORDS_PER_RES,
-                 terminal_atoms=None):
+                 terminal_atoms=None,
+                 has_hydrogens=None):
         """Initialize a PdbBuilder.
 
         Args:
@@ -35,21 +35,16 @@ class PdbBuilder(object):
             terminal_atoms: Python dictionary mapping "H2", "H3", and "OXT" atom names to
                 their positions in the structure.
         """
-        if len(seq) != coords.shape[0] / atoms_per_res:
+        if len(seq) != coords.shape[0]:
             raise ValueError(
                 "The sequence length must match the coordinate length and contain 1 "
-                "letter AA codes." + str(coords.shape[0] / atoms_per_res) + " " +
+                "letter AA codes." + str(coords.shape[0]) + " " +
                 str(len(seq)))
-        if coords.shape[0] % atoms_per_res != 0:
-            raise AssertionError(f"Coords is not divisible by {atoms_per_res}. "
-                                 f"{coords.shape}")
-        if atoms_per_res not in (NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS):
-            raise ValueError(
-                f"Values for atoms_per_res other than {NUM_COORDS_PER_RES}"
-                f"/{NUM_COORDS_PER_RES_W_HYDROGENS} are currently not supported.")
 
-        self.atoms_per_res = atoms_per_res
-        self.has_hydrogens = self.atoms_per_res == NUM_COORDS_PER_RES_W_HYDROGENS
+        if has_hydrogens is not None:
+            self.has_hydrogens = has_hydrogens
+        else:
+            self.has_hydrogens = coords.shape[1] == NUM_COORDS_PER_RES_W_HYDROGENS
         self.coords = coords
         self.seq = seq
         self.mapping = self._make_mapping_from_seq()
@@ -76,7 +71,7 @@ class PdbBuilder(object):
 
     def _coord_generator(self):
         """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
-        return coord_generator(self.coords, self.atoms_per_res)
+        return coord_generator(self.coords)
 
     def _get_line_for_atom(self, res_name, atom_name, atom_coords, missing=False):
         """Return the 'ATOM...' line in PDB format for the specified atom.
@@ -107,8 +102,7 @@ class PdbBuilder(object):
         """
         residue_lines = []
         for atom_name, atom_coord in zip(atom_names, coords):
-            if (atom_name == "PAD" or np.isnan(atom_coord).sum() > 0 or
-                    atom_coord.sum() == 0):
+            if (atom_name == "PAD" or np.isnan(atom_coord).sum() > 0):
                 continue
             residue_lines.append(self._get_line_for_atom(res_name, atom_name, atom_coord))
             self.atom_nbr += 1

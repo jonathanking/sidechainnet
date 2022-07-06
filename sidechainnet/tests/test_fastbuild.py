@@ -1,19 +1,43 @@
 """Test the fastbuild coordinate building module."""
+from re import A
+import numpy as np
+import prody as pr
 import pytest
 import torch
 
 import sidechainnet as scn
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.utils.download import _init_dssp_data, process_id
+
+torch.set_printoptions(sci_mode=False)
+nan = torch.nan
+
 
 @pytest.fixture
 def p():
-    nan = torch.nan
+    # angles = torch.tensor([  # nan in the first phi
+    #     [    nan,  2.9864,  3.1411,  1.8979,  2.0560,  2.1353, -1.1941, -2.9177, -0.0954,     nan,     nan,     nan],
+    #     [-2.2205, -2.7720,  3.1174,  1.9913,  2.0165,  2.1277,  1.9315,  1.3732, 2.8204, -1.2943,     nan,     nan],
+    #     [-1.8046,  2.6789, -3.0887,  1.8948,  2.0197,  2.1358,  2.3525, -2.9406, -1.0214,     nan,     nan,     nan],
+    #     [-2.6590,  2.7039,  3.0630,  1.9808,  2.0562,  2.1439,  1.5275,  3.0964, 1.1357, -3.0276,     nan,     nan],
+    #     [-2.6066, -0.7829,     nan,  1.9416,     nan,     nan,  1.5148, -3.0244, -2.8980, -0.4080,     nan,     nan]], dtype=torch.float64)
+    # phi_ = 2/3*np.pi
+    # angles = torch.tensor([
+    #     [  -phi_,  2.9864,  3.1411,  1.8979,  2.0560,  2.1353, -1.1941, -2.9177, -0.0954,     nan,     nan,     nan],
+    #     [-2.2205, -2.7720,  3.1174,  1.9913,  2.0165,  2.1277,  1.9315,  1.3732, 2.8204, -1.2943,     nan,     nan],
+    #     [-1.8046,  2.6789, -3.0887,  1.8948,  2.0197,  2.1358,  2.3525, -2.9406, -1.0214,     nan,     nan,     nan],
+    #     [-2.6590,  2.7039,  3.0630,  1.9808,  2.0562,  2.1439,  1.5275,  3.0964, 1.1357, -3.0276,     nan,     nan],
+    #     [-2.6066, -0.7829,     nan,  1.9416,     nan,     nan,  1.5148, -3.0244, -2.8980, -0.4080,     nan,     nan]], dtype=torch.float64)
+    # Below uses the new measurement methodology
     angles = torch.tensor([
-        [    nan,  2.9864,  3.1411,  1.8979,  2.0560,  2.1353, -1.1941, -2.9177, -0.0954,     nan,     nan,     nan],
-        [-2.2205, -2.7720,  3.1174,  1.9913,  2.0165,  2.1277,  1.9315,  1.3732, 2.8204, -1.2943,     nan,     nan],
-        [-1.8046,  2.6789, -3.0887,  1.8948,  2.0197,  2.1358,  2.3525, -2.9406, -1.0214,     nan,     nan,     nan],
-        [-2.6590,  2.7039,  3.0630,  1.9808,  2.0562,  2.1439,  1.5275,  3.0964, 1.1357, -3.0276,     nan,     nan],
-        [-2.6066, -0.7829,     nan,  1.9416,     nan,     nan,  1.5148, -3.0244, -2.8980, -0.4080,     nan,     nan]], dtype=torch.float64)
+        # [nan, 2.9864, 3.1411, 1.8979, 2.0560, 2.1353, 0.9887, -2.9177, -0.0954, nan, nan, nan],
+        [nan, 2.9864, 3.1411, 1.8979, 2.0560, 2.1353, np.deg2rad(-109.5), -2.9177, -0.0954, nan, nan, nan],
+        [-2.2205, -2.7720, 3.1174, 1.9913, 2.0165, 2.1277, 1.9315, 1.3732, 2.8204, -1.2943, nan, nan],
+        [-1.8046, 2.6789, -3.0887, 1.8948, 2.0197, 2.1358, 2.3525, -2.9406, -1.0214, nan, nan, nan],
+        [-2.6590, 2.7039, 3.0630, 1.9808, 2.0562, 2.1439, 1.5275, 3.0964, 1.1357, -3.0276, nan, nan],
+        [-2.6066, -0.7829, nan, 1.9416, nan, nan, 1.5148, -3.0244, -2.8980, -0.4080, nan, nan]
+        ], dtype=torch.float64)
     coordinates = torch.tensor([
         [  9.1920,  64.2680,   3.3370],
         [ 10.0050,  64.7540,   2.1820],
@@ -101,20 +125,65 @@ def p():
 def plarge():
     d = scn.load('demo',
                  local_scn_path='/home/jok120/sidechainnet_data/sidechainnet_debug.pkl',
-                 scn_dataset=True)
+                 scn_dataset=True,
+                 complete_structures_only=True)
     plarge = d[-10]
     plarge.torch()
     print("Loaded", plarge)
     return plarge
 
 
-def test_build01(p: SCNProtein):
+def test_angle_to_coord_rebuild_works_for_fixtures(p: SCNProtein):
+    """Make sure that rebuilding the protein's coords from its angles is equal."""
+    p.numpy()
+    pcopy = p.copy()
+    built_coords = pcopy.build_coords_from_angles()
+
+    # Remove rows with nans
+    built_coords = built_coords[~np.isnan(built_coords).any(axis=1)]
+    p.coords = p.coords[~np.isnan(p.coords).any(axis=1)]
+
+    # Remove first 3 atoms which may differ due to assumptions
+    built_coords = built_coords[3:, :]
+    p.coords = p.coords[3:, :]
+
+    # Compare
+    aligned_minimized = pr.calcTransformation(built_coords, p.coords).apply(built_coords)
+    rmsd = pr.calcRMSD(aligned_minimized, p.coords)
+
+    assert rmsd <= 1
+    assert aligned_minimized == pytest.approx(p.coords, abs=1)
+
+
+def test_fastbuild_vs_oldbuild01(p: SCNProtein):
     """Build a simple protein from angles, excluding hydrogens."""
-    new_coords = p.fastbuild(add_hydrogens=False)
-    assert new_coords.numpy() == pytest.approx(p.coords.numpy())
+    # p.angles[0, 0] = 0
+    fast_coords = p.fastbuild(add_hydrogens=False)
+    built_coords = p.build_coords_from_angles()
+    fast_coords = fast_coords.reshape(-1, 3)
 
+    # Remove first 3 atoms which may differ due to assumptions
+    built_coords = built_coords[3:, :].detach().numpy()
+    fast_coords = fast_coords[3:, :].detach().numpy()
 
-def test_build_large01(plarge: SCNProtein):
-    """Build a large protein from angles, excluding hydrogens."""
-    new_coords = plarge.fastbuild(add_hydrogens=False)
-    assert new_coords.numpy() == pytest.approx(plarge.coords.numpy())
+    # Remove rows with nans
+    built_coords = built_coords[~np.isnan(built_coords).any(axis=1)]
+    fast_coords = fast_coords[~np.isnan(fast_coords).any(axis=1)]
+
+    # Compare
+    aligned_minimized = pr.calcTransformation(fast_coords, built_coords).apply(fast_coords)
+    rmsd = pr.calcRMSD(aligned_minimized, built_coords)
+
+    assert aligned_minimized == pytest.approx(built_coords, abs=2)
+    assert rmsd <= 1
+
+def test_fasbuildh_01(p: SCNProtein):
+    """Build a simple protein from angles, including hydrogens."""
+    fast_coords = p.fastbuild(add_hydrogens=True)
+    p.coords = p.hcoords = fast_coords
+    p.to_pdb("/home/jok120/Downloads/predh14.pdb")
+
+def test_measure_x0_with_fictitious_atom():
+    _init_dssp_data()
+    data = process_id("1A38_2_P")
+    print(data)
