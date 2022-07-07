@@ -2,7 +2,7 @@
 import itertools
 
 import numpy as np
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.structure.build_info import SC_HBUILD_INFO
 from sidechainnet.structure.HydrogenBuilder import ATOM_MAP_H, NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
@@ -216,7 +216,8 @@ def split_every(n, iterable):
 
 
 ATOM_MAP_14 = {}
-for one_letter in ONE_TO_THREE_LETTER_MAP.keys():
-    ATOM_MAP_14[one_letter] = ["N", "CA", "C", "O"] + list(
-        SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
-    ATOM_MAP_14[one_letter].extend(["PAD"] * (14 - len(ATOM_MAP_14[one_letter])))
+for a, aaa in ONE_TO_THREE_LETTER_MAP.items():
+    atom_names = [tors.split("-")[-1].strip() for tors in SC_HBUILD_INFO[aaa]["torsion-names"]]
+    atom_names = list(filter(lambda x:not x.startswith("H"), atom_names))
+    ATOM_MAP_14[a] = ["N", "CA", "C", "O"] + atom_names
+    ATOM_MAP_14[a].extend(["PAD"] * (14 - len(ATOM_MAP_14[a])))

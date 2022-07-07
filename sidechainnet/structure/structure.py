@@ -5,7 +5,7 @@ import prody as pr
 import torch
 from numba import njit
 from sidechainnet.structure import StructureBuilder
-from sidechainnet.structure.build_info import NUM_ANGLES, SC_BUILD_INFO
+from sidechainnet.structure.build_info import NUM_ANGLES
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 
 

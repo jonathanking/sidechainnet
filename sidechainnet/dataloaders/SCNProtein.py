@@ -38,10 +38,10 @@ import sidechainnet.structure.fastbuild as fastbuild
 from sidechainnet.utils.download import MAX_SEQ_LEN
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_HBUILD_INFO
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
@@ -558,12 +558,13 @@ class SCNProtein(object):
 
     def hydrogenrep_to_heavyatomrep(self, hcoords=None):
         """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
+        # TODO Update with new h rep
         to_stack = []
         if hcoords is None:
             hcoords = self.hcoords
 
         for i, s in enumerate(self.seq3.split(" ")):
-            num_heavy = 4 + len(SC_BUILD_INFO[s]['atom-names'])
+            num_heavy = 4 + len(SC_HBUILD_INFO[s]['torsion-names'])
             h_start = i * hy.NUM_COORDS_PER_RES_W_HYDROGENS
             h_end = h_start + num_heavy
 

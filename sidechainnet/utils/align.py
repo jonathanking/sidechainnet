@@ -5,7 +5,7 @@ from Bio import Align
 
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, PRODY_CA_DIST
 from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 
 
 def init_basic_aligner(allow_mismatches=False):

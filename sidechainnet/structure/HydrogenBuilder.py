@@ -4,9 +4,9 @@ import math
 import numpy as np
 from numba import njit
 import torch
-from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_BUILD_INFO, SC_HBUILD_INFO
+from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_HBUILD_INFO
 from sidechainnet.structure.structure import coord_generator
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
 # ARG has 20 sc atoms (including hydrogens) + 4 bb + up to 2 terminal hydrogens + HA
@@ -910,5 +910,5 @@ def _get_amide_methine_hydrogen_help(R1, center, R2, length, is_numpy):
 
 ATOM_MAP_H = {}
 for a, aaa in ONE_TO_THREE_LETTER_MAP.items():
-    ATOM_MAP_H[a] = ["N", "CA", "C", "O", "H"] + list(SC_HBUILD_INFO[aaa]["atom-names"])
+    ATOM_MAP_H[a] = ["N", "CA", "C", "O", "H"] + [tors.split("-")[-1].strip() for tors in SC_HBUILD_INFO[aaa]["torsion-names"]]
     ATOM_MAP_H[a].extend(["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[a])))

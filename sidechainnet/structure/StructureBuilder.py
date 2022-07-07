@@ -5,10 +5,11 @@ from io import UnsupportedOperation
 import numpy as np
 import prody as pr
 import torch
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR, compute_fictious_atom_for_res1
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
+from sidechainnet.utils.measure import compute_fictious_atom_for_res1
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
-from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
+from sidechainnet.structure.build_info import SC_HBUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
 from sidechainnet.structure.structure import nerf
 from sidechainnet.structure.HydrogenBuilder import HydrogenBuilder, NUM_COORDS_PER_RES_W_HYDROGENS
 
@@ -489,7 +490,9 @@ class ResidueBuilder(object):
 
         last_torsion = None
         for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
-                _get_residue_build_iter(self.name, SC_BUILD_INFO, self.device)):
+                _get_residue_build_iter(self.name, SC_HBUILD_INFO, self.device)):
+                # TODO may be out of date; originally used SC_BUILD_INFO
+                raise ValueError("Warning: Trying to use normal structure builder after update.")
             # Select appropriate 3 points to build from
             if i == 0:
                 a, b, c = self.pts["C-"], self.pts["N"], self.pts["CA"]

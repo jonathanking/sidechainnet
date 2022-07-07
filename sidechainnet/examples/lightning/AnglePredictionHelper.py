@@ -5,7 +5,7 @@ from sidechainnet.examples.losses import (angle_diff, angle_mse, drmsd, gdc_all,
                                           rmsd, tm_score)
 from sidechainnet.structure.build_info import ANGLE_IDX_TO_NAME_MAP, NUM_SC_ANGLES
 from sidechainnet.structure.structure import inverse_trig_transform
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 
 

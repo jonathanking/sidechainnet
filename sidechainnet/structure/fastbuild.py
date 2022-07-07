@@ -5,17 +5,17 @@ import torch
 from sidechainnet.structure.fastbuild_matrices import MakeBackbone, MakeTMats
 from sidechainnet.structure.HydrogenBuilder import NUM_COORDS_PER_RES_W_HYDROGENS
 from .build_info import (ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO, NUM_COORDS_PER_RES,
-                         SC_ANGLES_START_POS, SC_BUILD_INFO, SC_HBUILD_INFO)
+                         SC_ANGLES_START_POS, SC_HBUILD_INFO)
 
 #################################################################################
 # Data structures for describing how to build all the atoms of each residue
-# For each datum, we have shape: residue_alphabet x max_num_sc_atoms == (20 x 10)
+# For each datum, we have shape: residue_alphabet x max_num_sc_atoms == (60 x ncoords)
 #################################################################################
 
-AA = np.array([
+AA = [
     'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T',
     'V', 'W', 'Y'
-])
+]
 AA3to1 = {
     'ALA': 'A',
     'ARG': 'R',
@@ -62,24 +62,25 @@ def _make_sc_heavy_atom_tensors():
         A dictionary mapping data names (the data nessary to compute NeRF and extend
         sidechains) to the data itself.
     """
-    NC = NUM_COORDS_PER_RES - 4
-    sc_source_atom = torch.zeros(20, NC, dtype=torch.long)
-    sc_bond_length = torch.zeros(20, NC)
-    sc_ctheta = torch.zeros(20, NC)
-    sc_stheta = torch.zeros(20, NC)
-    sc_cchi = torch.zeros(20, NC)
-    sc_schi = torch.zeros(20, NC)
-    sc_offset = torch.zeros(20, NC)
+    nres = len(AA)
+    ncoords = NUM_COORDS_PER_RES - 4
+    sc_source_atom = torch.zeros(nres, ncoords, dtype=torch.long)
+    sc_bond_length = torch.zeros(nres, ncoords)
+    sc_ctheta = torch.zeros(nres, ncoords)
+    sc_stheta = torch.zeros(nres, ncoords)
+    sc_cchi = torch.zeros(nres, ncoords)
+    sc_schi = torch.zeros(nres, ncoords)
+    sc_offset = torch.zeros(nres, ncoords)
 
     # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
-    sc_type = torch.zeros(20, NC, dtype=torch.long)
+    sc_type = torch.zeros(nres, ncoords, dtype=torch.long)
 
-    for a in range(20):
+    for a in range(nres):
         A = AA[a]
         a3 = AA1to3[A]
-        info = SC_BUILD_INFO[a3]
+        info = SC_HBUILD_INFO[a3]
         for i in range(NUM_COORDS_PER_RES - 4):
-            if i < len(info['torsion-vals']):
+            if i < len(info['torsion-names']) and not info['torsion-names'][i].split("-")[-1].startswith("H"):
                 sc_bond_length[a][i] = info['bonds-vals'][i]
                 sc_ctheta[a][i] = np.cos(np.pi - info['angles-vals'][i])
                 sc_stheta[a][i] = np.sin(np.pi - info['angles-vals'][i])
@@ -100,9 +101,9 @@ def _make_sc_heavy_atom_tensors():
                     sc_cchi[a][i] = np.cos(2 * np.pi - t)
                     sc_schi[a][i] = np.sin(2 * np.pi - t)
 
-                src = info['bonds-names'][i].split('-')[0]
+                src = info['torsion-names'][i].split('-')[-2]
                 if src != 'CA':
-                    sc_source_atom[a][i] = info['atom-names'].index(src)
+                    sc_source_atom[a][i] = _get_atom_idx_in_torsion_list(src, info['torsion-names'])
                 else:
                     sc_source_atom[a][i] = -1
     return {
@@ -115,6 +116,17 @@ def _make_sc_heavy_atom_tensors():
         'offsets': sc_offset,  # number of atoms we may extend from the CA.
         'sources': sc_source_atom  # e.g. Tryptophan has 10 sidechain atoms.
     }
+
+
+def _get_atom_idx_in_torsion_list(atom_name, tor_name_list):
+    if atom_name == 'C':
+        return -3
+    elif atom_name == 'N':
+        return -2
+    for position, t_name in enumerate(tor_name_list):
+        if t_name.split('-')[-1].strip() == atom_name.strip():
+            return position
+    raise ValueError(f"Could not find {atom_name} in {tor_name_list}.")
 
 
 def _make_sc_all_atom_tensors():
@@ -135,37 +147,38 @@ def _make_sc_all_atom_tensors():
         A dictionary mapping data names (the data nessary to compute NeRF and extend
         sidechains) to the data itself.
     """
-    NC = NUM_COORDS_PER_RES_W_HYDROGENS - 6  # TODO Make a new variable to describe this
-    sc_source_atom = torch.zeros(20, NC, dtype=torch.long)
-    sc_bond_length = torch.zeros(20, NC)
-    sc_ctheta = torch.zeros(20, NC)
-    sc_stheta = torch.zeros(20, NC)
-    sc_cchi = torch.zeros(20, NC)
-    sc_schi = torch.zeros(20, NC)
-    sc_offset = torch.zeros(20, NC)
-    sc_atom_name = [[] for _ in range(20)]  # Just for notekeeping
-    sc_chi = torch.zeros(20, NC)
+    nres = len(AA)
+    ncoords = NUM_COORDS_PER_RES_W_HYDROGENS - 6  # TODO Make a new var to describe this
+    sc_source_atom = torch.zeros(nres, ncoords, dtype=torch.long)
+    sc_bond_length = torch.zeros(nres, ncoords)
+    sc_ctheta = torch.zeros(nres, ncoords)
+    sc_stheta = torch.zeros(nres, ncoords)
+    sc_cchi = torch.zeros(nres, ncoords)
+    sc_schi = torch.zeros(nres, ncoords)
+    sc_offset = torch.zeros(nres, ncoords)
+    sc_atom_name = [[] for _ in range(nres)]  # Just for notekeeping
+    sc_chi = torch.zeros(nres, ncoords)
 
     # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
-    sc_type = torch.zeros(20, NC, dtype=torch.long)
+    sc_type = torch.zeros(nres, ncoords, dtype=torch.long)
 
-    for a in range(20):
+    for a in range(nres):
         A = AA[a]
         a3 = AA1to3[A]
         info = SC_HBUILD_INFO[a3]
         # First we add array data cooresponding to heavy atoms defined in SCBUILDINFO[RES]
         i = 0
-        for i in range(NC):
+        for i in range(ncoords):
             if i < len(info['torsion-vals']):
-                an = info['atom-names'][i]
+                an = info['torsion-names'][i].split('-')[-1].strip()
                 sc_atom_name[a].append(an)
                 sc_bond_length[a][i] = info['bonds-vals'][i]
                 sc_ctheta[a][i] = np.cos(np.pi - info['angles-vals'][i])
                 sc_stheta[a][i] = np.sin(np.pi - info['angles-vals'][i])
 
-                src = info['bonds-names'][i].split('-')[0]
+                src = info['torsion-names'][i].split('-')[-2].strip()
                 if src != 'CA':
-                    sc_source_atom[a][i] = info['atom-names'].index(src)
+                    sc_source_atom[a][i] = _get_atom_idx_in_torsion_list(src, info['torsion-names'])
                 else:
                     sc_source_atom[a][i] = -1
 
@@ -187,13 +200,13 @@ def _make_sc_all_atom_tensors():
                     sc_chi[a][i] = 2 * np.pi - t
 
                 # The following types describe hydrogens using the tuple format:
-                # ('hi', SRCATM, OFFSETVAL)
+                # ('hi', RELATM, OFFSETVAL)
 
                 elif isinstance(t, tuple):
                     # This is a hydrogen placed relative to an earlier angle/atom
                     # Both the relative atom and the atom that needs plcmnt have same src
                     _, rel_atom, offset = t
-                    rel_atom_idx = info['atom-names'].index(rel_atom)
+                    rel_atom_idx = _get_atom_idx_in_torsion_list(rel_atom, info['torsion-names'])
                     atom_src = sc_source_atom[a][rel_atom_idx]
                     assert atom_src == sc_source_atom[a][i], f"{atom_src}, {sc_source_atom[a][i]}, {t}"
                     # if atom_src == -1:
@@ -234,8 +247,8 @@ def _make_sc_all_atom_tensors():
     }
 
 
-def _x20(v):  # make 20 copies as tensor
-    return torch.Tensor([v]).repeat(20).reshape(20, 1)
+def _xNRES(v):  # make 20 copies as tensor
+    return torch.Tensor([v]).repeat(len(AA)).reshape(len(AA), 1)
 
 
 # In the dictionaries below, we specify geometries for atoms building off of N, CA, and C.
@@ -255,14 +268,14 @@ SC_HEAVY_ATOM_BUILD_INFO = {
     # Carbonyl carbons are built off of the backbone C. Each residue builds this oxygen
     # in the same way, so we simply repeat the relevant build info data per res identity.
     'C': {
-        'bond_lengths': _x20(BB_BUILD_INFO["BONDLENS"]["c-o"]),
-        'cthetas': _x20(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'sthetas': _x20(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'cchis': _x20(0.),
-        'schis': _x20(0.),
-        'types': _x20(1),
-        'offsets': _x20(0.),
-        'sources': _x20(-1),
+        'bond_lengths': _xNRES(BB_BUILD_INFO["BONDLENS"]["c-o"]),
+        'cthetas': _xNRES(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
+        'sthetas': _xNRES(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
+        'cchis': _xNRES(0.),
+        'schis': _xNRES(0.),
+        'types': _xNRES(1),
+        'offsets': _xNRES(0.),
+        'sources': _xNRES(-1),
         # 'names': [['O'] for _ in range(20)]
     }
 }
@@ -271,39 +284,26 @@ SC_HEAVY_ATOM_BUILD_INFO = {
 
 SC_ALL_ATOM_BUILD_INFO = {
     'N': {
-        'bond_lengths': _x20(1.01),
-        'cthetas': _x20(np.cos(np.deg2rad(60))),
-        'sthetas': _x20(np.sin(np.deg2rad(60))),
-        'cchis': _x20(0.),
-        'schis': _x20(0.),
-        'types': _x20(1),
-        'offsets': _x20(0.),
-        'sources': _x20(-1),
+        'bond_lengths': _xNRES(1.01),
+        'cthetas': _xNRES(np.cos(np.deg2rad(60))),
+        'sthetas': _xNRES(np.sin(np.deg2rad(60))),
+        'cchis': _xNRES(0.),
+        'schis': _xNRES(0.),
+        'types': _xNRES(1),
+        'offsets': _xNRES(0.),
+        'sources': _xNRES(-1),
     },
     'CA': _make_sc_all_atom_tensors(),
-    # HA is the atom that builds of CA for all residues but Proline
-    # 'HA': {
-    #     'bond_lengths': _x20(1.090),
-    #     # 'cthetas': _x20(np.cos(2*np.pi/6)),  # ??
-    #     # 'sthetas': _x20(np.sin(2*np.pi/6)),  # ??
-    #     'cthetas': _x20(np.cos(np.deg2rad(109.5))),  # ??
-    #     'sthetas': _x20(np.sin(np.deg2rad(109.5))),  # ??
-    #     'cchis': _x20(0.),
-    #     'schis': _x20(0.),
-    #     'types': _x20(2),
-    #     'offsets': _x20(- 2 * np.pi / 3),
-    #     'sources': _x20(-1).long(),
-    # },
     # =O off of C
     'C': {
-        'bond_lengths': _x20(BB_BUILD_INFO["BONDLENS"]["c-o"]),
-        'cthetas': _x20(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'sthetas': _x20(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'cchis': _x20(0.),
-        'schis': _x20(0.),
-        'types': _x20(1),
-        'offsets': _x20(0.),
-        'sources': _x20(-1),
+        'bond_lengths': _xNRES(BB_BUILD_INFO["BONDLENS"]["c-o"]),
+        'cthetas': _xNRES(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
+        'sthetas': _xNRES(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
+        'cchis': _xNRES(0.),
+        'schis': _xNRES(0.),
+        'types': _xNRES(1),
+        'offsets': _xNRES(0.),
+        'sources': _xNRES(-1),
     }
 }
 # Because proline does not have a hydrogen on CA, we set the build type for that atom to 0

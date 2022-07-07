@@ -5,10 +5,9 @@ import prody as pr
 import torch
 
 import sidechainnet as scn
-from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.structure.build_info import BB_BUILD_INFO, GLOBAL_PAD_CHAR, NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_HBUILD_INFO
 from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError, NonStandardAminoAcidError, NoneStructureError, SequenceError
 
-GLOBAL_PAD_CHAR = np.nan
 ALLOWED_NONSTD_RESIDUES = {
     "ASX": "ASP",
     "GLX": "GLU",
@@ -65,8 +64,8 @@ def check_standard_continuous(residue, prev_res_num):
 def determine_sidechain_atomnames(_res):
     """Given a residue from ProDy, returns a list of sidechain atom names that must be
     recorded."""
-    if _res.getResname() in SC_BUILD_INFO.keys():
-        return SC_BUILD_INFO[_res.getResname()]["atom-names"]
+    if _res.getResname() in SC_HBUILD_INFO.keys():
+        return SC_HBUILD_INFO[_res.getResname()]["atom-names"]
     else:
         raise NonStandardAminoAcidError
 
@@ -81,7 +80,7 @@ def compute_sidechain_dihedrals(residue, prev_residue):
     used to generate a list of dihedral angles for this residue.
     """
     try:
-        torsion_names = SC_BUILD_INFO[residue.getResname()]["torsion-names"]
+        torsion_names = SC_HBUILD_INFO[residue.getResname()]["torsion-names"]
     except KeyError as e:
         raise NonStandardAminoAcidError from e
     if len(torsion_names) == 0:
@@ -113,7 +112,7 @@ def compute_sidechain_dihedrals(residue, prev_residue):
     res_dihedrals = [cb_dihedral]
 
     for t_name, t_val in zip(torsion_names[1:],
-                             SC_BUILD_INFO[residue.getResname()]["torsion-vals"][1:]):
+                             SC_HBUILD_INFO[residue.getResname()]["torsion-vals"][1:]):
         # Only record torsional angles that are relevant (i.e. not planar).
         # All torsion values that vary are marked with 'p' in SC_BUILD_INFO
         if t_val != "p":

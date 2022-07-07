@@ -1,4 +1,4 @@
-from sidechainnet.structure.build_info import SC_BUILD_INFO
+from sidechainnet.structure.build_info import SC_HBUILD_INFO
 
 
 def test_same_number_of_bonds_angles_dihedrals():
@@ -7,10 +7,10 @@ def test_same_number_of_bonds_angles_dihedrals():
     residue is equal. In this way, a generator can be made to yield this
     information for structure generation.
     """
-    for AA, AA_dict in SC_BUILD_INFO.items():
-        l = len(AA_dict["angles-names"])
+    for AA, AA_dict in SC_HBUILD_INFO.items():
+        l = len(AA_dict["torsion-names"])
         for k in [
-                "bonds-names", "torsion-names", "angles-vals", "bonds-vals",
-                "torsion-vals", "bonds-types", "angles-types", "torsion-types"
+                "angles-vals", "bonds-vals",
+                "torsion-vals",  "torsion-types"
         ]:
             assert len(AA_dict[k]) == l
