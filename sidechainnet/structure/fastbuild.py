@@ -3,9 +3,9 @@
 import numpy as np
 import torch
 from sidechainnet.structure.fastbuild_matrices import MakeBackbone, MakeTMats
-from sidechainnet.structure.HydrogenBuilder import NUM_COORDS_PER_RES_W_HYDROGENS
-from .build_info import (ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO, NUM_COORDS_PER_RES,
-                         SC_ANGLES_START_POS, SC_HBUILD_INFO)
+from sidechainnet.structure.build_info import (ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO,
+                                               NUM_COORDS_PER_RES, SC_ANGLES_START_POS,
+                                               SC_HBUILD_INFO)
 
 #################################################################################
 # Data structures for describing how to build all the atoms of each residue
@@ -38,6 +38,20 @@ AA3to1 = {
     'TYR': 'Y',
     'VAL': 'V'
 }
+# Add N and C terminal residues to sequence representation
+_update_dict = {}
+for key, value in AA3to1.items():
+    _update_dict["N" + key] = "N" + value
+    _update_dict["C" + key] = "C" + value
+AA3to1.update(_update_dict)
+_update_list = []
+for a in AA:
+    _update_list.append("N" + a)
+for a in AA:
+    _update_list.append("C" + a)
+AA += _update_list
+assert len(AA) == 60, '20x3 AAs expected (including N and C terminal residues).'
+
 AA1to3 = {v: k for (k, v) in AA3to1.items()}
 NUM2AA = {i: a for i, a in enumerate(AA)}
 AA2NUM = {a: i for i, a in enumerate(AA)}
@@ -63,7 +77,7 @@ def _make_sc_heavy_atom_tensors():
         sidechains) to the data itself.
     """
     nres = len(AA)
-    ncoords = NUM_COORDS_PER_RES - 4
+    ncoords = NUM_COORDS_PER_RES - 4  # TODO fix function for heavy atom building
     sc_source_atom = torch.zeros(nres, ncoords, dtype=torch.long)
     sc_bond_length = torch.zeros(nres, ncoords)
     sc_ctheta = torch.zeros(nres, ncoords)
@@ -75,12 +89,15 @@ def _make_sc_heavy_atom_tensors():
     # 0: no atom, 1: regular torsion, 2: offset torsion, 3: constant
     sc_type = torch.zeros(nres, ncoords, dtype=torch.long)
 
-    for a in range(nres):
+    # While the build_info matrices have 60 rows (1/restype), only the first 20 have
+    # atoms that must be built off of the CA, which this function is limited to.
+    for a in range(20):
         A = AA[a]
         a3 = AA1to3[A]
         info = SC_HBUILD_INFO[a3]
         for i in range(NUM_COORDS_PER_RES - 4):
-            if i < len(info['torsion-names']) and not info['torsion-names'][i].split("-")[-1].startswith("H"):
+            if (i < len(info['torsion-names']) and
+                    not info['torsion-names'][i].split("-")[-1].startswith("H")):
                 sc_bond_length[a][i] = info['bonds-vals'][i]
                 sc_ctheta[a][i] = np.cos(np.pi - info['angles-vals'][i])
                 sc_stheta[a][i] = np.sin(np.pi - info['angles-vals'][i])
@@ -119,9 +136,20 @@ def _make_sc_heavy_atom_tensors():
 
 
 def _get_atom_idx_in_torsion_list(atom_name, tor_name_list):
+    """Return index of atom name in a list of torsion-name strings.
+
+    Args:
+        atom_name (str): Atom name.
+        tor_name_list (list): List of torsion-name strings (['N-CA-CB-CG'...])
+
+    Returns:
+        int: Index of atom name.
+    """
     if atom_name == 'C':
+        raise ValueError("Returning a strange atom source index.")
         return -3
     elif atom_name == 'N':
+        raise ValueError("Returning a strange atom source index.")
         return -2
     for position, t_name in enumerate(tor_name_list):
         if t_name.split('-')[-1].strip() == atom_name.strip():
@@ -129,7 +157,7 @@ def _get_atom_idx_in_torsion_list(atom_name, tor_name_list):
     raise ValueError(f"Could not find {atom_name} in {tor_name_list}.")
 
 
-def _make_sc_all_atom_tensors():
+def _make_sc_calpha_tensors():
     """Create a dict to map all-atom build_info (lens/angs/etc) to vals per res identity.
 
         For every sidechain atom, we need to know:
@@ -148,7 +176,8 @@ def _make_sc_all_atom_tensors():
         sidechains) to the data itself.
     """
     nres = len(AA)
-    ncoords = NUM_COORDS_PER_RES_W_HYDROGENS - 6  # TODO Make a new var to describe this
+    ncoords = 19  # TODO Automate this by pulling out the max list of atom names in build info
+    assert ncoords == 19
     sc_source_atom = torch.zeros(nres, ncoords, dtype=torch.long)
     sc_bond_length = torch.zeros(nres, ncoords)
     sc_ctheta = torch.zeros(nres, ncoords)
@@ -164,6 +193,10 @@ def _make_sc_all_atom_tensors():
 
     for a in range(nres):
         A = AA[a]
+        if len(A) == 2:
+            # If this residue is an N or C terminal residue, the atoms built off of the
+            # alpha Carbon are identical to the non-terminal residue version
+            A = A[1]
         a3 = AA1to3[A]
         info = SC_HBUILD_INFO[a3]
         # First we add array data cooresponding to heavy atoms defined in SCBUILDINFO[RES]
@@ -247,7 +280,7 @@ def _make_sc_all_atom_tensors():
     }
 
 
-def _xNRES(v):  # make 20 copies as tensor
+def _xNRES(v):  # make 60 copies as tensor
     return torch.Tensor([v]).repeat(len(AA)).reshape(len(AA), 1)
 
 
@@ -280,42 +313,79 @@ SC_HEAVY_ATOM_BUILD_INFO = {
     }
 }
 
-# This dict is nearly identical to the one above but adds information for H building.
+
+def _make_nitrogen_tensors():
+    # The 1st column in the matrices below is for typical N-H.
+    # The 2nd and 3rd columns are for terminal Hs (H2 and H3)
+    ndict = {
+        'bond_lengths': _xNRES(1.01).repeat(1, 3),
+        'cthetas': _xNRES(np.cos(np.deg2rad(60))).repeat(1, 3),
+        'sthetas': _xNRES(np.sin(np.deg2rad(60))).repeat(1, 3),
+        'cchis': _xNRES(0.).repeat(1, 3),
+        'schis': _xNRES(0.).repeat(1, 3),
+        'types': _xNRES(1).repeat(1, 3),
+        'offsets': _xNRES(0.).repeat(1, 3),
+        'sources': _xNRES(-1).repeat(1, 3),
+    }
+    # We correct some of the values that were quickly generated above to better describe
+    # the build info for NH2.
+    ndict['types'][0:20, 1:] = 0   # Do not build NH2 for non-terminal residues
+    ndict['types'][40:, 1:] = 0    # Do not build NH2 for C-terminal residues
+    ndict['types'][20:40, 1:] = 2  # Build H2 + H3 for N-terminal res only, type 2 infer
+
+    ndict['offsets'][20:40, 1] = 2 * np.pi / 3  # H2 and H3 are oriented by rotation
+    ndict['offsets'][20:40, 2] = -2 * np.pi / 3
+
+    ndict['cchis'][20:40, 1:] = np.cos(np.deg2rad(109.5))  # tetrahedral geom
+
+    return ndict
+
+
+def _make_carbon_tensors():
+    # The 1st column in the matrices below is for typical C=O. The 2nd is for terminal OXT
+    cdict = {
+        'bond_lengths':
+            _xNRES(BB_BUILD_INFO["BONDLENS"]["c-o"]).repeat(1, 2),
+        'cthetas':
+            _xNRES(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])).repeat(1, 2),
+        'sthetas':
+            _xNRES(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])).repeat(1, 2),
+        'cchis':
+            _xNRES(0.).repeat(1, 2),
+        'schis':
+            _xNRES(0.).repeat(1, 2),
+        'types':
+            _xNRES(1).repeat(1, 2),
+        'offsets':
+            _xNRES(0.).repeat(1, 2),
+        'sources':
+            _xNRES(-1).repeat(1, 2),
+    }
+    # We correct some of the values that were quickly generated above to better describe
+    # the build info for OXT.
+
+    cdict['types'][0:20, 1] = 0  # Do not build OXT for non-terminal residues
+    cdict['types'][20:40, 1] = 0  # Do not build OXT for N-terminal residues
+    cdict['types'][40:, 1] = 2  # Build OXT for C-terminal residues only, type 2 infer
+
+    # The source for the OXT is the same as C=O.
+    cdict['offsets'][40:, 1] = np.pi
+
+    return cdict
+
 
 SC_ALL_ATOM_BUILD_INFO = {
-    'N': {
-        'bond_lengths': _xNRES(1.01),
-        'cthetas': _xNRES(np.cos(np.deg2rad(60))),
-        'sthetas': _xNRES(np.sin(np.deg2rad(60))),
-        'cchis': _xNRES(0.),
-        'schis': _xNRES(0.),
-        'types': _xNRES(1),
-        'offsets': _xNRES(0.),
-        'sources': _xNRES(-1),
-    },
-    'CA': _make_sc_all_atom_tensors(),
-    # =O off of C
-    'C': {
-        'bond_lengths': _xNRES(BB_BUILD_INFO["BONDLENS"]["c-o"]),
-        'cthetas': _xNRES(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'sthetas': _xNRES(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'cchis': _xNRES(0.),
-        'schis': _xNRES(0.),
-        'types': _xNRES(1),
-        'offsets': _xNRES(0.),
-        'sources': _xNRES(-1),
-    }
+    'N': _make_nitrogen_tensors(),
+    'CA': _make_sc_calpha_tensors(),
+    'C': _make_carbon_tensors()
 }
-# Because proline does not have a hydrogen on CA, we set the build type for that atom to 0
-# SC_ALL_ATOM_BUILD_INFO['HA']['types'][AA2NUM['P']] = 0
-# Because Glycine has two hydrogens on CA that are slightly different than other res
 
 ###################################################
 # Coordinates
 ###################################################
 
 
-def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info, bb_angs=None):
+def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info):
     """Create sidechain coordinates from backbone matrices given relevant auxilliary data.
 
     Our goal is to generate arrays for each datum (bond length, thetas, chis) necessary
@@ -339,7 +409,7 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info, bb_angs=
     schis = build_info['schis'][seq_aa_index].to(device).type(dtype)
     offsets = build_info['offsets'][seq_aa_index].to(device).type(dtype)
     types = build_info['types'][seq_aa_index].to(device)
-    sources = build_info['sources'][seq_aa_index].to(device)
+    sources = build_info['sources'][seq_aa_index].to(device).long()
     names = [build_info['names'][idx] for idx in seq_aa_index] if 'names' in build_info else None
 
     # TODO modify the first and last residues (index 0 and -1 in above arrays) to add
@@ -360,6 +430,7 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info, bb_angs=
     # We then select BB transformation matrices for the residues that will build an atom
     prevmats = backbone_mats[prevbuildmask]
     matrices.append(prevmats)
+    masks.append(prevbuildmask)
 
     # Now, iterate through each level of the sidechain, from 0 to the max number of atoms
     for i in range(MAX):
@@ -429,7 +500,7 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info, bb_angs=
                     # change prevmat to earlier matrix
                     # We select the matrix from k+1 because when k==-1,
                     # we want the first matrix in the list
-                    prevmats[LLmask[prevbuildmask]] = matrices[k+1][LLmask[masks[k]]]
+                    prevmats[LLmask[prevbuildmask]] = matrices[k + 1][LLmask[masks[k+1]]]
 
         # We can finally update the globally-referenced TMats through multiplication
         prevmats = prevmats[buildmask[prevbuildmask]] @ tmats_for_level_i
@@ -444,6 +515,13 @@ def make_sidechain_coords(backbone_mats, seq_aa_index, ang, build_info, bb_angs=
         prevbuildmask = buildmask
 
     return sccoords
+
+
+def _add_terminal_residue_names_to_seq(seq):
+    new_seq = list(seq)
+    new_seq[0] = "N" + new_seq[0]
+    new_seq[-1] = "C" + new_seq[-1]
+    return new_seq
 
 
 def make_coords(seq, angles, add_hydrogens=False):
@@ -499,25 +577,27 @@ def make_coords(seq, angles, add_hydrogens=False):
     ncac = (ncacM @ vec)[:, :3].reshape(L, 3, 3)
 
     # Convert sequence to fixed AA index
-    seq_aa_index = torch.tensor([AA2NUM[a] for a in seq], device=device)
+    seq_with_terminals = _add_terminal_residue_names_to_seq(seq)
+    seq_aa_index = torch.tensor([AA2NUM[a] for a in seq_with_terminals], device=device)
 
     # Construct carbonyl oxygens (C=O) along backbone;
     # First: Select relevant angle (np.pi + psi)
     oang = (np.pi + ang[1:, ang_name_map['psi']]).unsqueeze(-1)
     # Next: Use the oang angle tensor and C-atom relevant info to place all oxygens
-    ocoords = make_sidechain_coords(ncacM[2::3], seq_aa_index, oang, build_info['C'])
+    ocoords = build_coords_from_source(ncacM[2::3], seq_aa_index, oang, build_info['C'])
 
     # Create hydrogens for nitrogens
     if build_info['N']:  # nH
         nang = (np.pi + ang[:L, ang_name_map['omega']]).unsqueeze(-1)
-        ncoords = make_sidechain_coords(ncacM[0::3], seq_aa_index, nang, build_info['N'])
+        ncoords = build_coords_from_source(ncacM[0::3], seq_aa_index, nang,
+                                           build_info['N'])
     else:
         ncoords = torch.zeros(L, 0, 3, dtype=dtype, device=device)
 
     # Construct all sidechain atoms by iteratively applying TMats starting from CA
     scang = (2 * np.pi - angles_cp.to(device)[:, SC_ANGLES_START_POS:])
-    sccoords = make_sidechain_coords(ncacM[1::3], seq_aa_index, scang, build_info['CA'],
-                                     bb_angs=ang[1:].clone())
+    sccoords = build_coords_from_source(ncacM[1::3], seq_aa_index, scang,
+                                        build_info['CA'])
 
     # When present, we place the H and HAs atom (attached to N and CA) after the backbone
     # This allows the tail end of all residue representations to contain PADs only.

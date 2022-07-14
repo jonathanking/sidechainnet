@@ -16,20 +16,8 @@ nan = torch.nan
 
 @pytest.fixture
 def p():
-    # angles = torch.tensor([  # nan in the first phi
-    #     [    nan,  2.9864,  3.1411,  1.8979,  2.0560,  2.1353, -1.1941, -2.9177, -0.0954,     nan,     nan,     nan],
-    #     [-2.2205, -2.7720,  3.1174,  1.9913,  2.0165,  2.1277,  1.9315,  1.3732, 2.8204, -1.2943,     nan,     nan],
-    #     [-1.8046,  2.6789, -3.0887,  1.8948,  2.0197,  2.1358,  2.3525, -2.9406, -1.0214,     nan,     nan,     nan],
-    #     [-2.6590,  2.7039,  3.0630,  1.9808,  2.0562,  2.1439,  1.5275,  3.0964, 1.1357, -3.0276,     nan,     nan],
-    #     [-2.6066, -0.7829,     nan,  1.9416,     nan,     nan,  1.5148, -3.0244, -2.8980, -0.4080,     nan,     nan]], dtype=torch.float64)
-    # phi_ = 2/3*np.pi
-    # angles = torch.tensor([
-    #     [  -phi_,  2.9864,  3.1411,  1.8979,  2.0560,  2.1353, -1.1941, -2.9177, -0.0954,     nan,     nan,     nan],
-    #     [-2.2205, -2.7720,  3.1174,  1.9913,  2.0165,  2.1277,  1.9315,  1.3732, 2.8204, -1.2943,     nan,     nan],
-    #     [-1.8046,  2.6789, -3.0887,  1.8948,  2.0197,  2.1358,  2.3525, -2.9406, -1.0214,     nan,     nan,     nan],
-    #     [-2.6590,  2.7039,  3.0630,  1.9808,  2.0562,  2.1439,  1.5275,  3.0964, 1.1357, -3.0276,     nan,     nan],
-    #     [-2.6066, -0.7829,     nan,  1.9416,     nan,     nan,  1.5148, -3.0244, -2.8980, -0.4080,     nan,     nan]], dtype=torch.float64)
-    # Below uses the new measurement methodology
+    # 1st line uses the new measurement methodology for X0
+    # 2nd line below uses default tetrahedral geom to place CB atom with X0
     angles = torch.tensor([
         # [nan, 2.9864, 3.1411, 1.8979, 2.0560, 2.1353, 0.9887, -2.9177, -0.0954, nan, nan, nan],
         [nan, 2.9864, 3.1411, 1.8979, 2.0560, 2.1353, np.deg2rad(-109.5), -2.9177, -0.0954, nan, nan, nan],
@@ -181,7 +169,7 @@ def test_fasbuildh_01(p: SCNProtein):
     """Build a simple protein from angles, including hydrogens."""
     fast_coords = p.fastbuild(add_hydrogens=True)
     p.coords = p.hcoords = fast_coords
-    p.to_pdb("/home/jok120/Downloads/predh14.pdb")
+    p.to_pdb("/home/jok120/Downloads/predh32.pdb")
 
 def test_measure_x0_with_fictitious_atom():
     _init_dssp_data()

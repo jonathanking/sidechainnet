@@ -492,7 +492,7 @@ class ResidueBuilder(object):
         for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
                 _get_residue_build_iter(self.name, SC_HBUILD_INFO, self.device)):
                 # TODO may be out of date; originally used SC_BUILD_INFO
-                raise ValueError("Warning: Trying to use normal structure builder after update.")
+            raise ValueError("Warning: Trying to use normal structure builder after update.")
             # Select appropriate 3 points to build from
             if i == 0:
                 a, b, c = self.pts["C-"], self.pts["N"], self.pts["CA"]

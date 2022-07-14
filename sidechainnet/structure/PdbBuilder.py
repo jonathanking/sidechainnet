@@ -154,8 +154,13 @@ class PdbBuilder(object):
         generated in groups of atoms_per_res (the output is L x atoms_per_res x 3.)"""
         atom_names = ATOM_MAP_14 if not self.has_hydrogens else ATOM_MAP_H
         mapping = []
-        for residue in self.seq:
-            mapping.append((residue, atom_names[residue]))
+        for i, residue in enumerate(self.seq):
+            an = atom_names[residue]
+            # The first residue, if N-terminal, actually calls its N-H hydrogen H1, not H
+            if i == 0:
+                assert an[5] == "H"
+                an = an[0:5] + ["H1"] + an[6:]
+            mapping.append((residue, an))
         return mapping
 
     def get_pdb_string(self, title=None):

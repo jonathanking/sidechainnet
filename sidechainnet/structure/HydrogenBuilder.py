@@ -9,9 +9,10 @@ from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
-# ARG has 20 sc atoms (including hydrogens) + 4 bb + up to 2 terminal hydrogens + HA
-# TODO Recount maximum residue size w/terminal residues
-NUM_COORDS_PER_RES_W_HYDROGENS = NUM_COORDS_PER_RES + 6 + 4 + 2 + 2
+# ARG has 24 atoms including Hs (see amino12.lib)  + 2 terminal H + 1 terminal OXT
+# 3 of these are backbone heavy atom (N, CA, C), 1 is bb Oxygen, 1 is N-H
+# 27 (total incl 3 term) - 3 term - 5 bb (N, CA, C, O, NH) = 19 sc atoms extending from CA
+NUM_COORDS_PER_RES_W_HYDROGENS = 27
 
 
 METHYL_ANGLE = torch.tensor(np.deg2rad(109.5))
@@ -910,5 +911,5 @@ def _get_amide_methine_hydrogen_help(R1, center, R2, length, is_numpy):
 
 ATOM_MAP_H = {}
 for a, aaa in ONE_TO_THREE_LETTER_MAP.items():
-    ATOM_MAP_H[a] = ["N", "CA", "C", "O", "H"] + [tors.split("-")[-1].strip() for tors in SC_HBUILD_INFO[aaa]["torsion-names"]]
+    ATOM_MAP_H[a] = ["N", "CA", "C", "O", "OXT", "H", "H2", "H3"] + [tors.split("-")[-1].strip() for tors in SC_HBUILD_INFO[aaa]["torsion-names"]]
     ATOM_MAP_H[a].extend(["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[a])))
