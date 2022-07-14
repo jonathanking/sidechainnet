@@ -98,6 +98,8 @@ SC_HBUILD_INFO = {
             2.0420352248333655,
             2.0420352248333655,
 
+            1.9111355,  # HA
+
             1.9111355,
             1.9111355
         ],
@@ -108,6 +110,8 @@ SC_HBUILD_INFO = {
             1.25,
             1.25,
 
+            1.090,  # HA
+
             1.09,
             1.09],
         'torsion-names': [
@@ -115,6 +119,8 @@ SC_HBUILD_INFO = {
             'N-CA-CB-CG',
             'CA-CB-CG-OD1',
             'CA-CB-CG-OD2',
+
+            'C-N-CA-HA',  # HA
 
             'N-CA-CB-HB2',
             'N-CA-CB-HB3'],
@@ -124,6 +130,8 @@ SC_HBUILD_INFO = {
             'CX-2C-CO-O2',
             'CX-2C-CO-O2',
 
+            'C -N -CX-H1',  # HA
+
             'N -CX-2C-HC',
             'N -CX-2C-HC'],
         'torsion-vals': [
@@ -131,6 +139,8 @@ SC_HBUILD_INFO = {
             'p',
             'p',
             'i',
+
+            ('hi', 'CB', 2*np.pi/3),  # HA
 
             ('hi', 'CG', +2*np.pi/3),
             ('hi', 'CG', -2*np.pi/3)]
@@ -164,6 +174,8 @@ SC_HBUILD_INFO = {
             2.0420352248333655,
             2.0420352248333655,
 
+            1.9111355,  # HA
+
             1.9111355,
             1.9111355,
             1.9111355,
@@ -176,6 +188,8 @@ SC_HBUILD_INFO = {
             1.25,
             1.25,
 
+            1.090,  # HA
+
             1.0900,
             1.0900,
             1.0900,
@@ -186,6 +200,8 @@ SC_HBUILD_INFO = {
             'CA-CB-CG-CD',
             'CB-CG-CD-OE1',
             'CB-CG-CD-OE2',
+
+            'C-N-CA-HA',  # HA
 
             'N-CA-CB-HB2',
             'N-CA-CB-HB3',
@@ -199,6 +215,8 @@ SC_HBUILD_INFO = {
             '2C-2C-CO-O2',
             '2C-2C-CO-O2',
 
+            'C -N -CX-H1',  # HA
+
             'N -CX-2C-HC',
             'N -CX-2C-HC',
             'CX-2C-2C-HC',
@@ -210,6 +228,8 @@ SC_HBUILD_INFO = {
             'p',
             'p',
             'i',
+
+            ('hi', 'CB', 2*np.pi/3),  # HA
 
             ('hi', 'CG',  2*np.pi/3),  # chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
             ('hi', 'CG', -2*np.pi/3),
@@ -420,6 +440,8 @@ SC_HBUILD_INFO = {
             2.0943951023931953,
             2.0943951023931953,
 
+            1.9111355,  # HA
+
             1.9111355,
             1.9111355,
             -np.deg2rad(120.00),
@@ -442,6 +464,8 @@ SC_HBUILD_INFO = {
             1.4,
             1.404,
 
+            1.090,  # HA
+
             1.090,
             1.090,
             1.080,  # TODO this might come from histidine, not sure why
@@ -461,6 +485,8 @@ SC_HBUILD_INFO = {
             'CE2-CZ2-CH2-CZ3',
             'CZ2-CH2-CZ3-CE3',
             'CH2-CZ3-CE3-CD2',
+
+            'C-N-CA-HA',  # HA
 
             'N-CA-CB-HB2',
             'N-CA-CB-HB3',
@@ -483,6 +509,8 @@ SC_HBUILD_INFO = {
             'CA-CA-CA-CA',
             'CA-CA-CA-CB',
 
+            'C -N -CX-H1',  # HA
+
             'N -CT-CT-HC',
             'N -CT-CT-HC',
             'CT-C*-CW-H4',
@@ -493,25 +521,27 @@ SC_HBUILD_INFO = {
             'CA-CA-CA-HA'
         ],
         'torsion-vals': [
-            'p',                        #  'CB',
-            'p',                        #  'CG',
-            'p',                        #  'CD1',
-            3.141592653589793,          #  'NE1',
-            0.0,                        #  'CE2',
-            3.141592653589793,          #  'CZ2',
-            3.141592653589793,          #  'CH2',
-            0.0,                        #  'CZ3',
-            0.0,                        #  'CE3',
-            0.0,                        #  'CD2',
+            'p',                        # 'CB',
+            'p',                        # 'CG',
+            'p',                        # 'CD1',
+            3.141592653589793,          # 'NE1',
+            0.0,                        # 'CE2',
+            3.141592653589793,          # 'CZ2',
+            3.141592653589793,          # 'CH2',
+            0.0,                        # 'CZ3',
+            0.0,                        # 'CE3',
+            0.0,                        # 'CD2',
 
-            ('hi', 'CG', 2*np.pi/3),    #  'HB2',
-            ('hi', 'CG', -2*np.pi/3),   #  'HB3',
-            ('hi', 'NE1', -np.pi),       #  'HD1',
-            ('hi', 'CE2', -np.pi),      #  'HE1',
-            ('hi', 'CD2', -np.pi),      #  'HE3',
-            ('hi', 'CZ3', -np.pi),      #  'HH2',
-            ('hi', 'CH2', -np.pi),      #  'HZ2',
-            ('hi', 'CE3', -np.pi),      #  'HZ3'
+            ('hi', 'CB', 2*np.pi/3),    # HA
+
+            ('hi', 'CG', 2*np.pi/3),    # 'HB2',
+            ('hi', 'CG', -2*np.pi/3),   # 'HB3',
+            ('hi', 'NE1', -np.pi),      # 'HD1',
+            ('hi', 'CE2', -np.pi),      # 'HE1',
+            ('hi', 'CD2', -np.pi),      # 'HE3',
+            ('hi', 'CZ3', -np.pi),      # 'HH2',
+            ('hi', 'CH2', -np.pi),      # 'HZ2',
+            ('hi', 'CE3', -np.pi),      # 'HZ3'
         ]
     },
     'TYR': {
