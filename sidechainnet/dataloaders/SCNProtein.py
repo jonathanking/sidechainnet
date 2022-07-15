@@ -30,6 +30,7 @@ from openmm.app import Topology
 from openmm.app import element as elem
 from openmm.app.forcefield import ForceField, HBonds
 from openmm.app.modeller import Modeller
+from openmm.app.pdbfile import PDBFile
 from openmm.openmm import LangevinMiddleIntegrator
 from openmm.unit import kelvin, nanometer, picosecond, picoseconds
 
@@ -338,6 +339,7 @@ class SCNProtein(object):
             self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
 
+
     ##########################################
     #         OPENMM SETUP FUNCTIONS         #
     ##########################################
@@ -364,16 +366,12 @@ class SCNProtein(object):
             residue = self.topology.addResidue(name=residue_name, chain=chain)
 
             for j, (an, c) in enumerate(zip(atom_names, coords)):
-                if an == "PAD":
+                # If this atom is a PAD character or non-existent terminal atom, skip
+                if an == "PAD" or (an in ["OXT", "H2", "H3"] and np.isnan(c).any()):
                     hcoord_idx += 1
                     continue
                 # Handle missing atoms
                 if np.isnan(c).any():
-                    # if i == len(self.seq) - 1 and an in ["O", "OXT"]:
-                    #     # TODO Terminal structures mistakenly have an O where they should
-                    #     # have an OXT. The O is not present, and this is permissible.
-                    #     continue
-                    # print(coords)
                     raise ValueError("Cannot construct an OpenMM Representation with "
                                      f"missing atoms ({i} {residue_name} {self}).")
                     self.has_missing_atoms = True
@@ -488,6 +486,10 @@ class SCNProtein(object):
         self.ending_positions = np.asarray(self.state.getPositions(asNumpy=True))
         return self.ending_energy - self.starting_energy
 
+    def write_ending_positions_to_pdbfile(self, filename):
+        with open(filename, 'w') as f:
+            PDBFile.writeFile(self.simulation.topology, self.ending_positions * 10, f)
+
     def get_energy_difference(self):
         """Create PDBFixer object, minimize, and report ∆E."""
         self.add_hydrogens()
@@ -513,13 +515,6 @@ class SCNProtein(object):
                 atom_names = ATOM_MAP_14[self.seq[i]]
             else:
                 atom_names = hy.ATOM_MAP_H[self.seq[i]]
-            # Update atom names with terminal atoms
-            if i == 0 and not heavy_only:
-                atom_names = self.insert_terminal_atoms_into_name_list(
-                    atom_names, ["H2", "H3"])
-            elif i == len(self.seq) - 1 and not heavy_only:
-                atom_names = self.insert_terminal_atoms_into_name_list(
-                    atom_names, ["OXT"])
             all_atom_name_list.append(atom_names)
 
         if pprint:

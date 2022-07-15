@@ -171,6 +171,14 @@ def test_fasbuildh_01(p: SCNProtein):
     p.coords = p.hcoords = fast_coords
     p.to_pdb("/home/jok120/Downloads/predh32.pdb")
 
+
+def test_fasbuildh_02(p: SCNProtein):
+    """Build a simple protein from angles, including hydrogens. Compute E."""
+    fast_coords = p.fastbuild(add_hydrogens=True)
+    p.coords = p.hcoords = fast_coords
+    e = p.get_energy()
+
+
 def test_measure_x0_with_fictitious_atom():
     _init_dssp_data()
     data = process_id("1A38_2_P")
