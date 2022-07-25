@@ -633,8 +633,10 @@ def _create_atomname_lookup():
 
 
 class ForceFieldLookupHelper(object):
+    """Reads in AMBER ForceField data to facilitate bond/angle lookups with Regex."""
 
     def __init__(self, *forcefield_files):
+        """Ingest one or more forcefield files ordered in terms of priority."""
         self.ff_files = forcefield_files
         self.text = ""
 
@@ -646,9 +648,9 @@ class ForceFieldLookupHelper(object):
         """Lookup the value (bond length or bond angle) for the item (ex 'CX-2C':1.526).
 
         Args:
-            item (str): A string representing a bond (2 atoms) or angle (3 atoms) with atom
-                types separated by hyphens.
-        
+            item (str): A string representing a bond (2 atoms) or angle (3 atoms) with
+                atom types separated by hyphens.
+
         Returns:
             value (float): The value of item as specified in AMBER forcefield parameters.
         """
@@ -674,6 +676,7 @@ class ForceFieldLookupHelper(object):
 
 
 def create_complete_hydrogen_build_param_dict():
+    """Create a Python dictionary that describes all necessary info for building atoms."""
     # We need to record the following information: bond lengths, bond angles
     new_build_info = copy.deepcopy(BUILD_INFO)
 
@@ -703,6 +706,9 @@ def create_complete_hydrogen_build_param_dict():
             new_build_info[resname]['angle-values'].append(ff_helper.get_value(angle))
 
     return new_build_info
+
+
+BUILD_INFO = create_complete_hydrogen_build_param_dict()
 
 
 if __name__ == "__main__":
