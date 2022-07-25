@@ -39,21 +39,21 @@ import sidechainnet.structure.fastbuild as fastbuild
 from sidechainnet.utils.download import MAX_SEQ_LEN
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_HBUILD_INFO
-from sidechainnet.research.build_parameter_optim.construct_build_info import BUILD_INFO
-from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
+from sidechainnet.structure.build_info import ATOM_MAP_H, NUM_COORDS_PER_RES, SC_HBUILD_INFO
+from sidechainnet.structure.build_info import ATOM_MAP_HEAVY
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
-OPENMM_PLATFORM = "CPU"  #CUDA"  # CUDA or CPU
+OPENMM_PLATFORM = "CPU"  # CUDA"  # CUDA or CPU
 
 
 class SCNProtein(object):
     """Represent one protein in SidechainNet. Created programmatically by SCNDataset."""
 
     def __init__(self, **kwargs) -> None:
+        """Create a SCNProtein from keyword arguments."""
         super().__init__()
         self.coords = kwargs['coordinates'] if 'coordinates' in kwargs else None
         self.angles = kwargs['angles'] if 'angles' in kwargs else None
@@ -95,6 +95,7 @@ class SCNProtein(object):
 
     @property
     def sequence(self):
+        """Return the protein's sequence in 1-letter amino acid codes."""
         return self.seq
 
     def __len__(self):
@@ -209,16 +210,17 @@ class SCNProtein(object):
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
 
-    def fastbuild(self, add_hydrogens=False, build_info=None):
-        """Build protein coordinates from angles. Does not update coords."""
-        # if build_info is None:
-            # build_info = BUILD_INFO
+    def fastbuild(self, add_hydrogens=False, build_info=None, inplace=False):
+        """Build protein coordinates from angles."""
         coords, params = fastbuild.make_coords(self.seq,
                                                self.angles,
                                                build_info=build_info,
                                                add_hydrogens=add_hydrogens)
-        self.coords = self.hcoords = coords
-        self.has_hydrogens = add_hydrogens
+        if inplace:
+            self.coords = self.hcoords = coords
+            self.has_hydrogens = add_hydrogens
+            self.sb = None
+            return
         # if self.positions is None and add_hydrogens:
             # self.initialize_openmm()
         # self.update_positions()
@@ -522,9 +524,9 @@ class SCNProtein(object):
         all_atom_name_list = []
         for i in range(len(self.seq)):
             if not self.has_hydrogens or heavy_only:
-                atom_names = ATOM_MAP_14[self.seq[i]]
+                atom_names = ATOM_MAP_HEAVY[self.seq[i]]
             else:
-                atom_names = hy.ATOM_MAP_H[self.seq[i]]
+                atom_names = ATOM_MAP_H[self.seq[i]]
             all_atom_name_list.append(atom_names)
 
         if pprint:
@@ -542,11 +544,11 @@ class SCNProtein(object):
                 f"{item: <4}" for sublist in all_atom_name_list for item in sublist
             ]
             if heavy_only:
-                items = list(zip(flat_list, self.coords))
+                items = list(zip(flat_list, self.coords.reshape(-1, 3)))
             elif self.has_hydrogens:
-                items = list(zip(flat_list, self.hcoords))
+                items = list(zip(flat_list, self.hcoords.reshape(-1, 3)))
             else:
-                items = list(zip(flat_list, self.coords))
+                items = list(zip(flat_list, self.coords.reshape(-1, 3)))
             for i, xy in enumerate(items):
                 xy = list(xy)
                 xy[1] = xy[1].detach().numpy()

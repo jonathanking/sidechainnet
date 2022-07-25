@@ -2,8 +2,8 @@
 import itertools
 
 import numpy as np
-from sidechainnet.structure.build_info import SC_HBUILD_INFO
-from sidechainnet.structure.HydrogenBuilder import ATOM_MAP_H, NUM_COORDS_PER_RES_W_HYDROGENS
+from sidechainnet.structure.build_info import ATOM_MAP_H, ATOM_MAP_HEAVY
+from sidechainnet.structure.HydrogenBuilder import NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
@@ -152,7 +152,7 @@ class PdbBuilder(object):
     def _make_mapping_from_seq(self):
         """Given a protein sequence, this returns a mapping that assumes coords are
         generated in groups of atoms_per_res (the output is L x atoms_per_res x 3.)"""
-        atom_names = ATOM_MAP_14 if not self.has_hydrogens else ATOM_MAP_H
+        atom_names = ATOM_MAP_HEAVY if not self.has_hydrogens else ATOM_MAP_H
         mapping = []
         for i, residue in enumerate(self.seq):
             an = atom_names[residue]
@@ -218,11 +218,3 @@ def split_every(n, iterable):
     while piece:
         yield piece
         piece = list(itertools.islice(i, n))
-
-
-ATOM_MAP_14 = {}
-for a, aaa in ONE_TO_THREE_LETTER_MAP.items():
-    atom_names = [tors.split("-")[-1].strip() for tors in SC_HBUILD_INFO[aaa]["torsion-names"]]
-    atom_names = list(filter(lambda x:not x.startswith("H"), atom_names))
-    ATOM_MAP_14[a] = ["N", "CA", "C", "O"] + atom_names
-    ATOM_MAP_14[a].extend(["PAD"] * (14 - len(ATOM_MAP_14[a])))

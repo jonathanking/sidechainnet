@@ -12,7 +12,7 @@ from ._version import get_versions
 # Add imports here
 from .structure.StructureBuilder import StructureBuilder
 from .structure.BatchedStructureBuilder import BatchedStructureBuilder
-from .utils.load import load
+from .utils.load import load, load_pdb
 from .utils.download import VALID_SPLITS, DATA_SPLITS
 from .structure.build_info import GLOBAL_PAD_CHAR
 from .create import create, create_custom, get_proteinnet_ids, generate_all

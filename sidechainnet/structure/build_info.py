@@ -28,6 +28,7 @@ import copy
 import re
 import numpy as np
 
+
 PI = np.pi
 
 NUM_ANGLES = 12
@@ -350,7 +351,7 @@ RAW_BUILD_INFO = {
             'p',                         # CB
             'p',                         # CG
             'p',                         # CD1
-            ('hi', 'CD1', 2 * PI / 3),   # CD2,  # TODO Do not measure/predict this angle
+            ('hi', 'CD1', -2 * PI / 3),  # CD2,  # TODO Do not measure/predict this angle
             ('hi', 'CB', 2 * PI / 3),    # HA
             ('hi', 'CG', 2 * PI / 3),    # HB2
             ('hi', 'CG', -2 * PI / 3),   # HB3
@@ -673,6 +674,36 @@ BB_BUILD_INFO = {
 }
 
 
+def _get_max_num_atoms_heavy():
+    lengths = []
+    for resname, resinfo in RAW_BUILD_INFO.items():
+        heavyatms = list(filter(lambda an: not an.startswith("H"), resinfo['atom-names']))
+        nonh_terminals = list(
+            filter(lambda an: not an.startswith('H'), _SUPPORTED_TERMINAL_ATOMS))
+        n = len(heavyatms) + len(nonh_terminals) + len(_BACKBONE_ATOMS)
+        lengths.append(n)
+    return max(lengths)
+
+
+def _get_max_num_atoms_hydrogen():
+    lengths = []
+    for resname, resinfo in RAW_BUILD_INFO.items():
+        n = len(resinfo['torsion-names']) + len(_SUPPORTED_TERMINAL_ATOMS) + len(
+            _BACKBONE_ATOMS + ['H'])
+        lengths.append(n)
+    return max(lengths)
+
+
+_SUPPORTED_TERMINAL_ATOMS = ['OXT', 'H2', 'H3']
+_BACKBONE_ATOMS = ['N', 'CA', 'C', 'O']
+_MAX_NUM_ATOMS_HEAVY = _get_max_num_atoms_heavy()
+_MAX_NUM_ATOMS_HYDROGEN = _get_max_num_atoms_hydrogen()
+assert _MAX_NUM_ATOMS_HYDROGEN == 27, _MAX_NUM_ATOMS_HYDROGEN
+assert _MAX_NUM_ATOMS_HEAVY == 15, _MAX_NUM_ATOMS_HEAVY
+NUM_COORDS_PER_RES = _MAX_NUM_ATOMS_HEAVY
+NUM_COORDS_PER_RES_W_HYDROGENS = _MAX_NUM_ATOMS_HYDROGEN
+
+
 def _create_atomname_lookup():
     """Create a dictionary mapping resname3 to dict mapping atom_name to atom_type."""
     with open("/home/jok120/build/amber16/dat/leap/lib/amino12.lib", "r") as f:
@@ -719,7 +750,8 @@ class ForceFieldLookupHelper(object):
 
         self.overwrite_rules = {}
         histidine_interior_angles = ["CT-CC-NA", "CC-NA-CR", "NA-CR-NB", "CR-NB-CV"]
-        for hia in histidine_interior_angles:
+        self.overwrite_rules[('HIS', histidine_interior_angles[0])] = np.deg2rad(122.6690)
+        for hia in histidine_interior_angles[1:]:
             self.overwrite_rules[('HIS', hia)] = np.deg2rad(108)
         self.overwrite_rules[('PRO', "N -CX-CT")] = np.deg2rad(101.8812)
         self.overwrite_rules[('PRO', "CX-CT-CT")] = np.deg2rad(103.6465)
@@ -797,7 +829,23 @@ def create_complete_hydrogen_build_param_dict():
 
 
 SC_HBUILD_INFO = create_complete_hydrogen_build_param_dict()
+from sidechainnet.structure.fastbuild import AA1to3
 
+ATOM_MAP_HEAVY = {}
+for a, aaa in AA1to3.items():
+    if len(aaa) == 4:  # terminal res
+        continue
+    atom_names = list(
+        filter(lambda x: not x.startswith("H"), SC_HBUILD_INFO[aaa]['atom-names']))
+    ATOM_MAP_HEAVY[a] = ["N", "CA", "C", "O", "OXT"] + atom_names
+    ATOM_MAP_HEAVY[a].extend(["PAD"] * (NUM_COORDS_PER_RES - len(ATOM_MAP_HEAVY[a])))
+
+ATOM_MAP_H = {}
+for a, aaa in AA1to3.items():
+    if len(aaa) == 4:  # terminal res
+        continue
+    ATOM_MAP_H[a] = ["N", "CA", "C", "O", "OXT", "H", "H2", "H3"] + SC_HBUILD_INFO[aaa]['atom-names']
+    ATOM_MAP_H[a].extend(["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[a])))
 
 if __name__ == "__main__":
     import pprint

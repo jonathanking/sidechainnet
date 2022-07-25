@@ -3,7 +3,7 @@
 import numpy as np
 import torch
 from sidechainnet.structure.fastbuild_matrices import MakeBackbone, MakeTMats
-from sidechainnet.structure.build_info import (ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO,
+from sidechainnet.structure.build_info import (_BACKBONE_ATOMS, ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO,
                                                NUM_COORDS_PER_RES, SC_ANGLES_START_POS,
                                                SC_HBUILD_INFO)
 
@@ -77,7 +77,8 @@ def _make_sc_heavy_atom_tensors():
         sidechains) to the data itself.
     """
     nres = len(AA)
-    ncoords = NUM_COORDS_PER_RES - 4  # TODO fix function for heavy atom building
+    ncoords = NUM_COORDS_PER_RES - (len(_BACKBONE_ATOMS) + 1)  # TODO fix function for heavy atom building
+    assert ncoords == 10
     sc_source_atom = torch.zeros(nres, ncoords, dtype=torch.long)
     sc_bond_length = torch.zeros(nres, ncoords)
     sc_ctheta = torch.zeros(nres, ncoords)
@@ -273,6 +274,13 @@ def _make_sc_calpha_tensors():
             else:
                 break
 
+    # sc_bond_length.requires_grad_(True)
+    # sc_ctheta.requires_grad_(True)
+    # sc_stheta.requires_grad_(True)
+    # sc_cchi.requires_grad_(True)
+    # sc_schi.requires_grad_(True)
+    # sc_offset.requires_grad_(True)
+
     return {
         'bond_lengths': sc_bond_length,  # Each of these is a matrix containing relevant
         'cthetas': sc_ctheta,  # build info for all atoms in all residues.
@@ -288,36 +296,6 @@ def _make_sc_calpha_tensors():
 
 def _xNRES(v):  # make 60 copies as tensor
     return torch.Tensor([v]).repeat(len(AA)).reshape(len(AA), 1)
-
-
-# In the dictionaries below, we specify geometries for atoms building off of N, CA, and C.
-# Only CA has angles that vary by residue identity. The other atoms (N, C) have identical
-# build data for every residue. CA atom build info is organized into a data with data
-# labels as keys, and vectors of values ordered by residue identity.
-
-SC_HEAVY_ATOM_BUILD_INFO = {
-    # Nothing extends from Nitrogen, so no data is needed here.
-    'N': None,
-    # Many atoms potentially extend from alpha Carbons. Data is organized by res identity.
-    # i.e. 'bond_lengths' : 20 x 10,  'types' : 20 x 10
-    # Items are meant to be selected from this dictionary to match the sequence that will
-    # be built.
-    'CA': _make_sc_heavy_atom_tensors(),
-    'HA': None,
-    # Carbonyl carbons are built off of the backbone C. Each residue builds this oxygen
-    # in the same way, so we simply repeat the relevant build info data per res identity.
-    'C': {
-        'bond_lengths': _xNRES(BB_BUILD_INFO["BONDLENS"]["c-o"]),
-        'cthetas': _xNRES(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'sthetas': _xNRES(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])),
-        'cchis': _xNRES(0.),
-        'schis': _xNRES(0.),
-        'types': _xNRES(1),
-        'offsets': _xNRES(0.),
-        'sources': _xNRES(-1),
-        # 'names': [['O'] for _ in range(20)]
-    }
-}
 
 
 def _make_nitrogen_tensors():
@@ -383,6 +361,26 @@ def _make_carbon_tensors():
     cdict['offsets'][40:, 1] = np.pi
 
     return cdict
+
+
+# In the dictionaries below, we specify geometries for atoms building off of N, CA, and C.
+# Only CA has angles that vary by residue identity. The other atoms (N, C) have identical
+# build data for every residue. CA atom build info is organized into a data with data
+# labels as keys, and vectors of values ordered by residue identity.
+
+SC_HEAVY_ATOM_BUILD_INFO = {
+    # Nothing extends from Nitrogen, so no data is needed here.
+    'N': None,
+    # Many atoms potentially extend from alpha Carbons. Data is organized by res identity.
+    # i.e. 'bond_lengths' : 20 x 10,  'types' : 20 x 10
+    # Items are meant to be selected from this dictionary to match the sequence that will
+    # be built.
+    'CA': _make_sc_heavy_atom_tensors(),
+    'HA': None,
+    # Carbonyl carbons are built off of the backbone C. Each residue builds this oxygen
+    # in the same way, so we simply repeat the relevant build info data per res identity.
+    'C': _make_carbon_tensors()
+}
 
 
 def get_all_atom_build_info():
@@ -561,8 +559,8 @@ def make_coords(seq, angles, build_info, add_hydrogens=False):
     build_info describes what atoms to make and how.
     """
     if build_info is None:
-        build_info = SC_ALL_ATOM_BUILD_INFO
-    # build_info = SC_HEAVY_ATOM_BUILD_INFO if not add_hydrogens else get_all_atom_build_info
+        build_info = SC_HEAVY_ATOM_BUILD_INFO if not add_hydrogens else SC_ALL_ATOM_BUILD_INFO
+
     L = len(seq)
     device = angles.device
     dtype = angles.dtype

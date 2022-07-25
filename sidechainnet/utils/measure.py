@@ -62,12 +62,11 @@ def check_standard_continuous(residue, prev_res_num):
 
 
 def determine_sidechain_atomnames(_res, include_h=False):
-    """Given a residue from ProDy, returns a list of sidechain atom names that must be
-    recorded."""
+    """Given a ProDy residue, return a list of sidechain atom names to be recorded."""
     if _res.getResname() in SC_HBUILD_INFO.keys():
-        return list(filter(lambda an: not an.startswith("H"), 
-                           SC_HBUILD_INFO[_res.getResname()]["atom-names"])
-        )
+        return list(
+            filter(lambda an: not an.startswith("H"),
+                   SC_HBUILD_INFO[_res.getResname()]["atom-names"]))
     else:
         raise NonStandardAminoAcidError
 
@@ -156,8 +155,7 @@ def compute_fictious_atom_for_res1(n, ca, c):
 
 
 def get_atom_coords_by_names(residue, atom_names):
-    """Given a ProDy Residue and a list of atom names, this attempts to select and return
-    all the atoms.
+    """Given a ProDy Residue and a list of atom names, select and return all the atoms.
 
     If atoms are not present, it substitutes the pad character in lieu of their
     coordinates.
@@ -176,7 +174,7 @@ def get_atom_coords_by_names(residue, atom_names):
 def measure_res_coordinates(_res):
     """Given a ProDy residue, measure all relevant coordinates."""
     sc_atom_names = determine_sidechain_atomnames(_res, include_h=False)
-    bbcoords = get_atom_coords_by_names(_res, ["N", "CA", "C", "O"])
+    bbcoords = get_atom_coords_by_names(_res, ["N", "CA", "C", "O", "OXT"])
     sccoords = get_atom_coords_by_names(_res, sc_atom_names)
     coord_padding = np.zeros((NUM_COORDS_PER_RES - len(bbcoords) - len(sccoords), 3))
     coord_padding[:] = GLOBAL_PAD_CHAR
@@ -213,7 +211,7 @@ def replace_nonstdaas(residues):
 
 
 def get_seq_coords_and_angles(chain, replace_nonstd=True):
-    """Extracts protein sequence, coordinates, and angles from a ProDy chain.
+    """Extract protein sequence, coordinates, and angles from a ProDy chain.
 
     Args:
         chain: ProDy chain object

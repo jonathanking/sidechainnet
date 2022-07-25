@@ -122,13 +122,13 @@ class HydrogenBuilder(object):
             coords (numpy.ndarray, torch.tensor): Coordinate set for a protein that does
                 not yet contain Hydrogens.
         """
-        from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
+        from sidechainnet.structure.PdbBuilder import ATOM_MAP_HEAVY
 
         self.seq = seq
         self.coords = coords
         self.mode = "torch" if isinstance(coords, torch.Tensor) else "numpy"
         self.is_numpy = self.mode == "numpy"
-        self.atom_map = ATOM_MAP_14
+        self.atom_map = ATOM_MAP_HEAVY
         self.terminal_atoms = {"H2": None, "H3": None, "OXT": None}
         self.empty_coord = np.zeros(
             (3)) if self.is_numpy else torch.zeros(3, device=device)
@@ -907,9 +907,3 @@ def _get_amide_methine_hydrogen_help(R1, center, R2, length, is_numpy):
         return _scale_np(-R1 - R2 + 2 * center, length) + center
     else:
         return _scale(-R1 - R2 + 2 * center, length) + center
-
-
-ATOM_MAP_H = {}
-for a, aaa in ONE_TO_THREE_LETTER_MAP.items():
-    ATOM_MAP_H[a] = ["N", "CA", "C", "O", "OXT", "H", "H2", "H3"] + [tors.split("-")[-1].strip() for tors in SC_HBUILD_INFO[aaa]["torsion-names"]]
-    ATOM_MAP_H[a].extend(["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[a])))
