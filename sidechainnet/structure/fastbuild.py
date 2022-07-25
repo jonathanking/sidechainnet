@@ -98,12 +98,14 @@ def _make_sc_heavy_atom_tensors():
         for i in range(NUM_COORDS_PER_RES - 4):
             if (i < len(info['torsion-names']) and
                     not info['torsion-names'][i].split("-")[-1].startswith("H")):
-                sc_bond_length[a][i] = info['bonds-vals'][i]
-                sc_ctheta[a][i] = np.cos(np.pi - info['angles-vals'][i])
-                sc_stheta[a][i] = np.sin(np.pi - info['angles-vals'][i])
+                sc_bond_length[a][i] = info['bond-vals'][i]
+                sc_ctheta[a][i] = np.cos(np.pi - info['angle-vals'][i])
+                sc_stheta[a][i] = np.sin(np.pi - info['angle-vals'][i])
 
                 t = info['torsion-vals'][i]
                 # Declare type of torsion angle
+                if isinstance(t, tuple) and t[0] == 'hi':
+                    continue
                 # Type 0: No atom and no angle (no change from sc_type value of 0)
                 # Type 1: Normal, predicted/measured torsion angle
                 if t == 'p':
@@ -146,10 +148,10 @@ def _get_atom_idx_in_torsion_list(atom_name, tor_name_list):
         int: Index of atom name.
     """
     if atom_name == 'C':
-        raise ValueError("Returning a strange atom source index.")
+        raise ValueError("Returning a strange atom source index. " + "-".join(tor_name_list))
         return -3
     elif atom_name == 'N':
-        raise ValueError("Returning a strange atom source index.")
+        raise ValueError("Returning a strange atom source index. " + "-".join(tor_name_list))
         return -2
     for position, t_name in enumerate(tor_name_list):
         if t_name.split('-')[-1].strip() == atom_name.strip():
@@ -205,9 +207,9 @@ def _make_sc_calpha_tensors():
             if i < len(info['torsion-vals']):
                 an = info['torsion-names'][i].split('-')[-1].strip()
                 sc_atom_name[a].append(an)
-                sc_bond_length[a][i] = info['bonds-vals'][i]
-                sc_ctheta[a][i] = np.cos(np.pi - info['angles-vals'][i])
-                sc_stheta[a][i] = np.sin(np.pi - info['angles-vals'][i])
+                sc_bond_length[a][i] = info['bond-vals'][i]
+                sc_ctheta[a][i] = np.cos(np.pi - info['angle-vals'][i])
+                sc_stheta[a][i] = np.sin(np.pi - info['angle-vals'][i])
 
                 src = info['torsion-names'][i].split('-')[-2].strip()
                 if src != 'CA':
@@ -234,6 +236,10 @@ def _make_sc_calpha_tensors():
 
                 # The following types describe hydrogens using the tuple format:
                 # ('hi', RELATM, OFFSETVAL)
+
+                elif isinstance(t, tuple) and t[1] == 'phi':
+                    sc_type[a][i] = 6
+                    sc_offset[a][i] = t[2]
 
                 elif isinstance(t, tuple):
                     # This is a hydrogen placed relative to an earlier angle/atom
@@ -338,6 +344,11 @@ def _make_nitrogen_tensors():
 
     ndict['cchis'][20:40, 1:] = np.cos(np.deg2rad(109.5))  # tetrahedral geom
 
+    # Do not build a hydrogen on the nitrogen for all prolines
+    ndict['types'][AA2NUM['P'], 0] = 0
+    ndict['types'][AA2NUM['NP'], 0] = 0
+    ndict['types'][AA2NUM['CP'], 0] = 0
+
     return ndict
 
 
@@ -374,18 +385,23 @@ def _make_carbon_tensors():
     return cdict
 
 
-SC_ALL_ATOM_BUILD_INFO = {
-    'N': _make_nitrogen_tensors(),
-    'CA': _make_sc_calpha_tensors(),
-    'C': _make_carbon_tensors()
-}
+def get_all_atom_build_info():
+    bi = {
+        'N': _make_nitrogen_tensors(),
+        'CA': _make_sc_calpha_tensors(),
+        'C': _make_carbon_tensors()
+    }
+    return bi
+
+
+SC_ALL_ATOM_BUILD_INFO = get_all_atom_build_info()
 
 ###################################################
 # Coordinates
 ###################################################
 
 
-def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info):
+def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info, bb_ang=None):
     """Create sidechain coordinates from backbone matrices given relevant auxilliary data.
 
     Our goal is to generate arrays for each datum (bond length, thetas, chis) necessary
@@ -488,6 +504,13 @@ def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info):
             cchi[type4mask[buildmask]] = torch.cos(offang)
             schi[type4mask[buildmask]] = torch.sin(offang)
 
+        # Fill in Type 6 chis, (Hydrogens defined by an offset from phi bb angle)
+        type6mask = types[:, i] == 6
+        if type6mask.any():
+            offang = bb_ang[type6mask, 0] + offsets[type6mask, i]
+            cchi[type6mask[buildmask]] = torch.cos(offang)
+            schi[type6mask[buildmask]] = torch.sin(offang)
+
         # Construct all necessary transformation matrices to build all atoms on level i
         tmats_for_level_i = MakeTMats.apply(ctheta, stheta, cchi, schi, lens)
 
@@ -514,7 +537,15 @@ def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info):
         masks.append(buildmask)
         prevbuildmask = buildmask
 
-    return sccoords
+    build_params = {
+        "bond_lengths": bond_lengths,
+        "cthetas": cthetas,
+        "sthetas": sthetas,
+        "cchis": cchis,
+        "schis": schis
+    }
+
+    return sccoords, build_params
 
 
 def _add_terminal_residue_names_to_seq(seq):
@@ -524,12 +555,14 @@ def _add_terminal_residue_names_to_seq(seq):
     return new_seq
 
 
-def make_coords(seq, angles, add_hydrogens=False):
+def make_coords(seq, angles, build_info, add_hydrogens=False):
     """Create coordinates from sequence and angles using torch operations.
 
     build_info describes what atoms to make and how.
     """
-    build_info = SC_HEAVY_ATOM_BUILD_INFO if not add_hydrogens else SC_ALL_ATOM_BUILD_INFO
+    if build_info is None:
+        build_info = SC_ALL_ATOM_BUILD_INFO
+    # build_info = SC_HEAVY_ATOM_BUILD_INFO if not add_hydrogens else get_all_atom_build_info
     L = len(seq)
     device = angles.device
     dtype = angles.dtype
@@ -545,6 +578,7 @@ def make_coords(seq, angles, add_hydrogens=False):
     # Because the first backbone angle is undefined (it has no phi), we replace nan with 0
     # This avoids improper generation of backbone TMats
     ang[1, 0] = 0
+    angles_cp[0, 6] = np.deg2rad(-109.5)  # The first CB just has tetrahedral geom
     ang[:, :3] = 2 * np.pi - ang[:, :3]  # backbone torsion angles, aka 'chi' for NeRF
     ang[:, 3:] = np.pi - ang[:, 3:]  # backbone bond angles, aka 'theta' for NeRF
 
@@ -584,21 +618,24 @@ def make_coords(seq, angles, add_hydrogens=False):
     # First: Select relevant angle (np.pi + psi)
     oang = (np.pi + ang[1:, ang_name_map['psi']]).unsqueeze(-1)
     # Next: Use the oang angle tensor and C-atom relevant info to place all oxygens
-    ocoords = build_coords_from_source(ncacM[2::3], seq_aa_index, oang, build_info['C'])
+    ocoords, o_params = build_coords_from_source(ncacM[2::3], seq_aa_index, oang, build_info['C'])
 
     # Create hydrogens for nitrogens
     if build_info['N']:  # nH
         nang = (np.pi + ang[:L, ang_name_map['omega']]).unsqueeze(-1)
-        ncoords = build_coords_from_source(ncacM[0::3], seq_aa_index, nang,
+        ncoords, n_params = build_coords_from_source(ncacM[0::3], seq_aa_index, nang,
                                            build_info['N'])
     else:
-        ncoords = torch.zeros(L, 0, 3, dtype=dtype, device=device)
+        ncoords, n_params = torch.zeros(L, 0, 3, dtype=dtype, device=device), dict()
 
     # Construct all sidechain atoms by iteratively applying TMats starting from CA
     scang = (2 * np.pi - angles_cp.to(device)[:, SC_ANGLES_START_POS:])
-    sccoords = build_coords_from_source(ncacM[1::3], seq_aa_index, scang,
-                                        build_info['CA'])
+    sccoords, s_params = build_coords_from_source(ncacM[1::3],
+                                                  seq_aa_index,
+                                                  scang,
+                                                  build_info['CA'],
+                                                  bb_ang=ang[1:, :3])
 
     # When present, we place the H and HAs atom (attached to N and CA) after the backbone
     # This allows the tail end of all residue representations to contain PADs only.
-    return torch.concat([ncac, ocoords, ncoords, sccoords], dim=1)
+    return torch.concat([ncac, ocoords, ncoords, sccoords], dim=1), (o_params, n_params, s_params)

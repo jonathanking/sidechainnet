@@ -40,6 +40,7 @@ from sidechainnet.utils.download import MAX_SEQ_LEN
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_HBUILD_INFO
+from sidechainnet.research.build_parameter_optim.construct_build_info import BUILD_INFO
 from sidechainnet.structure.PdbBuilder import ATOM_MAP_14
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
@@ -208,10 +209,19 @@ class SCNProtein(object):
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
 
-    def fastbuild(self, add_hydrogens=False):
+    def fastbuild(self, add_hydrogens=False, build_info=None):
         """Build protein coordinates from angles. Does not update coords."""
-        coords = fastbuild.make_coords(self.seq, self.angles, add_hydrogens=add_hydrogens)
+        # if build_info is None:
+            # build_info = BUILD_INFO
+        coords, params = fastbuild.make_coords(self.seq,
+                                               self.angles,
+                                               build_info=build_info,
+                                               add_hydrogens=add_hydrogens)
+        self.coords = self.hcoords = coords
         self.has_hydrogens = add_hydrogens
+        # if self.positions is None and add_hydrogens:
+            # self.initialize_openmm()
+        # self.update_positions()
         return coords
 
     def build_coords_from_angles(self, angles=None, add_hydrogens=False):

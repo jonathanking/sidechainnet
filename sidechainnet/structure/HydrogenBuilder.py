@@ -45,14 +45,14 @@ HYDROGEN_NAMES = {
     'ILE': ['H', 'HA', 'HB', 'HD11', 'HD12', 'HD13', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23'],
     'LEU': ['H', 'HA', 'HB2', 'HB3', 'HD11', 'HD12', 'HD13', 'HD21', 'HD22', 'HD23', 'HG'],
     'LYS': ['H', 'HA', 'HB2', 'HB3', 'HD2', 'HD3', 'HE2', 'HE3', 'HG2', 'HG3', 'HZ1', 'HZ2', 'HZ3'],
-    'MET': ['H', 'HA', 'HB2', 'HB3', 'HE1', 'HE2', 'HE3', 'HG2', 'HG3'],
-    'PHE': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'],
-    'PRO': ['HA', 'HB2', 'HB3', 'HD2', 'HD3', 'HG2', 'HG3'],
-    'SER': ['H', 'HA', 'HB2', 'HB3', 'HG'],
-    'THR': ['H', 'HA', 'HB', 'HG1', 'HG21', 'HG22', 'HG23'],
-    'TRP': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HE3', 'HH2', 'HZ2', 'HZ3'],
-    'TYR': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'],
-    'VAL': ['H', 'HA', 'HB', 'HG11', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23']
+    'MET': ['H', 'HA', 'HB2', 'HB3', 'HE1', 'HE2', 'HE3', 'HG2', 'HG3',],
+    'PHE': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ',],
+    'PRO': ['HA', 'HB2', 'HB3', 'HD2', 'HD3', 'HG2', 'HG3',],
+    'SER': ['H', 'HA', 'HB2', 'HB3', 'HG',],
+    'THR': ['H', 'HA', 'HB', 'HG1', 'HG21', 'HG22', 'HG23',],
+    'TRP': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HE3', 'HH2', 'HZ2', 'HZ3',],
+    'TYR': ['H', 'HA', 'HB2', 'HB3', 'HD1', 'HD2', 'HE1', 'HE2', 'HH',],
+    'VAL': ['H', 'HA', 'HB', 'HG11', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23',]
 }
 
 HYDROGEN_TYPES = {

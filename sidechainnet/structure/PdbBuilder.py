@@ -157,7 +157,7 @@ class PdbBuilder(object):
         for i, residue in enumerate(self.seq):
             an = atom_names[residue]
             # The first residue, if N-terminal, actually calls its N-H hydrogen H1, not H
-            if i == 0:
+            if i == 0 and self.has_hydrogens:
                 assert an[5] == "H"
                 an = an[0:5] + ["H1"] + an[6:]
             mapping.append((residue, an))

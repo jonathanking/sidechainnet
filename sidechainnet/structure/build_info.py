@@ -26,6 +26,7 @@ SIDECHAIN DATA FORMAT
 """
 import copy
 import numpy as np
+from sidechainnet.research.build_parameter_optim.construct_build_info import BUILD_INFO
 
 NUM_ANGLES = 12
 NUM_BB_TORSION_ANGLES = 3
@@ -532,7 +533,7 @@ SC_HBUILD_INFO = {
             0.0,                        # 'CE3',
             0.0,                        # 'CD2',
 
-            ('hi', 'CB', 2*np.pi/3),    # HA
+            ('hi', 'CB', 2*np.pi/3),  # HA
 
             ('hi', 'CG', 2*np.pi/3),    # 'HB2',
             ('hi', 'CG', -2*np.pi/3),   # 'HB3',
@@ -574,6 +575,8 @@ SC_HBUILD_INFO = {
         'torsion-vals': ['p', 'p', 'p']
     }
 }
+
+SC_HBUILD_INFO = BUILD_INFO
 
 BB_BUILD_INFO = {
     "BONDLENS": {

@@ -205,11 +205,12 @@ BUILD_INFO = {
             'C-N-CA-HA3',  # HA3
         ],
         'torsion-vals': [
-            ('hi', 'C', 2 * PI / 3),    # HA2
-            ('hi', 'C', -2 * PI / 3),   # HA3 # TODO Is this correct??
+            ('hi', 'phi', 2 * PI / 3),    # HA2
+            ('hi', 'phi', -2 * PI / 3),   # HA3
+
         ]
     },
-    'HIS': {
+    'HIS': {                            # Actually HID
         'torsion-names': [
             'C-N-CA-CB',                # CB
             'N-CA-CB-CG',               # CG
@@ -237,9 +238,9 @@ BUILD_INFO = {
             ('hi', 'CB', 2 * PI / 3),    # HA
             ('hi', 'CG', 2 * PI / 3),    # HB2  chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
             ('hi', 'CG', -2 * PI / 3),   # HB3
-            0, #('hi', 'CE1', PI),           # HD1  # TODO should be pi, 0, or relative?
-            0, #('hi', 'NE2', PI),           # HE1  # TODO should be pi, 0, or relative?
-            0, #('hi', 'CD2', PI),           # HD2  # TODO should be pi, 0, or relative?
+            0,                           # HD1
+            PI,                          # HE1
+            PI,                          # HD2
         ]
     },
     'ILE': {
@@ -265,9 +266,9 @@ BUILD_INFO = {
             'p',
             'p',
             ('hi', 'CB', 2 * PI / 3),    # HA
-            ('hi', 'CG', 2 * PI / 3),    # HB # TODO unclear
+            ('hi', 'CG1', -2 * PI / 3),  # HB
             ('hi', 'CD1', 2 * PI / 3),   # HG12
-            ('hi', 'CD1', 2 * PI / 3),   # HG13
+            ('hi', 'CD1', -2 * PI / 3),  # HG13
             0,                           # HD11
             2*PI/3,                      # HD12
             -2*PI/3,                     # HD13
@@ -296,20 +297,20 @@ BUILD_INFO = {
         'torsion-vals': [
             # chi HB2 is defined by chi used to place CG rotated +/- 2pi/3  # HB2
             # chi HD1X and HD2X are arbitrary - spaced out by 2pi/3
-            'p',                        # CB
-            'p',                        # CG
-            'p',                        # CD1
-            'i',                        # CD2  # TODO Check that making this angle inferred still works
-            ('hi', 'CB', 2 * PI / 3),   # HA
-            ('hi', 'CG', 2 * PI / 3),   # HB2
-            ('hi', 'CG', -2 * PI / 3),  # HB3
-            ('hi', 'CD1', 2 * PI / 3),  # HG
-            0,                          # HD11
-            2.09439510239,              # HD12
-            -2.09439510239,             # HD13
-            0,                          # HD21
-            2.09439510239,              # HD22
-            -2.09439510239,             # HD23
+            'p',                         # CB
+            'p',                         # CG
+            'p',                         # CD1
+            ('hi', 'CD1', 2 * PI / 3),   # CD2,  # TODO Do not measure/predict this angle
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'CG', 2 * PI / 3),    # HB2
+            ('hi', 'CG', -2 * PI / 3),   # HB3
+            ('hi', 'CD1', -2 * PI / 3),  # HG
+            0,                           # HD11
+            2.09439510239,               # HD12
+            -2.09439510239,              # HD13
+            0,                           # HD21
+            2.09439510239,               # HD22
+            -2.09439510239,              # HD23
         ]
     },
     'LYS': {
@@ -377,9 +378,9 @@ BUILD_INFO = {
             ('hi', 'CG', -2 * PI / 3),  # HB3
             ('hi', 'SD', 2 * PI / 3),   # HG2
             ('hi', 'SD', -2 * PI / 3),  # HG3
-            0,  # HE1
-            2*PI/3,  # HE2
-            -2*PI/3,  # HE3
+            PI/3 + 0,                   # HE1
+            PI/3 + 2*PI/3,              # HE2
+            PI/3 - 2*PI/3,              # HE3
             ]
     },
     'PHE': {
@@ -411,11 +412,10 @@ BUILD_INFO = {
             ('hi', 'CB', 2 * PI / 3),   # HA
             ('hi', 'CG', 2 * PI / 3),   # HB2
             ('hi', 'CG', -2 * PI / 3),  # HB3
-            0,  # ('hi', 'CE1', PI),    # HD1  # TODO should be pi, 0, or relative?
-            0,  # ('hi', 'CZ', PI),     # HE1  # TODO should be pi, 0, or relative?
-            0,  # ('hi', 'CE2', PI),    # HZ   # TODO should be pi, 0, or relative?
-            0,  # ('hi', 'CD2', PI),    # HE2  # TODO should be pi, 0, or relative?
-            0,  # ('hi', 'CD', PI),     # HD2  # TODO should be pi, 0, or relative?
+            0,                          # HE1
+            PI,                         # HZ
+            PI,                         # HE2
+            PI,                         # HD2
         ]
     },
     'PRO': {
@@ -440,8 +440,8 @@ BUILD_INFO = {
             ('hi', 'CG', -2 * PI / 3),  # HB3
             ('hi', 'CD', 2 * PI / 3),   # HG2
             ('hi', 'CD', -2 * PI / 3),  # HG3
-            ('hi', 'CE', 2 * PI / 3),   # HD2
-            ('hi', 'CE', -2 * PI / 3),  # HD3
+            2 * PI / 3,                 # HD2
+            -2 * PI / 3,                # HD3
         ]
     },
     'SER': {
@@ -457,9 +457,9 @@ BUILD_INFO = {
             'p',
             'p',
             ('hi', 'CB', 2 * PI / 3),   # HA
-            ('hi', 'CG', 2 * PI / 3),   # HB2
-            ('hi', 'CG', -2 * PI / 3),  # HB3
-            PI,                         # HG  # TODO check
+            ('hi', 'OG', 2 * PI / 3),   # HB2
+            ('hi', 'OG', -2 * PI / 3),  # HB3
+            PI,                         # HG
         ]
     },
     'THR': {
@@ -467,23 +467,23 @@ BUILD_INFO = {
             'C-N-CA-CB',
             'N-CA-CB-OG1',
             'N-CA-CB-CG2',
-            'C-N-CA-HA',                # HA
-            'N-CA-CB-HB',               # HB
-            'CA-CB-OG1-HG1',            # HG1
-            'CA-CB-CG2-HG21',           # HG21
-            'CA-CB-CG2-HG22',           # HG22
-            'CA-CB-CG2-HG23',           # HG23
+            'C-N-CA-HA',                 # HA
+            'N-CA-CB-HB',                # HB
+            'CA-CB-OG1-HG1',             # HG1
+            'CA-CB-CG2-HG21',            # HG21
+            'CA-CB-CG2-HG22',            # HG22
+            'CA-CB-CG2-HG23',            # HG23
         ],
         'torsion-vals': [
             'p',
             'p',
             'p',
-            ('hi', 'CB', 2 * PI / 3),   # HA
-            ('hi', 'OG1', 2 * PI / 3),  # HB
-            PI,                         # HG1  # TODO check
-            0,                          # HG21
-            2*PI/3,                     # HG22
-            -2*PI/3,                    # HG23
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'OG1', -2 * PI / 3),  # HB
+            PI,                          # HG1  
+            0,                           # HG21
+            2*PI/3,                      # HG22
+            -2*PI/3,                     # HG23
         ]
     },
     'TRP': {
@@ -503,10 +503,10 @@ BUILD_INFO = {
             'N-CA-CB-HB3',
             'CB-CG-CD1-HD1',
             'CZ2-CE2-NE1-HE1',
-            'CH2-CZ3-CE3-HE3',
-            'CE2-CZ2-CH2-HH2',
             'NE1-CE2-CZ2-HZ2',
-            'CZ2-CH2-CZ3-HZ3'
+            'CE2-CZ2-CH2-HH2',
+            'CZ2-CH2-CZ3-HZ3',
+            'CH2-CZ3-CE3-HE3',
         ],
         'torsion-vals': [
             'p',                        # CB
@@ -522,12 +522,12 @@ BUILD_INFO = {
             ('hi', 'CB', 2 * PI / 3),   # HA
             ('hi', 'CG', 2 * PI / 3),   # HB2
             ('hi', 'CG', -2 * PI / 3),  # HB3
-            ('hi', 'NE1', -PI),         # HD1
-            ('hi', 'CE2', -PI),         # HE1
-            ('hi', 'CD2', -PI),         # HE3
-            ('hi', 'CZ3', -PI),         # HH2
-            ('hi', 'CH2', -PI),         # HZ2
-            ('hi', 'CE3', -PI),         # HZ3
+            0,                          # HD1
+            PI,                         # HE1
+            0,                          # HZ2
+            PI,                         # HH2
+            PI,                         # HZ3
+            PI,                         # HE3
             ]
     },
     'TYR': {
@@ -561,11 +561,11 @@ BUILD_INFO = {
             ('hi', 'CB', 2 * PI / 3),   # HA
             ('hi', 'CG', 2 * PI / 3),   # HB2
             ('hi', 'CG', -2 * PI / 3),  # HB3
-            0,                          # HD1 # TODO check
-            0,                          # HE1 # TODO check
-            PI,                         # HH  # TODO check
-            0,                          # HE2 # TODO check
-            0,                          # HD2 # TODO check
+            0,                          # HD1
+            PI,                         # HE1
+            PI,                         # HH
+            PI,                         # HE2
+            PI,                         # HD2
         ]
     },
     'VAL': {
@@ -587,7 +587,7 @@ BUILD_INFO = {
             'p',
             'p',
             ('hi', 'CB', 2 * PI / 3),    # HA
-            ('hi', 'CG', 2 * PI / 3),    # HB # TODO unclear
+            ('hi', 'CG1', 2 * PI / 3),   # HB
             0,                           # HG11
             2*PI/3,                      # HG12
             -2*PI/3,                     # HG13
@@ -644,7 +644,20 @@ class ForceFieldLookupHelper(object):
             with open(fn, "r") as f:
                 self.text += f.read()
 
-    def get_value(self, item):
+        # Here we make some pre-emptive corrections for values that are not adequate in
+        # AMBER. AMBER seems to specify interior angles for histidine and proline wich are
+        # much too large (120 degrees and 109.5 degrees, respectively). Here, I have
+        # remeasured the offending values.
+
+        self.overwrite_rules = {}
+        histidine_interior_angles = ["CT-CC-NA", "CC-NA-CR", "NA-CR-NB", "CR-NB-CV"]
+        for hia in histidine_interior_angles:
+            self.overwrite_rules[('HIS', hia)] = np.deg2rad(108)
+        self.overwrite_rules[('PRO', "N -CX-CT")] = np.deg2rad(101.8812)
+        self.overwrite_rules[('PRO', "CX-CT-CT")] = np.deg2rad(103.6465)
+        self.overwrite_rules[('PRO', "CX-CT-CT")] = np.deg2rad(103.3208)
+
+    def get_value(self, resname, item, convert_to_rad=True):
         """Lookup the value (bond length or bond angle) for the item (ex 'CX-2C':1.526).
 
         Args:
@@ -656,7 +669,11 @@ class ForceFieldLookupHelper(object):
         """
         assert len(item.split("-")) <= 3, "Does not support torsion lookup."
 
+        if (resname, item) in self.overwrite_rules:
+            return self.overwrite_rules[(resname, item)]
+
         def get_match(s):
+            s = s.replace("*", "\\*")
             pattern = f"^{s}[^-].+"
             return re.search(pattern, self.text, re.MULTILINE)
 
@@ -671,8 +688,10 @@ class ForceFieldLookupHelper(object):
 
         line = match.group(0)
         line = line.replace(item, "").strip()
-        value = line.split()[1]
-        return float(value)
+        value = float(line.split()[1])
+        if convert_to_rad and len(item.split("-")) == 3:
+            return np.deg2rad(value)
+        return value
 
 
 def create_complete_hydrogen_build_param_dict():
@@ -692,8 +711,8 @@ def create_complete_hydrogen_build_param_dict():
     for resname, resinfo in BUILD_INFO.items():
         new_build_info[resname]['bond-types'] = []
         new_build_info[resname]['angle-types'] = []
-        new_build_info[resname]['bond-values'] = []
-        new_build_info[resname]['angle-values'] = []
+        new_build_info[resname]['bond-vals'] = []
+        new_build_info[resname]['angle-vals'] = []
         for torsion in resinfo['torsion-names']:
             atomtypes = [f"{atom_type_map[resname][an]:<2}" for an in torsion.split("-")]
             bond = "-".join(atomtypes[-2:])
@@ -701,9 +720,9 @@ def create_complete_hydrogen_build_param_dict():
             new_build_info[resname]['bond-types'].append(bond)
             new_build_info[resname]['angle-types'].append(angle)
 
-            # Given names/types of necessary bonds/angles, we look up their AMBER values
-            new_build_info[resname]['bond-values'].append(ff_helper.get_value(bond))
-            new_build_info[resname]['angle-values'].append(ff_helper.get_value(angle))
+            # Given names/types of necessary bonds/angles, we look up their AMBER vals
+            new_build_info[resname]['bond-vals'].append(ff_helper.get_value(resname, bond))
+            new_build_info[resname]['angle-vals'].append(ff_helper.get_value(resname, angle))
 
     return new_build_info
 
@@ -713,7 +732,9 @@ BUILD_INFO = create_complete_hydrogen_build_param_dict()
 
 if __name__ == "__main__":
     import pprint
+    import json
     hbp = create_complete_hydrogen_build_param_dict()
     hbp_str = pprint.pformat(hbp, indent=1, width=90, compact=False)
     with open("hbp.py", "w") as f:
-        f.write(hbp_str)
+        f.write(json.dumps(hbp, indent=2))
+        # f.write(hbp_str)
