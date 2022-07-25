@@ -12,7 +12,7 @@ BUILD_INFO = {
         'torsion-names': [
             'C-N-CA-CB',
             # Hydrogens
-            'C-N-CA-HA',  # HA
+            'C-N-CA-HA',
             'N-CA-CB-HB1',
             'N-CA-CB-HB2',
             'N-CA-CB-HB3'],
@@ -21,8 +21,8 @@ BUILD_INFO = {
             # Hydrogens
             ('hi', 'CB', 2 * PI / 3),  # HA
             0,               # HB1, chi HBX are arbitrary - spaced out by 2pi/3
-            2.09439510239,   # HB2
-            -2.09439510239,  # HB3
+            2 * PI/3,   # HB2
+            -2 * PI/3,  # HB3
         ]
     },
     'ARG': {
@@ -59,16 +59,16 @@ BUILD_INFO = {
             'i',
             # Hydrogens
             ('hi', 'CB', 2 * PI / 3),    # HA
-            ('hi', 'CG', 2 * PI / 3),    # HB2  chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
+            ('hi', 'CG', 2 * PI / 3),    # HB2
             ('hi', 'CG', -2 * PI / 3),   # HB3
-            ('hi', 'CD', 2 * PI / 3),    # HG2  chi HG2 is defined by chi used to place CD rotated +/- 2pi/3
+            ('hi', 'CD', 2 * PI / 3),    # HG2
             ('hi', 'CD', -2 * PI / 3),   # HG3
-            ('hi', 'NE', 2 * PI / 3),    # HD2  chi HD2 is defined by chi used to place NE rotated +/- 2pi/3
+            ('hi', 'NE', 2 * PI / 3),    # HD2
             ('hi', 'NE', -2 * PI / 3),   # HD3
             ('hi', 'CZ', -PI),           # HE
-            0,                           # HH11  
-            PI,                          # HH12  
-            0,                           # HH21  
+            0,                           # HH11
+            PI,                          # HH12
+            0,                           # HH21
             PI,                          # HH22
             ]
     },
@@ -91,7 +91,7 @@ BUILD_INFO = {
             'p',                        # OD1
             'i',                        # ND2
             ('hi', 'CB', 2 * PI / 3),   # HA
-            ('hi', 'CG', 2 * PI / 3),   # HB2  chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
+            ('hi', 'CG', 2 * PI / 3),   # HB2
             ('hi', 'CG', -2 * PI / 3),  # HB3
             0,                          # HD21
             PI,                         # HD22
@@ -134,9 +134,9 @@ BUILD_INFO = {
             'p',                        # SG
             # Hydrogens
             ('hi', 'CB', 2 * PI / 3),   # HA
-            ('hi', 'SG', 2 * PI / 3),   # HB2  chi HB2 is defined by chi used to place SG rotated +/- 2pi/3
+            ('hi', 'SG', 2 * PI / 3),   # HB2
             ('hi', 'SG', -2 * PI / 3),  # HB3
-            PI,                         # TODO HG  TODO may not be correct
+            PI,                         # HG
         ]
     },
     'GLN': {
@@ -163,9 +163,9 @@ BUILD_INFO = {
             'i',                        # NE2
             # Hydrogens
             ('hi', 'CB', 2 * PI / 3),   # HA
-            ('hi', 'CG', 2 * PI / 3),   # HB2  chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
+            ('hi', 'CG', 2 * PI / 3),   # HB2
             ('hi', 'CG', -2 * PI / 3),  # HB3
-            ('hi', 'CD', 2 * PI / 3),   # HG2  chi HG2 is defined by chi used to place CD rotated +/- 2pi/3
+            ('hi', 'CD', 2 * PI / 3),   # HG2
             ('hi', 'CD', -2 * PI / 3),  # HG3
             0,                          # HE21
             PI,                         # HE22
@@ -193,7 +193,7 @@ BUILD_INFO = {
             'i',                        # OE2
             # Hydrogens
             ('hi', 'CB', 2 * PI / 3),   # HA
-            ('hi', 'CG', 2 * PI / 3),   # HB2  chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
+            ('hi', 'CG', 2 * PI / 3),   # HB2
             ('hi', 'CG', -2 * PI / 3),  # HB3
             ('hi', 'CD', 2 * PI / 3),   # HG2
             ('hi', 'CD', -2 * PI / 3)   # HG3
@@ -236,7 +236,7 @@ BUILD_INFO = {
             0.0,                         # CD2
             # Hydrogens
             ('hi', 'CB', 2 * PI / 3),    # HA
-            ('hi', 'CG', 2 * PI / 3),    # HB2  chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
+            ('hi', 'CG', 2 * PI / 3),    # HB2
             ('hi', 'CG', -2 * PI / 3),   # HB3
             0,                           # HD1
             PI,                          # HE1
@@ -736,5 +736,5 @@ if __name__ == "__main__":
     hbp = create_complete_hydrogen_build_param_dict()
     hbp_str = pprint.pformat(hbp, indent=1, width=90, compact=False)
     with open("hbp.py", "w") as f:
-        f.write(json.dumps(hbp, indent=2))
-        # f.write(hbp_str)
+        # f.write(json.dumps(hbp, indent=2))
+        f.write(hbp_str)
