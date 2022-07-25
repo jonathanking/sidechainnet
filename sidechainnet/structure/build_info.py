@@ -26,7 +26,9 @@ SIDECHAIN DATA FORMAT
 """
 import copy
 import numpy as np
-from sidechainnet.research.build_parameter_optim.construct_build_info import BUILD_INFO
+from sidechainnet.research.build_parameter_optim.construct_build_info import BUILD_INFO, create_complete_hydrogen_build_param_dict
+
+PI = np.pi
 
 NUM_ANGLES = 12
 NUM_BB_TORSION_ANGLES = 3
@@ -54,427 +56,487 @@ ANGLE_NAME_TO_IDX_MAP = {
 }
 
 ANGLE_IDX_TO_NAME_MAP = {idx: name for name, idx in ANGLE_NAME_TO_IDX_MAP.items()}
-
-# TODO Consolidate info: organize by atom name, remove types fields for all but torsions
-
 # yapf: disable
-SC_HBUILD_INFO = {
+RAW_BUILD_INFO = {
     'ALA': {
-        'angles-vals': [1.9146261894377796],
-        'bonds-vals': [1.526],
-        'torsion-names': ['C-N-CA-CB'],
-        'torsion-types': ['C -N -CX-CT'],
-        'torsion-vals': ['p']
+        'torsion-names': [
+            'C-N-CA-CB',
+            # Hydrogens
+            'C-N-CA-HA',
+            'N-CA-CB-HB1',
+            'N-CA-CB-HB2',
+            'N-CA-CB-HB3'],
+        'torsion-vals': [
+            'p',
+            # Hydrogens
+            ('hi', 'CB', 2 * PI / 3),  # HA
+            0,               # HB1, chi HBX are arbitrary - spaced out by 2pi/3
+            2 * PI/3,   # HB2
+            -2 * PI/3,  # HB3
+        ]
     },
     'ARG': {
-
-        'angles-vals': [
-            1.9146261894377796, 1.911135530933791, 1.911135530933791, 1.9408061282176945,
-            2.150245638457014, 2.0943951023931953, 2.0943951023931953
-        ],
-        'bonds-vals': [1.526, 1.526, 1.526, 1.463, 1.34, 1.34, 1.34],
         'torsion-names': [
-            'C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-CD', 'CB-CG-CD-NE', 'CG-CD-NE-CZ',
-            'CD-NE-CZ-NH1', 'CD-NE-CZ-NH2'
+            'C-N-CA-CB',
+            'N-CA-CB-CG',
+            'CA-CB-CG-CD',
+            'CB-CG-CD-NE',
+            'CG-CD-NE-CZ',
+            'CD-NE-CZ-NH1',
+            'CD-NE-CZ-NH2',
+            # Hydrogens
+            'C-N-CA-HA',  # HA
+            'N-CA-CB-HB2',
+            'N-CA-CB-HB3',
+            'CA-CB-CG-HG2',
+            'CA-CB-CG-HG3',
+            'CB-CG-CD-HD2',
+            'CB-CG-CD-HD3',
+            'CG-CD-NE-HE',
+            'NE-CZ-NH1-HH11',
+            'NE-CZ-NH1-HH12',
+            'NE-CZ-NH2-HH21',
+            'NE-CZ-NH2-HH22',
         ],
-        'torsion-types': [
-            'C -N -CX-C8', 'N -CX-C8-C8', 'CX-C8-C8-C8', 'C8-C8-C8-N2', 'C8-C8-N2-CA',
-            'C8-N2-CA-N2', 'C8-N2-CA-N2'
-        ],
-        'torsion-vals': ['p', 'p', 'p', 'p', 'p', 'p', 'i']
+
+        'torsion-vals': [
+            'p',
+            'p',
+            'p',
+            'p',
+            'p',
+            'p',
+            'i',
+            # Hydrogens
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'CG', 2 * PI / 3),    # HB2
+            ('hi', 'CG', -2 * PI / 3),   # HB3
+            ('hi', 'CD', 2 * PI / 3),    # HG2
+            ('hi', 'CD', -2 * PI / 3),   # HG3
+            ('hi', 'NE', 2 * PI / 3),    # HD2
+            ('hi', 'NE', -2 * PI / 3),   # HD3
+            ('hi', 'CZ', -PI),           # HE
+            0,                           # HH11
+            PI,                          # HH12
+            0,                           # HH21
+            PI,                          # HH22
+            ]
     },
     'ASN': {
-        'angles-vals': [
-            1.9146261894377796, 1.9390607989657, 2.101376419401173, 2.035053907825388
-        ],
-        'bonds-vals': [1.526, 1.522, 1.229, 1.335],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-OD1', 'CA-CB-CG-ND2'],
-        'torsion-types': ['C -N -CX-2C', 'N -CX-2C-C ', 'CX-2C-C -O ', 'CX-2C-C -N '],
-        'torsion-vals': ['p', 'p', 'p', 'i']
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-CG',
+            'CA-CB-CG-OD1',
+            'CA-CB-CG-ND2',
+            # Hydrogens
+            'C-N-CA-HA',  # HA
+            'N-CA-CB-HB2',
+            'N-CA-CB-HB3',
+            'CB-CG-ND2-HD21',
+            'CB-CG-ND2-HD22',
+            ],
+        'torsion-vals': [
+            'p',                        # CB
+            'p',                        # CG
+            'p',                        # OD1
+            'i',                        # ND2
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            0,                          # HD21
+            PI,                         # HD22
+            ]
     },
     'ASP': {
-        'angles-vals': [
-            1.9146261894377796,
-            1.9390607989657,
-            2.0420352248333655,
-            2.0420352248333655,
-
-            1.9111355,  # HA
-
-            1.9111355,
-            1.9111355
-        ],
-
-        'bonds-vals': [
-            1.526,
-            1.522,
-            1.25,
-            1.25,
-
-            1.090,  # HA
-
-            1.09,
-            1.09],
         'torsion-names': [
             'C-N-CA-CB',
             'N-CA-CB-CG',
             'CA-CB-CG-OD1',
             'CA-CB-CG-OD2',
-
+            # Hydrogens
             'C-N-CA-HA',  # HA
-
             'N-CA-CB-HB2',
-            'N-CA-CB-HB3'],
-        'torsion-types': [
-            'C -N -CX-2C',
-            'N -CX-2C-CO',
-            'CX-2C-CO-O2',
-            'CX-2C-CO-O2',
-
-            'C -N -CX-H1',  # HA
-
-            'N -CX-2C-HC',
-            'N -CX-2C-HC'],
+            'N-CA-CB-HB3'
+        ],
         'torsion-vals': [
             'p',
             'p',
             'p',
             'i',
-
-            ('hi', 'CB', 2*np.pi/3),  # HA
-
-            ('hi', 'CG', +2*np.pi/3),
-            ('hi', 'CG', -2*np.pi/3)]
+            # Hydrogens
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', +2 * PI / 3),  # HB2
+            ('hi', 'CG', -2 * PI / 3)   # HB3
+        ]
     },
     'CYS': {
-        'angles-vals': [1.9146261894377796, 1.8954275676658419],
-        'bonds-vals': [1.526, 1.81],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-SG'],
-        'torsion-types': ['C -N -CX-2C', 'N -CX-2C-SH'],
-        'torsion-vals': ['p', 'p']
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-SG',
+            # Hydrogens
+            'C-N-CA-HA',  # HA
+            'N-CA-CB-HB2',
+            'N-CA-CB-HB3',
+            'CA-CB-SG-HG'
+        ],
+        'torsion-vals': [
+            'p',                        # CB
+            'p',                        # SG
+            # Hydrogens
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'SG', 2 * PI / 3),   # HB2
+            ('hi', 'SG', -2 * PI / 3),  # HB3
+            PI,                         # HG
+        ]
     },
     'GLN': {
-        'angles-vals': [
-            1.9146261894377796, 1.911135530933791, 1.9390607989657, 2.101376419401173,
-            2.035053907825388
-        ],
-        'bonds-vals': [1.526, 1.526, 1.522, 1.229, 1.335],
         'torsion-names': [
-            'C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-CD', 'CB-CG-CD-OE1', 'CB-CG-CD-NE2'
+            'C-N-CA-CB',
+            'N-CA-CB-CG',
+            'CA-CB-CG-CD',
+            'CB-CG-CD-OE1',
+            'CB-CG-CD-NE2',
+            # Hydrogens
+            'C-N-CA-HA',  # HA
+            'N-CA-CB-HB2',
+            'N-CA-CB-HB3',
+            'CA-CB-CG-HG2',
+            'CA-CB-CG-HG3',
+            'CG-CD-NE2-HE21',
+            'CG-CD-NE2-HE22',
         ],
-        'torsion-types': [
-            'C -N -CX-2C', 'N -CX-2C-2C', 'CX-2C-2C-C ', '2C-2C-C -O ', '2C-2C-C -N '
-        ],
-        'torsion-vals': ['p', 'p', 'p', 'p', 'i']
+        'torsion-vals': [
+            'p',                        # CB
+            'p',                        # CG
+            'p',                        # CD
+            'p',                        # OE1
+            'i',                        # NE2
+            # Hydrogens
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            ('hi', 'CD', 2 * PI / 3),   # HG2
+            ('hi', 'CD', -2 * PI / 3),  # HG3
+            0,                          # HE21
+            PI,                         # HE22
+        ]
     },
     'GLU': {
-        'angles-vals': [
-            1.9146261894377796,
-            1.911135530933791,
-            1.9390607989657,
-            2.0420352248333655,
-            2.0420352248333655,
-
-            1.9111355,  # HA
-
-            1.9111355,
-            1.9111355,
-            1.9111355,
-            1.9111355,
-        ],
-        'bonds-vals': [
-            1.526,
-            1.526,
-            1.522,
-            1.25,
-            1.25,
-
-            1.090,  # HA
-
-            1.0900,
-            1.0900,
-            1.0900,
-            1.0900],
         'torsion-names': [
             'C-N-CA-CB',
             'N-CA-CB-CG',
             'CA-CB-CG-CD',
             'CB-CG-CD-OE1',
             'CB-CG-CD-OE2',
-
+            # Hydrogens
             'C-N-CA-HA',  # HA
-
             'N-CA-CB-HB2',
             'N-CA-CB-HB3',
             'CA-CB-CG-HG2',
-            'CA-CB-CG-HG3'
+            'CA-CB-CG-HG3',
         ],
-        'torsion-types': [
-            'C -N -CX-2C',
-            'N -CX-2C-2C',
-            'CX-2C-2C-CO',
-            '2C-2C-CO-O2',
-            '2C-2C-CO-O2',
+        'torsion-vals': [
+            'p',                        # CB
+            'p',                        # CG
+            'p',                        # CD
+            'p',                        # OE1
+            'i',                        # OE2
+            # Hydrogens
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            ('hi', 'CD', 2 * PI / 3),   # HG2
+            ('hi', 'CD', -2 * PI / 3)   # HG3
+        ]
+    },
+    'GLY': {
+        'torsion-names': [
+            'C-N-CA-HA2',  # HA2
+            'C-N-CA-HA3',  # HA3
+        ],
+        'torsion-vals': [
+            ('hi', 'phi', 2 * PI / 3),    # HA2
+            ('hi', 'phi', -2 * PI / 3),   # HA3
 
-            'C -N -CX-H1',  # HA
+        ]
+    },
+    'HIS': {                            # Actually HID
+        'torsion-names': [
+            'C-N-CA-CB',                # CB
+            'N-CA-CB-CG',               # CG
+            'CA-CB-CG-ND1',             # ND1
+            'CB-CG-ND1-CE1',            # CE1
+            'CG-ND1-CE1-NE2',           # NE2
+            'ND1-CE1-NE2-CD2',          # CD2
+            # Hydrogens
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CB-CG-ND1-HD1',            # HD1
+            'CG-ND1-CE1-HE1',           # HE1
+            'CE1-NE2-CD2-HD2',          # HD2
 
-            'N -CX-2C-HC',
-            'N -CX-2C-HC',
-            'CX-2C-2C-HC',
-            'CX-2C-2C-HC'
+        ],
+        'torsion-vals': [
+            'p',                         # CB
+            'p',                         # CG
+            'p',                         # ND1
+            PI,                          # CE1
+            0.0,                         # NE2
+            0.0,                         # CD2
+            # Hydrogens
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'CG', 2 * PI / 3),    # HB2
+            ('hi', 'CG', -2 * PI / 3),   # HB3
+            0,                           # HD1
+            PI,                          # HE1
+            PI,                          # HD2
+        ]
+    },
+    'ILE': {
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-CG1',
+            'CA-CB-CG1-CD1',
+            'N-CA-CB-CG2',
+            'C-N-CA-HA',                 # HA
+            'N-CA-CB-HB',                # HB
+            'CA-CB-CG1-HG12',            # HG12
+            'CA-CB-CG1-HG13',            # HG13
+            'CB-CG1-CD1-HD11',           # HD11
+            'CB-CG1-CD1-HD12',           # HD12
+            'CB-CG1-CD1-HD13',           # HD13
+            'CA-CB-CG2-HG21',            # HG21
+            'CA-CB-CG2-HG21',            # HG22
+            'CA-CB-CG2-HG21',            # HG23
         ],
         'torsion-vals': [
             'p',
             'p',
             'p',
             'p',
-            'i',
-
-            ('hi', 'CB', 2*np.pi/3),  # HA
-
-            ('hi', 'CG',  2*np.pi/3),  # chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
-            ('hi', 'CG', -2*np.pi/3),
-            ('hi', 'CD',  2*np.pi/3),
-            ('hi', 'CD', -2*np.pi/3)]
-    },
-    'GLY': {
-        'angles-vals': [],
-        'bonds-vals': [],
-        'torsion-names': [],
-        'torsion-types': [],
-        'torsion-vals': []
-    },
-    'HIS': {
-        'angles-vals': [
-            1.9146261894377796, 1.9739673840055867, 2.0943951023931953,
-            1.8849555921538759, 1.8849555921538759, 1.8849555921538759
-        ],
-        'bonds-vals': [1.526, 1.504, 1.385, 1.343, 1.335, 1.394],
-        'torsion-names': [
-            'C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-ND1', 'CB-CG-ND1-CE1', 'CG-ND1-CE1-NE2',
-            'ND1-CE1-NE2-CD2'
-        ],
-        'torsion-types': [
-            'C -N -CX-CT', 'N -CX-CT-CC', 'CX-CT-CC-NA', 'CT-CC-NA-CR', 'CC-NA-CR-NB',
-            'NA-CR-NB-CV'
-        ],
-        'torsion-vals': ['p', 'p', 'p', 3.141592653589793, 0.0, 0.0]
-    },
-    'ILE': {
-        'angles-vals': [
-            1.9146261894377796, 1.911135530933791, 1.911135530933791, 1.911135530933791
-        ],
-        'bonds-vals': [1.526, 1.526, 1.526, 1.526],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-CG1', 'CA-CB-CG1-CD1', 'N-CA-CB-CG2'],
-        'torsion-types': ['C -N -CX-3C', 'N -CX-3C-2C', 'CX-3C-2C-CT', 'N -CX-3C-CT'],
-        'torsion-vals': ['p', 'p', 'p', 'p']
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'CG1', -2 * PI / 3),  # HB
+            ('hi', 'CD1', 2 * PI / 3),   # HG12
+            ('hi', 'CD1', -2 * PI / 3),  # HG13
+            0,                           # HD11
+            2*PI/3,                      # HD12
+            -2*PI/3,                     # HD13
+            0,                           # HG21
+            2*PI/3,                      # HG22
+            -2*PI/3,                     # HG23
+        ]
     },
     'LEU': {
-
-        'angles-vals': [
-            1.9146261894377796,
-            1.911135530933791,
-            1.911135530933791,
-            1.911135530933791,
-
-            1.9111355,  # HA
-
-            1.9111355,
-            1.9111355,
-            1.9111355,
-            1.9111355,
-            1.9111355,
-            1.9111355,
-            1.9111355,
-            1.9111355,
-            1.9111355,
+        'torsion-names': [
+            'C-N-CA-CB',                # CB
+            'N-CA-CB-CG',               # CG
+            'CA-CB-CG-CD1',             # CD1
+            'CA-CB-CG-CD2',             # CD2
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CA-CB-CG-HG',              # HG
+            'CB-CG-CD1-HD11',           # HD11
+            'CB-CG-CD1-HD12',           # HD12
+            'CB-CG-CD1-HD13',           # HD13
+            'CB-CG-CD2-HD21',           # HD21
+            'CB-CG-CD2-HD22',           # HD22
+            'CB-CG-CD2-HD23',           # HD23
         ],
-
-        'bonds-vals': [
-            1.526,
-            1.526,
-            1.526,
-            1.526,
-
-            1.090,  # HA
-
-            1.0900,
-            1.0900,
-            1.090,
-            1.090,
-            1.090,
-            1.090,
-            1.090,
-            1.090,
-            1.090],
+        'torsion-vals': [
+            # chi HB2 is defined by chi used to place CG rotated +/- 2pi/3  # HB2
+            # chi HD1X and HD2X are arbitrary - spaced out by 2pi/3
+            'p',                         # CB
+            'p',                         # CG
+            'p',                         # CD1
+            ('hi', 'CD1', 2 * PI / 3),   # CD2,  # TODO Do not measure/predict this angle
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'CG', 2 * PI / 3),    # HB2
+            ('hi', 'CG', -2 * PI / 3),   # HB3
+            ('hi', 'CD1', -2 * PI / 3),  # HG
+            0,                           # HD11
+            2.09439510239,               # HD12
+            -2.09439510239,              # HD13
+            0,                           # HD21
+            2.09439510239,               # HD22
+            -2.09439510239,              # HD23
+        ]
+    },
+    'LYS': {
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-CG',
+            'CA-CB-CG-CD',
+            'CB-CG-CD-CE',
+            'CG-CD-CE-NZ',
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CA-CB-CG-HG2',             # HG2
+            'CA-CB-CG-HG3',             # HG3
+            'CB-CG-CD-HD2',             # HD2
+            'CB-CG-CD-HD3',             # HD3
+            'CG-CD-CE-HE2',             # HE2
+            'CG-CD-CE-HE3',             # HE3
+            'CD-CE-NZ-HZ1',             # HZ1
+            'CD-CE-NZ-HZ2',             # HZ2
+            'CD-CE-NZ-HZ3',             # HZ3
+        ],
+        'torsion-vals': [
+            'p',
+            'p',
+            'p',
+            'p',
+            'p',
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            ('hi', 'CD', 2 * PI / 3),   # HG2
+            ('hi', 'CD', -2 * PI / 3),  # HG3
+            ('hi', 'CE', 2 * PI / 3),   # HD2
+            ('hi', 'CE', -2 * PI / 3),  # HD3
+            ('hi', 'NZ', 2 * PI / 3),   # HE2
+            ('hi', 'NZ', -2 * PI / 3),  # HE3
+            0,                          # HZ1
+            -2*PI/3,                    # HZ2
+            2*PI/3,                     # HZ3
+            ]
+    },
+    'MET': {
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-CG',
+            'CA-CB-CG-SD',
+            'CB-CG-SD-CE',
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CA-CB-CG-HG2',             # HG2
+            'CA-CB-CG-HG3',             # HG3
+            'CG-SD-CE-HE1',  # HE1
+            'CG-SD-CE-HE2',  # HE2
+            'CG-SD-CE-HE3',  # HE3
+            ],
+        'torsion-vals': [
+            'p',
+            'p',
+            'p',
+            'p',
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            ('hi', 'SD', 2 * PI / 3),   # HG2
+            ('hi', 'SD', -2 * PI / 3),  # HG3
+            PI/3 + 0,                   # HE1
+            PI/3 + 2*PI/3,              # HE2
+            PI/3 - 2*PI/3,              # HE3
+            ]
+    },
+    'PHE': {
         'torsion-names': [
             'C-N-CA-CB',
             'N-CA-CB-CG',
             'CA-CB-CG-CD1',
-            'CA-CB-CG-CD2',
-
-            'C-N-CA-HA',  # HA
-
-            'N-CA-CB-HB2',
-            'N-CA-CB-HB3',
-            'CB-CG-CD1-HD11',
-            'CB-CG-CD1-HD12',
-            'CB-CG-CD1-HD13',
-            'CB-CG-CD2-HD21',
-            'CB-CG-CD2-HD22',
-            'CB-CG-CD2-HD23',
-            'CA-CB-CG-HG'],
-        'torsion-types': [
-            'C -N -CX-2C',
-            'N -CX-2C-3C',
-            'CX-2C-3C-CT',
-            'CX-2C-3C-CT',
-
-            'C -N -CX-H1',  # HA
-
-            'N -CX-2C-HC',
-            'N -CX-2C-HC',
-            '2C-3C-CT-HC',
-            '2C-3C-CT-HC',
-            '2C-3C-CT-HC',
-            '2C-3C-CT-HC',
-            '2C-3C-CT-HC',
-            '2C-3C-CT-HC',
-            'CX-2C-3C-HC'],
+            'CB-CG-CD1-CE1',
+            'CG-CD1-CE1-CZ',
+            'CD1-CE1-CZ-CE2',
+            'CE1-CZ-CE2-CD2',
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CB-CG-CD1-HD1',            # HD1
+            'CG-CD1-CE1-HE1',           # HE1
+            'CD1-CE1-CZ-HZ',            # HZ
+            'CE1-CZ-CE2-HE2',           # HE2
+            'CZ-CE2-CD2-HD2',           # HD2
+        ],
         'torsion-vals': [
             'p',
             'p',
             'p',
-            'p',
-
-            ('hi', 'CB', 2*np.pi/3),  # HA
-
-            ('hi', 'CG',  2*np.pi/3),  # chi HB2 is defined by chi used to place CG rotated +/- 2pi/3
-            ('hi', 'CG', -2*np.pi/3),
-            0,               # chi HD1X are arbitrary - spaced out by 2pi/3
-            2.09439510239,   # 2pi/3
-            -2.09439510239,  # -2pi/3
-            0,               # chi HD2X are arbitrary - spaced out by 2pi/3
-            2.09439510239,
-            -2.09439510239,
-            ('hi', 'CD1', 2*np.pi/3),
-            ]
-    },
-    'LYS': {
-        'angles-vals': [
-            1.9146261894377796, 1.911135530933791, 1.911135530933791, 1.911135530933791,
-            1.9408061282176945
-        ],
-        'bonds-vals': [1.526, 1.526, 1.526, 1.526, 1.471],
-        'torsion-names': [
-            'C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-CD', 'CB-CG-CD-CE', 'CG-CD-CE-NZ'
-        ],
-        'torsion-types': [
-            'C -N -CX-C8', 'N -CX-C8-C8', 'CX-C8-C8-C8', 'C8-C8-C8-C8', 'C8-C8-C8-N3'
-        ],
-        'torsion-vals': ['p', 'p', 'p', 'p', 'p']
-    },
-    'MET': {
-        'angles-vals': [
-            1.9146261894377796, 1.911135530933791, 2.0018926520374962, 1.726130630222392
-        ],
-        'bonds-vals': [1.526, 1.526, 1.81, 1.81],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-SD', 'CB-CG-SD-CE'],
-        'torsion-types': ['C -N -CX-2C', 'N -CX-2C-2C', 'CX-2C-2C-S ', '2C-2C-S -CT'],
-        'torsion-vals': ['p', 'p', 'p', 'p']
-    },
-    'PHE': {
-
-        'angles-vals': [
-            1.9146261894377796, 1.9896753472735358, 2.0943951023931953,
-            2.0943951023931953, 2.0943951023931953, 2.0943951023931953, 2.0943951023931953
-        ],
-
-        'bonds-vals': [1.526, 1.51, 1.4, 1.4, 1.4, 1.4, 1.4],
-        'torsion-names': [
-            'C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-CD1', 'CB-CG-CD1-CE1', 'CG-CD1-CE1-CZ',
-            'CD1-CE1-CZ-CE2', 'CE1-CZ-CE2-CD2'
-        ],
-        'torsion-types': [
-            'C -N -CX-CT', 'N -CX-CT-CA', 'CX-CT-CA-CA', 'CT-CA-CA-CA', 'CA-CA-CA-CA',
-            'CA-CA-CA-CA', 'CA-CA-CA-CA'
-        ],
-        'torsion-vals': ['p', 'p', 'p', 3.141592653589793, 0.0, 0.0, 0.0]
+            PI,
+            0.0,
+            0.0,
+            0.0,
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            0,                          # HE1
+            PI,                         # HZ
+            PI,                         # HE2
+            PI,                         # HD2
+        ]
     },
     'PRO': {
-
-        'angles-vals': [1.9146261894377796, 1.911135530933791, 1.911135530933791],
-
-        'bonds-vals': [1.526, 1.526, 1.526],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-CD'],
-        'torsion-types': ['C -N -CX-CT', 'N -CX-CT-CT', 'CX-CT-CT-CT'],
-        'torsion-vals': ['p', 'p', 'p']
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-CG',
+            'CA-CB-CG-CD',
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CA-CB-CG-HG2',             # HG2
+            'CA-CB-CG-HG3',             # HG3
+            'CB-CG-CD-HD2',             # HD2
+            'CB-CG-CD-HD3',             # HD3
+        ],
+        'torsion-vals': [
+            'p',
+            'p',
+            'p',
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            ('hi', 'CD', 2 * PI / 3),   # HG2
+            ('hi', 'CD', -2 * PI / 3),  # HG3
+            2 * PI / 3,                 # HD2
+            -2 * PI / 3,                # HD3
+        ]
     },
     'SER': {
-
-        'angles-vals': [1.9146261894377796, 1.911135530933791],
-
-        'bonds-vals': [1.526, 1.41],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-OG'],
-        'torsion-types': ['C -N -CX-2C', 'N -CX-2C-OH'],
-        'torsion-vals': ['p', 'p']
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-OG',
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CA-CB-OG-HG',              # HG
+        ],
+        'torsion-vals': [
+            'p',
+            'p',
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'OG', 2 * PI / 3),   # HB2
+            ('hi', 'OG', -2 * PI / 3),  # HB3
+            PI,                         # HG
+        ]
     },
     'THR': {
-
-        'angles-vals': [1.9146261894377796, 1.911135530933791, 1.911135530933791],
-
-        'bonds-vals': [1.526, 1.41, 1.526],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-OG1', 'N-CA-CB-CG2'],
-        'torsion-types': ['C -N -CX-3C', 'N -CX-3C-OH', 'N -CX-3C-CT'],
-        'torsion-vals': ['p', 'p', 'p']
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-OG1',
+            'N-CA-CB-CG2',
+            'C-N-CA-HA',                 # HA
+            'N-CA-CB-HB',                # HB
+            'CA-CB-OG1-HG1',             # HG1
+            'CA-CB-CG2-HG21',            # HG21
+            'CA-CB-CG2-HG22',            # HG22
+            'CA-CB-CG2-HG23',            # HG23
+        ],
+        'torsion-vals': [
+            'p',
+            'p',
+            'p',
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'OG1', -2 * PI / 3),  # HB
+            PI,                          # HG1  
+            0,                           # HG21
+            2*PI/3,                      # HG22
+            -2*PI/3,                     # HG23
+        ]
     },
     'TRP': {
-        'angles-vals': [
-            1.9146261894377796,
-            2.0176006153054447,
-            2.181661564992912,
-            1.8971728969178363,
-            1.9477874452256716,
-            2.3177972466484698,
-            2.0943951023931953,
-            2.0943951023931953,
-            2.0943951023931953,
-            2.0943951023931953,
-
-            1.9111355,  # HA
-
-            1.9111355,
-            1.9111355,
-            -np.deg2rad(120.00),
-            -np.deg2rad(123.1),
-            np.deg2rad(120.00),
-            -np.deg2rad(120.00),
-            np.deg2rad(120.00),
-            np.deg2rad(120.0)
-        ],
-
-        'bonds-vals': [
-            1.526,
-            1.495,
-            1.352,
-            1.381,
-            1.38,
-            1.4,
-            1.4,
-            1.4,
-            1.4,
-            1.404,
-
-            1.090,  # HA
-
-            1.090,
-            1.090,
-            1.080,  # TODO this might come from histidine, not sure why
-            1.010,  # TODO this might be for gua/ura/his
-            1.080,
-            1.080,
-            1.080,
-            1.080],
         'torsion-names': [  # TODO cw-na-h is not defined for trp, so we use CN-NA-H
             'C-N-CA-CB',
             'N-CA-CB-CG',
@@ -486,97 +548,113 @@ SC_HBUILD_INFO = {
             'CE2-CZ2-CH2-CZ3',
             'CZ2-CH2-CZ3-CE3',
             'CH2-CZ3-CE3-CD2',
-
             'C-N-CA-HA',  # HA
-
             'N-CA-CB-HB2',
             'N-CA-CB-HB3',
             'CB-CG-CD1-HD1',
             'CZ2-CE2-NE1-HE1',
-            'CH2-CZ3-CE3-HE3',
-            'CE2-CZ2-CH2-HH2',
             'NE1-CE2-CZ2-HZ2',
-            'CZ2-CH2-CZ3-HZ3'
-        ],
-        'torsion-types': [
-            'C -N -CT-CT',
-            'N -CT-CT-C*',
-            'CT-CT-C*-CW',
-            'CT-C*-CW-NA',
-            'C*-CW-NA-CN',
-            'CW-NA-CN-CA',
-            'NA-CN-CA-CA',
-            'CN-CA-CA-CA',
-            'CA-CA-CA-CA',
-            'CA-CA-CA-CB',
-
-            'C -N -CX-H1',  # HA
-
-            'N -CT-CT-HC',
-            'N -CT-CT-HC',
-            'CT-C*-CW-H4',
-            'CA-CN-NA-H',
-            'CA-CA-CA-HA',
-            'CN-CA-CA-HA',
-            'NA-CN-CA-HA',
-            'CA-CA-CA-HA'
+            'CE2-CZ2-CH2-HH2',
+            'CZ2-CH2-CZ3-HZ3',
+            'CH2-CZ3-CE3-HE3',
         ],
         'torsion-vals': [
-            'p',                        # 'CB',
-            'p',                        # 'CG',
-            'p',                        # 'CD1',
-            3.141592653589793,          # 'NE1',
-            0.0,                        # 'CE2',
-            3.141592653589793,          # 'CZ2',
-            3.141592653589793,          # 'CH2',
-            0.0,                        # 'CZ3',
-            0.0,                        # 'CE3',
-            0.0,                        # 'CD2',
-
-            ('hi', 'CB', 2*np.pi/3),  # HA
-
-            ('hi', 'CG', 2*np.pi/3),    # 'HB2',
-            ('hi', 'CG', -2*np.pi/3),   # 'HB3',
-            ('hi', 'NE1', -np.pi),      # 'HD1',
-            ('hi', 'CE2', -np.pi),      # 'HE1',
-            ('hi', 'CD2', -np.pi),      # 'HE3',
-            ('hi', 'CZ3', -np.pi),      # 'HH2',
-            ('hi', 'CH2', -np.pi),      # 'HZ2',
-            ('hi', 'CE3', -np.pi),      # 'HZ3'
-        ]
+            'p',                        # CB
+            'p',                        # CG
+            'p',                        # CD1
+            PI,                         # NE1
+            0.0,                        # CE2
+            PI,                         # CZ2
+            PI,                         # CH2
+            0.0,                        # CZ3
+            0.0,                        # CE3
+            0.0,                        # CD2
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            0,                          # HD1
+            PI,                         # HE1
+            0,                          # HZ2
+            PI,                         # HH2
+            PI,                         # HZ3
+            PI,                         # HE3
+            ]
     },
     'TYR': {
-
-        'angles-vals': [
-            1.9146261894377796, 1.9896753472735358, 2.0943951023931953,
-            2.0943951023931953, 2.0943951023931953, 2.0943951023931953,
-            2.0943951023931953, 2.0943951023931953
-        ],
-
-        'bonds-vals': [1.526, 1.51, 1.4, 1.4, 1.409, 1.364, 1.409, 1.4],
         'torsion-names': [
-            'C-N-CA-CB', 'N-CA-CB-CG', 'CA-CB-CG-CD1', 'CB-CG-CD1-CE1', 'CG-CD1-CE1-CZ',
-            'CD1-CE1-CZ-OH', 'CD1-CE1-CZ-CE2', 'CE1-CZ-CE2-CD2'
-        ],
-        'torsion-types': [
-            'C -N -CX-CT', 'N -CX-CT-CA', 'CX-CT-CA-CA', 'CT-CA-CA-CA', 'CA-CA-CA-C ',
-            'CA-CA-C -OH', 'CA-CA-C -CA', 'CA-C -CA-CA'
+            'C-N-CA-CB',
+            'N-CA-CB-CG',
+            'CA-CB-CG-CD1',
+            'CB-CG-CD1-CE1',
+            'CG-CD1-CE1-CZ',
+            'CD1-CE1-CZ-OH',
+            'CD1-CE1-CZ-CE2',
+            'CE1-CZ-CE2-CD2',
+            'C-N-CA-HA',                # HA
+            'N-CA-CB-HB2',              # HB2
+            'N-CA-CB-HB3',              # HB3
+            'CB-CG-CD1-HD1',            # HD1
+            'CG-CD1-CE1-HE1',           # HE1
+            'CE1-CZ-OH-HH',             # HH
+            'CE1-CZ-CE2-HE2',           # HE2
+            'CZ-CE2-CD2-HD2',           # HD2
         ],
         'torsion-vals': [
-            'p', 'p', 'p', 3.141592653589793, 0.0, 3.141592653589793, 0.0, 0.0
+            'p',
+            'p',
+            'p',
+            PI,
+            0.0,
+            PI,
+            0.0,
+            0.0,
+            ('hi', 'CB', 2 * PI / 3),   # HA
+            ('hi', 'CG', 2 * PI / 3),   # HB2
+            ('hi', 'CG', -2 * PI / 3),  # HB3
+            0,                          # HD1
+            PI,                         # HE1
+            PI,                         # HH
+            PI,                         # HE2
+            PI,                         # HD2
         ]
     },
     'VAL': {
-
-        'angles-vals': [1.9146261894377796, 1.911135530933791, 1.911135530933791],
-        'bonds-vals': [1.526, 1.526, 1.526],
-        'torsion-names': ['C-N-CA-CB', 'N-CA-CB-CG1', 'N-CA-CB-CG2'],
-        'torsion-types': ['C -N -CX-3C', 'N -CX-3C-CT', 'N -CX-3C-CT'],
-        'torsion-vals': ['p', 'p', 'p']
+        'torsion-names': [
+            'C-N-CA-CB',
+            'N-CA-CB-CG1',
+            'N-CA-CB-CG2',
+            'C-N-CA-HA',                 # HA
+            'N-CA-CB-HB',                # HB
+            'CA-CB-CG1-HG11',            # HG11
+            'CA-CB-CG1-HG12',            # HG12
+            'CA-CB-CG1-HG13',            # HG13
+            'CA-CB-CG2-HG21',            # HG21
+            'CA-CB-CG2-HG22',            # HG22
+            'CA-CB-CG2-HG23',            # HG23
+            ],
+        'torsion-vals': [
+            'p',
+            'p',
+            'p',
+            ('hi', 'CB', 2 * PI / 3),    # HA
+            ('hi', 'CG1', 2 * PI / 3),   # HB
+            0,                           # HG11
+            2*PI/3,                      # HG12
+            -2*PI/3,                     # HG13
+            0,                           # HG21
+            2*PI/3,                      # HG22
+            -2*PI/3,                     # HG23
+            ]
     }
 }
+# yapf: enable
 
-SC_HBUILD_INFO = BUILD_INFO
+# Add atom names to build dict
+for resname, res_info in RAW_BUILD_INFO.items():
+    atom_names = [torsion.split("-")[-1] for torsion in res_info['torsion-names']]
+    RAW_BUILD_INFO[resname]['atom-names'] = atom_names
+
+SC_HBUILD_INFO = create_complete_hydrogen_build_param_dict()
 
 BB_BUILD_INFO = {
     "BONDLENS": {
