@@ -58,7 +58,7 @@ ANGLE_NAME_TO_IDX_MAP = {
 
 ANGLE_IDX_TO_NAME_MAP = {idx: name for name, idx in ANGLE_NAME_TO_IDX_MAP.items()}
 # yapf: disable
-RAW_BUILD_INFO = {
+_RAW_BUILD_INFO = {
     'ALA': {
         'torsion-names': [
             'C-N-CA-CB',
@@ -71,9 +71,9 @@ RAW_BUILD_INFO = {
             'p',
             # Hydrogens
             ('hi', 'CB', 2 * PI / 3),  # HA
-            0,               # HB1, chi HBX are arbitrary - spaced out by 2pi/3
-            2 * PI/3,   # HB2
-            -2 * PI/3,  # HB3
+            0,                         # HB1, chi HBX are arbitrary - spaced out by 2pi/3
+            2 * PI/3,                  # HB2
+            -2 * PI/3,                 # HB3
         ]
     },
     'ARG': {
@@ -308,8 +308,8 @@ RAW_BUILD_INFO = {
             'CB-CG1-CD1-HD12',           # HD12
             'CB-CG1-CD1-HD13',           # HD13
             'CA-CB-CG2-HG21',            # HG21
-            'CA-CB-CG2-HG21',            # HG22
-            'CA-CB-CG2-HG21',            # HG23
+            'CA-CB-CG2-HG22',            # HG22
+            'CA-CB-CG2-HG23',            # HG23
         ],
         'torsion-vals': [
             'p',
@@ -463,7 +463,8 @@ RAW_BUILD_INFO = {
             ('hi', 'CB', 2 * PI / 3),   # HA
             ('hi', 'CG', 2 * PI / 3),   # HB2
             ('hi', 'CG', -2 * PI / 3),  # HB3
-            0,                          # HE1
+            0,                          # HD1
+            PI,                         # HE1
             PI,                         # HZ
             PI,                         # HE2
             PI,                         # HD2
@@ -651,9 +652,9 @@ RAW_BUILD_INFO = {
 # yapf: enable
 
 # Add atom names to build dict
-for resname, res_info in RAW_BUILD_INFO.items():
+for resname, res_info in _RAW_BUILD_INFO.items():
     atom_names = [torsion.split("-")[-1] for torsion in res_info['torsion-names']]
-    RAW_BUILD_INFO[resname]['atom-names'] = atom_names
+    _RAW_BUILD_INFO[resname]['atom-names'] = atom_names
 
 BB_BUILD_INFO = {
     "BONDLENS": {
@@ -676,7 +677,7 @@ BB_BUILD_INFO = {
 
 def _get_max_num_atoms_heavy():
     lengths = []
-    for resname, resinfo in RAW_BUILD_INFO.items():
+    for resname, resinfo in _RAW_BUILD_INFO.items():
         heavyatms = list(filter(lambda an: not an.startswith("H"), resinfo['atom-names']))
         nonh_terminals = list(
             filter(lambda an: not an.startswith('H'), _SUPPORTED_TERMINAL_ATOMS))
@@ -687,7 +688,7 @@ def _get_max_num_atoms_heavy():
 
 def _get_max_num_atoms_hydrogen():
     lengths = []
-    for resname, resinfo in RAW_BUILD_INFO.items():
+    for resname, resinfo in _RAW_BUILD_INFO.items():
         n = len(resinfo['torsion-names']) + len(_SUPPORTED_TERMINAL_ATOMS) + len(
             _BACKBONE_ATOMS + ['H'])
         lengths.append(n)
@@ -717,7 +718,7 @@ def _create_atomname_lookup():
         assert len(resname) != 4, "terminal res not supported"
         if resname == 'HID':
             resname = 'HIS'
-        if resname not in RAW_BUILD_INFO:
+        if resname not in _RAW_BUILD_INFO:
             continue
         atom_name_lookup[resname] = {}
         for line in lines[1:]:
@@ -797,7 +798,7 @@ class ForceFieldLookupHelper(object):
 def create_complete_hydrogen_build_param_dict():
     """Create a Python dictionary that describes all necessary info for building atoms."""
     # We need to record the following information: bond lengths, bond angles
-    new_build_info = copy.deepcopy(RAW_BUILD_INFO)
+    new_build_info = copy.deepcopy(_RAW_BUILD_INFO)
 
     # First, we must lookup the atom type for each atom
     atom_type_map = _create_atomname_lookup()
@@ -807,7 +808,7 @@ def create_complete_hydrogen_build_param_dict():
     ff_helper = ForceFieldLookupHelper(base + "frcmod.ff14SB", base + "parm10.dat")
 
     # Now, let's generate the types of the bonds and angles we will need to lookup
-    for resname, resinfo in RAW_BUILD_INFO.items():
+    for resname, resinfo in _RAW_BUILD_INFO.items():
         new_build_info[resname]['bond-types'] = []
         new_build_info[resname]['angle-types'] = []
         new_build_info[resname]['bond-vals'] = []

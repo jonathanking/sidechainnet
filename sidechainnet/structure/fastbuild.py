@@ -3,8 +3,9 @@
 import numpy as np
 import torch
 from sidechainnet.structure.fastbuild_matrices import MakeBackbone, MakeTMats
-from sidechainnet.structure.build_info import (_BACKBONE_ATOMS, ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO,
-                                               NUM_COORDS_PER_RES, SC_ANGLES_START_POS,
+from sidechainnet.structure.build_info import (_BACKBONE_ATOMS, _SUPPORTED_TERMINAL_ATOMS,
+                                               ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO,
+                                               NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS, SC_ANGLES_START_POS,
                                                SC_HBUILD_INFO)
 
 #################################################################################
@@ -57,7 +58,7 @@ NUM2AA = {i: a for i, a in enumerate(AA)}
 AA2NUM = {a: i for i, a in enumerate(AA)}
 
 
-def _make_sc_heavy_atom_tensors():
+def _make_sc_heavy_atom_tensors(build_info):
     """Create a dict mapping build_info (lens, angs, types) to vals per residue identity.
 
         For every sidechain atom, we need to know:
@@ -77,7 +78,7 @@ def _make_sc_heavy_atom_tensors():
         sidechains) to the data itself.
     """
     nres = len(AA)
-    ncoords = NUM_COORDS_PER_RES - (len(_BACKBONE_ATOMS) + 1)  # TODO fix function for heavy atom building
+    ncoords = NUM_COORDS_PER_RES - len(set(_BACKBONE_ATOMS + ['OXT']))
     assert ncoords == 10
     sc_source_atom = torch.zeros(nres, ncoords, dtype=torch.long)
     sc_bond_length = torch.zeros(nres, ncoords)
@@ -95,7 +96,7 @@ def _make_sc_heavy_atom_tensors():
     for a in range(20):
         A = AA[a]
         a3 = AA1to3[A]
-        info = SC_HBUILD_INFO[a3]
+        info = build_info[a3]
         for i in range(NUM_COORDS_PER_RES - 4):
             if (i < len(info['torsion-names']) and
                     not info['torsion-names'][i].split("-")[-1].startswith("H")):
@@ -123,7 +124,8 @@ def _make_sc_heavy_atom_tensors():
 
                 src = info['torsion-names'][i].split('-')[-2]
                 if src != 'CA':
-                    sc_source_atom[a][i] = _get_atom_idx_in_torsion_list(src, info['torsion-names'])
+                    sc_source_atom[a][i] = _get_atom_idx_in_torsion_list(
+                        src, info['torsion-names'])
                 else:
                     sc_source_atom[a][i] = -1
     return {
@@ -149,10 +151,12 @@ def _get_atom_idx_in_torsion_list(atom_name, tor_name_list):
         int: Index of atom name.
     """
     if atom_name == 'C':
-        raise ValueError("Returning a strange atom source index. " + "-".join(tor_name_list))
+        raise ValueError("Returning a strange atom source index. " +
+                         "-".join(tor_name_list))
         return -3
     elif atom_name == 'N':
-        raise ValueError("Returning a strange atom source index. " + "-".join(tor_name_list))
+        raise ValueError("Returning a strange atom source index. " +
+                         "-".join(tor_name_list))
         return -2
     for position, t_name in enumerate(tor_name_list):
         if t_name.split('-')[-1].strip() == atom_name.strip():
@@ -160,7 +164,7 @@ def _get_atom_idx_in_torsion_list(atom_name, tor_name_list):
     raise ValueError(f"Could not find {atom_name} in {tor_name_list}.")
 
 
-def _make_sc_calpha_tensors():
+def _make_sc_calpha_tensors(build_info):
     """Create a dict to map all-atom build_info (lens/angs/etc) to vals per res identity.
 
         For every sidechain atom, we need to know:
@@ -179,7 +183,9 @@ def _make_sc_calpha_tensors():
         sidechains) to the data itself.
     """
     nres = len(AA)
-    ncoords = 19  # TODO Automate this by pulling out the max list of atom names in build info
+    ncoords = NUM_COORDS_PER_RES_W_HYDROGENS - (
+        len(_SUPPORTED_TERMINAL_ATOMS) + len(set(_BACKBONE_ATOMS + ['H']))
+    )  # TODO Automate this by pulling out the max list of atom names in build info
     assert ncoords == 19
     sc_source_atom = torch.zeros(nres, ncoords, dtype=torch.long)
     sc_bond_length = torch.zeros(nres, ncoords)
@@ -201,7 +207,7 @@ def _make_sc_calpha_tensors():
             # alpha Carbon are identical to the non-terminal residue version
             A = A[1]
         a3 = AA1to3[A]
-        info = SC_HBUILD_INFO[a3]
+        info = build_info[a3]
         # First we add array data cooresponding to heavy atoms defined in SCBUILDINFO[RES]
         i = 0
         for i in range(ncoords):
@@ -214,7 +220,8 @@ def _make_sc_calpha_tensors():
 
                 src = info['torsion-names'][i].split('-')[-2].strip()
                 if src != 'CA':
-                    sc_source_atom[a][i] = _get_atom_idx_in_torsion_list(src, info['torsion-names'])
+                    sc_source_atom[a][i] = _get_atom_idx_in_torsion_list(
+                        src, info['torsion-names'])
                 else:
                     sc_source_atom[a][i] = -1
 
@@ -246,9 +253,11 @@ def _make_sc_calpha_tensors():
                     # This is a hydrogen placed relative to an earlier angle/atom
                     # Both the relative atom and the atom that needs plcmnt have same src
                     _, rel_atom, offset = t
-                    rel_atom_idx = _get_atom_idx_in_torsion_list(rel_atom, info['torsion-names'])
+                    rel_atom_idx = _get_atom_idx_in_torsion_list(
+                        rel_atom, info['torsion-names'])
                     atom_src = sc_source_atom[a][rel_atom_idx]
-                    assert atom_src == sc_source_atom[a][i], f"{atom_src}, {sc_source_atom[a][i]}, {t}"
+                    assert atom_src == sc_source_atom[a][
+                        i], f"{atom_src}, {sc_source_atom[a][i]}, {t}"
                     # if atom_src == -1:
                     #     # The source is CA, this means this is HA and should be rel to CB
                     #     assert an == 'HA' and rel_atom == 'CB', "Atom must be HA and relative to CB."
@@ -274,12 +283,6 @@ def _make_sc_calpha_tensors():
             else:
                 break
 
-    # sc_bond_length.requires_grad_(True)
-    # sc_ctheta.requires_grad_(True)
-    # sc_stheta.requires_grad_(True)
-    # sc_cchi.requires_grad_(True)
-    # sc_schi.requires_grad_(True)
-    # sc_offset.requires_grad_(True)
 
     return {
         'bond_lengths': sc_bond_length,  # Each of these is a matrix containing relevant
@@ -330,15 +333,15 @@ def _make_nitrogen_tensors():
     return ndict
 
 
-def _make_carbon_tensors():
+def _make_carbon_tensors(bb_build_info):
     # The 1st column in the matrices below is for typical C=O. The 2nd is for terminal OXT
     cdict = {
         'bond_lengths':
-            _xNRES(BB_BUILD_INFO["BONDLENS"]["c-o"]).repeat(1, 2),
+            _xNRES(bb_build_info["BONDLENS"]["c-o"]).repeat(1, 2),
         'cthetas':
-            _xNRES(np.cos(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])).repeat(1, 2),
+            _xNRES(np.cos(np.pi - bb_build_info["BONDANGS"]["ca-c-o"])).repeat(1, 2),
         'sthetas':
-            _xNRES(np.sin(np.pi - BB_BUILD_INFO["BONDANGS"]["ca-c-o"])).repeat(1, 2),
+            _xNRES(np.sin(np.pi - bb_build_info["BONDANGS"]["ca-c-o"])).repeat(1, 2),
         'cchis':
             _xNRES(0.).repeat(1, 2),
         'schis':
@@ -368,31 +371,31 @@ def _make_carbon_tensors():
 # build data for every residue. CA atom build info is organized into a data with data
 # labels as keys, and vectors of values ordered by residue identity.
 
-SC_HEAVY_ATOM_BUILD_INFO = {
+SC_HEAVY_ATOM_BUILD_PARAMS = {
     # Nothing extends from Nitrogen, so no data is needed here.
     'N': None,
     # Many atoms potentially extend from alpha Carbons. Data is organized by res identity.
     # i.e. 'bond_lengths' : 20 x 10,  'types' : 20 x 10
     # Items are meant to be selected from this dictionary to match the sequence that will
     # be built.
-    'CA': _make_sc_heavy_atom_tensors(),
+    'CA': _make_sc_heavy_atom_tensors(SC_HBUILD_INFO),
     'HA': None,
     # Carbonyl carbons are built off of the backbone C. Each residue builds this oxygen
     # in the same way, so we simply repeat the relevant build info data per res identity.
-    'C': _make_carbon_tensors()
+    'C': _make_carbon_tensors(BB_BUILD_INFO)
 }
 
 
-def get_all_atom_build_info():
+def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUILD_INFO):
     bi = {
         'N': _make_nitrogen_tensors(),
-        'CA': _make_sc_calpha_tensors(),
-        'C': _make_carbon_tensors()
+        'CA': _make_sc_calpha_tensors(sc_build_info),
+        'C': _make_carbon_tensors(bb_build_info)
     }
     return bi
 
 
-SC_ALL_ATOM_BUILD_INFO = get_all_atom_build_info()
+SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
 
 ###################################################
 # Coordinates
@@ -426,8 +429,6 @@ def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info, bb_an
     sources = build_info['sources'][seq_aa_index].to(device).long()
     names = [build_info['names'][idx] for idx in seq_aa_index] if 'names' in build_info else None
 
-    # TODO modify the first and last residues (index 0 and -1 in above arrays) to add
-    # TODO support for CB generation w/fictitious residue as well as terminal hydrogens.
 
     # Create empty sidechain coordinate tensor and starting coordinate at origin
     MAX = bond_lengths.shape[1]  # always equal to the maximum num sidechain atoms per res
@@ -553,13 +554,13 @@ def _add_terminal_residue_names_to_seq(seq):
     return new_seq
 
 
-def make_coords(seq, angles, build_info, add_hydrogens=False):
+def make_coords(seq, angles, build_params, add_hydrogens=False):
     """Create coordinates from sequence and angles using torch operations.
 
-    build_info describes what atoms to make and how.
+    build_params describes what atoms to make and how.
     """
-    if build_info is None:
-        build_info = SC_HEAVY_ATOM_BUILD_INFO if not add_hydrogens else SC_ALL_ATOM_BUILD_INFO
+    if build_params is None:
+        build_params = SC_HEAVY_ATOM_BUILD_PARAMS if not add_hydrogens else SC_ALL_ATOM_BUILD_PARAMS
 
     L = len(seq)
     device = angles.device
@@ -616,13 +617,14 @@ def make_coords(seq, angles, build_info, add_hydrogens=False):
     # First: Select relevant angle (np.pi + psi)
     oang = (np.pi + ang[1:, ang_name_map['psi']]).unsqueeze(-1)
     # Next: Use the oang angle tensor and C-atom relevant info to place all oxygens
-    ocoords, o_params = build_coords_from_source(ncacM[2::3], seq_aa_index, oang, build_info['C'])
+    ocoords, o_params = build_coords_from_source(ncacM[2::3], seq_aa_index, oang,
+                                                 build_params['C'])
 
     # Create hydrogens for nitrogens
-    if build_info['N']:  # nH
+    if build_params['N']:  # nH
         nang = (np.pi + ang[:L, ang_name_map['omega']]).unsqueeze(-1)
         ncoords, n_params = build_coords_from_source(ncacM[0::3], seq_aa_index, nang,
-                                           build_info['N'])
+                                                     build_params['N'])
     else:
         ncoords, n_params = torch.zeros(L, 0, 3, dtype=dtype, device=device), dict()
 
@@ -631,9 +633,10 @@ def make_coords(seq, angles, build_info, add_hydrogens=False):
     sccoords, s_params = build_coords_from_source(ncacM[1::3],
                                                   seq_aa_index,
                                                   scang,
-                                                  build_info['CA'],
+                                                  build_params['CA'],
                                                   bb_ang=ang[1:, :3])
 
     # When present, we place the H and HAs atom (attached to N and CA) after the backbone
     # This allows the tail end of all residue representations to contain PADs only.
-    return torch.concat([ncac, ocoords, ncoords, sccoords], dim=1), (o_params, n_params, s_params)
+    return torch.concat([ncac, ocoords, ncoords, sccoords],
+                        dim=1), (o_params, n_params, s_params)

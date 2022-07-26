@@ -619,7 +619,7 @@ def test_alphabet():
     d.hcoords = hcoords
     d.has_hydrogens = True
     d.sb = None
-    d.to_pdb("/home/jok120/Downloads/alfa28.pdb", title='ALFA')
+    d.to_pdb("/home/jok120/Downloads/alfa31.pdb", title='ALFA')
     print(hcoords)
 
 

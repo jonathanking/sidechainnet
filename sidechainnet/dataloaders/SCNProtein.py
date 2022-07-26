@@ -39,7 +39,7 @@ import sidechainnet.structure.fastbuild as fastbuild
 from sidechainnet.utils.download import MAX_SEQ_LEN
 import sidechainnet.structure.HydrogenBuilder as hy
 from sidechainnet import structure
-from sidechainnet.structure.build_info import ATOM_MAP_H, NUM_COORDS_PER_RES, SC_HBUILD_INFO
+from sidechainnet.structure.build_info import ATOM_MAP_H, NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS, SC_HBUILD_INFO
 from sidechainnet.structure.build_info import ATOM_MAP_HEAVY
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
@@ -69,6 +69,10 @@ class SCNProtein(object):
         self.id = kwargs['id'] if 'id' in kwargs else None
         self.split = kwargs['split'] if 'split' in kwargs else None
         self.add_sos_eos = kwargs['add_sos_eos'] if 'add_sos_eos' in kwargs else False
+        if 'openmm_forcefields' in kwargs and kwargs['openmm_forcefields'] is not None:
+            self.openmm_forcefields = kwargs['openmm_forcefields']
+        else:
+            self.openmm_forcefields = OPENMM_FORCEFIELDS
 
         # Prepare data for model training
         self.int_seq = VOCAB.str2ints(self.seq, add_sos_eos=self.add_sos_eos)
@@ -210,20 +214,20 @@ class SCNProtein(object):
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
 
-    def fastbuild(self, add_hydrogens=False, build_info=None, inplace=False):
+    def fastbuild(self, add_hydrogens=False, build_params=None, inplace=False):
         """Build protein coordinates from angles."""
         coords, params = fastbuild.make_coords(self.seq,
                                                self.angles,
-                                               build_info=build_info,
+                                               build_params=build_params,
                                                add_hydrogens=add_hydrogens)
         if inplace:
             self.coords = self.hcoords = coords
             self.has_hydrogens = add_hydrogens
             self.sb = None
             return
-        # if self.positions is None and add_hydrogens:
-            # self.initialize_openmm()
-        # self.update_positions()
+        if self.positions is None and add_hydrogens:
+            self.initialize_openmm()
+            self.update_positions()
         return coords
 
     def build_coords_from_angles(self, angles=None, add_hydrogens=False):
@@ -299,7 +303,7 @@ class SCNProtein(object):
         """Return tensor of forces as requested."""
         # Initialize tensor and energy
         if self.forces is None:
-            self.forces = np.zeros((len(self.seq) * hy.NUM_COORDS_PER_RES_W_HYDROGENS, 3))
+            self.forces = np.zeros((len(self.seq) * NUM_COORDS_PER_RES_W_HYDROGENS, 3))
         if not self.starting_energy:
             self.get_energy()
 
@@ -347,10 +351,9 @@ class SCNProtein(object):
         hcoords = hcoords.detach().cpu().numpy() if not isinstance(
             hcoords, np.ndarray) else hcoords
         # A mapping is used to correct for small differences between the Torch/OpenMM pos
-        self.positions[self.hcoord_to_pos_map_values] = hcoords[
-            self.hcoord_to_pos_map_keys]
+        self.positions[self.hcoord_to_pos_map_values] = hcoords.reshape(
+            -1, 3)[self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
-
 
     ##########################################
     #         OPENMM SETUP FUNCTIONS         #
@@ -373,13 +376,14 @@ class SCNProtein(object):
                 zip(self.seq, coord_gen, self.mask, self.get_atom_names())):
             residue_name = ONE_TO_THREE_LETTER_MAP[residue_code]
             if mask_char == "-" and skip_missing_residues:
-                hcoord_idx += hy.NUM_COORDS_PER_RES_W_HYDROGENS
+                hcoord_idx += NUM_COORDS_PER_RES_W_HYDROGENS
                 continue
             residue = self.topology.addResidue(name=residue_name, chain=chain)
 
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 # If this atom is a PAD character or non-existent terminal atom, skip
-                if an == "PAD" or (an in ["OXT", "H2", "H3"] and np.isnan(c).any()):
+                # TODO more graciously handle pads for terminal residues
+                if an == "PAD" or (an in ["OXT", "H2", "H3"] and np.isnan(c).any()) or (residue_code == 'P' and an == 'H'):
                     hcoord_idx += 1
                     continue
                 # Handle missing atoms
@@ -409,7 +413,7 @@ class SCNProtein(object):
         """Create top., pos., modeller, forcefield, system, integrator, & simulation."""
         self.get_openmm_repr()
         self.modeller = Modeller(self.topology, self.positions)
-        self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
+        self.forcefield = ForceField(*self.openmm_forcefields)
         self.system = self.forcefield.createSystem(self.modeller.topology,
                                                    nonbondedMethod=openmm.app.NoCutoff,
                                                    nonbondedCutoff=1 * nanometer,
@@ -435,15 +439,21 @@ class SCNProtein(object):
         if self._hcoord_mask is not None:
             return self._hcoord_mask
         else:
-            self._hcoord_mask = torch.zeros_like(self.hcoords)
+            self._hcoord_mask = torch.full_like(self.hcoords, 1)
             for i, (res3, atom_names) in enumerate(
                     zip(self.seq3.split(" "), self.get_atom_names())):
-                n_heavy_atoms = sum([True if an != "PAD" else False for an in atom_names])
-                n_hydrogens = len(hy.HYDROGEN_NAMES[res3])
-                self._hcoord_mask[i * hy.NUM_COORDS_PER_RES_W_HYDROGENS:i *
-                                  hy.NUM_COORDS_PER_RES_W_HYDROGENS + n_heavy_atoms +
-                                  n_hydrogens, :] = 1.0
-            self._hcoord_mask[self._hcoord_mask == 0] = torch.nan
+                pad_chars = [an == "PAD" for an in atom_names]
+                if i == 0:
+                    # Terminal does not have OXT
+                    self._hcoord_mask[i, 4, :] = torch.nan
+                if i == self.hcoords.shape[0] - 1:
+                    # Terminal does not have H2/H3
+                    # TODO improve atom naming convention
+                    self._hcoord_mask[i, [6, 7], :] = torch.nan
+                if res3 == "PRO":
+                    # Proline does not have H
+                    self._hcoord_mask[i, 5, :] = torch.nan
+                self._hcoord_mask[i, pad_chars, :] = torch.nan
             return self._hcoord_mask
 
     ##########################################
@@ -468,16 +478,22 @@ class SCNProtein(object):
         # self.pdbfixer.addMissingAtoms()
         # self.pdbfixer.addMissingHydrogens(7.0)
 
-    def minimize(self):
+    def minimize(self, nonbonded_interactions=True):
         """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
+        cutoff_method = openmm.app.NoCutoff if nonbonded_interactions else openmm.app.CutoffNonPeriodic
+        cutoff_dist = 1 * nanometer if nonbonded_interactions else 1e-5 * nanometer
+        constraints = HBonds if nonbonded_interactions else None
         if not hasattr(self, "topology") or self.topology is None:
             self.initialize_openmm()
         self.modeller = Modeller(self.topology, self.positions)
-        self.forcefield = ForceField(*OPENMM_FORCEFIELDS)
+        self.forcefield = ForceField(*self.openmm_forcefields)
         self.system = self.forcefield.createSystem(self.modeller.topology,
-                                                   nonbondedMethod=openmm.app.NoCutoff,
-                                                   nonbondedCutoff=1 * nanometer,
-                                                   constraints=HBonds)
+                                                   nonbondedMethod=cutoff_method,
+                                                   nonbondedCutoff=cutoff_dist,
+                                                   constraints=constraints)
+        if not nonbonded_interactions:
+            print(f"Removing {self.system.getForce(3)}.")
+            self.system.removeForce(3)
         self.integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond,
                                                    0.004 * picoseconds)
         self.simulation = openmm.app.Simulation(self.modeller.topology, self.system,

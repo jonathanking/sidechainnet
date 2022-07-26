@@ -74,6 +74,7 @@ class OpenMMEnergyH(torch.autograd.Function):
         ctx.forces = forces
         ctx.grad_scale = force_scaling
         ctx.device = protein.device
+        ctx.coord_shape = hcoords.shape
 
         return energy
 
@@ -81,7 +82,8 @@ class OpenMMEnergyH(torch.autograd.Function):
     def backward(ctx, grad_output=None):
         """Return the negative force acting on each atom."""
         return None, torch.tensor(
-            -ctx.forces, device=ctx.device) * grad_output * ctx.grad_scale, None, None
+            -ctx.forces.reshape(*ctx.coord_shape),
+            device=ctx.device) * grad_output * ctx.grad_scale, None, None
 
 
 def _get_alias(protein):
