@@ -36,8 +36,9 @@ setup(
     package_data={
         "astral_data": ["resources/astral_data.txt"],
         "full_protein_dssp": ["resources/full_protein_dssp_annotations.json"],
-        "single_domain_dssp": ["resources/single_domain_dssp_annotations.json"]
-        },
+        "single_domain_dssp": ["resources/single_domain_dssp_annotations.json"],
+        "amber_build_params": ["resources/build_params.pkl"]
+    },
 
     # Allows `setup.py test` to work correctly with pytest
     setup_requires=[] + pytest_runner,
@@ -45,8 +46,8 @@ setup(
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     url='https://github.com/jonathanking/sidechainnet',  # Website
     install_requires=[
-        'ProDy>=2.0', 'numpy', 'scipy', 'biopython', 'tqdm', 'py3Dmol',
-        'requests', 'setuptools', 'pandas', 'numba'
+        'ProDy>=2.0', 'numpy', 'scipy', 'biopython', 'tqdm', 'py3Dmol', 'requests',
+        'setuptools', 'pandas', 'numba'
     ],  # Required packages, pulls from pip if needed; do not use for Conda deployment
     tests_require=['pytest'],
     # platforms=['Linux',
@@ -58,10 +59,8 @@ setup(
     # Manual control if final package is compressible or not, set False to prevent the .egg from being made
     # zip_safe=False,
     classifiers=[
-        'Development Status :: 4 - Beta',
-        'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: BSD License',
-        'Programming Language :: Python :: 3',
+        'Development Status :: 4 - Beta', 'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: BSD License', 'Programming Language :: Python :: 3',
         'Operating System :: POSIX :: Linux',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Bio-Informatics'

@@ -1,12 +1,15 @@
 """Utilities for building structures using sublinear algorithms."""
 
+import pickle
 import numpy as np
+import pkg_resources
 import torch
 from sidechainnet.structure.fastbuild_matrices import MakeBackbone, MakeTMats
 from sidechainnet.structure.build_info import (_BACKBONE_ATOMS, _SUPPORTED_TERMINAL_ATOMS,
                                                ANGLE_NAME_TO_IDX_MAP, BB_BUILD_INFO,
-                                               NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS, SC_ANGLES_START_POS,
-                                               SC_HBUILD_INFO)
+                                               NUM_COORDS_PER_RES,
+                                               NUM_COORDS_PER_RES_W_HYDROGENS,
+                                               SC_ANGLES_START_POS, SC_HBUILD_INFO)
 
 #################################################################################
 # Data structures for describing how to build all the atoms of each residue
@@ -283,7 +286,6 @@ def _make_sc_calpha_tensors(build_info):
             else:
                 break
 
-
     return {
         'bond_lengths': sc_bond_length,  # Each of these is a matrix containing relevant
         'cthetas': sc_ctheta,  # build info for all atoms in all residues.
@@ -316,8 +318,8 @@ def _make_nitrogen_tensors():
     }
     # We correct some of the values that were quickly generated above to better describe
     # the build info for NH2.
-    ndict['types'][0:20, 1:] = 0   # Do not build NH2 for non-terminal residues
-    ndict['types'][40:, 1:] = 0    # Do not build NH2 for C-terminal residues
+    ndict['types'][0:20, 1:] = 0  # Do not build NH2 for non-terminal residues
+    ndict['types'][40:, 1:] = 0  # Do not build NH2 for C-terminal residues
     ndict['types'][20:40, 1:] = 2  # Build H2 + H3 for N-terminal res only, type 2 infer
 
     ndict['offsets'][20:40, 1] = 2 * np.pi / 3  # H2 and H3 are oriented by rotation
@@ -395,7 +397,9 @@ def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUI
     return bi
 
 
-SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
+with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
+          "rb") as f:
+    SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
 
 ###################################################
 # Coordinates
@@ -428,7 +432,6 @@ def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info, bb_an
     types = build_info['types'][seq_aa_index].to(device)
     sources = build_info['sources'][seq_aa_index].to(device).long()
     names = [build_info['names'][idx] for idx in seq_aa_index] if 'names' in build_info else None
-
 
     # Create empty sidechain coordinate tensor and starting coordinate at origin
     MAX = bond_lengths.shape[1]  # always equal to the maximum num sidechain atoms per res
@@ -522,7 +525,7 @@ def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info, bb_an
                     # change prevmat to earlier matrix
                     # We select the matrix from k+1 because when k==-1,
                     # we want the first matrix in the list
-                    prevmats[LLmask[prevbuildmask]] = matrices[k + 1][LLmask[masks[k+1]]]
+                    prevmats[LLmask[prevbuildmask]] = matrices[k + 1][LLmask[masks[k +1]]]
 
         # We can finally update the globally-referenced TMats through multiplication
         prevmats = prevmats[buildmask[prevbuildmask]] @ tmats_for_level_i
@@ -559,6 +562,9 @@ def make_coords(seq, angles, build_params, add_hydrogens=False):
 
     build_params describes what atoms to make and how.
     """
+    if not add_hydrogens:
+        print("WARNING: Must transfer optimized build_params from all atom optimized"
+              " build_params.")
     if build_params is None:
         build_params = SC_HEAVY_ATOM_BUILD_PARAMS if not add_hydrogens else SC_ALL_ATOM_BUILD_PARAMS
 

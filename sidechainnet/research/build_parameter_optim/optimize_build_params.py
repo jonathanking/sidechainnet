@@ -1,5 +1,8 @@
 """Load SC_HBUILD_INFO and optimize the corresponding build_params to minimize energy."""
 import copy
+import pickle
+import numpy as np
+import pkg_resources
 
 from tqdm import tqdm
 import torch
@@ -13,16 +16,27 @@ from sidechainnet.tests.test_fastbuild import alphabet_protein
 class BuildParamOptimizer(object):
     """Class to help optimize building parameters."""
 
-    def __init__(self, protein, ffname=OPENMM_FORCEFIELDS):
+    def __init__(self,
+                 protein,
+                 opt_bond_lengths=True,
+                 opt_thetas=True,
+                 opt_chis=True,
+                 ffname=OPENMM_FORCEFIELDS):
         self.build_params = get_all_atom_build_params(SC_HBUILD_INFO, BB_BUILD_INFO)
         self._starting_build_params = copy.deepcopy(self.build_params)
         self.protein = self.prepare_protein(protein)
         self.ffname = ffname
         assert ffname == ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
         self.energy_loss = OpenMMEnergyH()
-        # self.keys_to_optimize = ['bond_lengths', 'cthetas', 'sthetas', 'cchis', 'schis']
-        self.keys_to_optimize = ['cthetas', 'sthetas']
+        self.keys_to_optimize = []
+        if opt_bond_lengths:
+            self.keys_to_optimize.append('bond_lengths')
+        if opt_thetas:
+            self.keys_to_optimize.extend(['cthetas', 'sthetas'])
+        if opt_chis:
+            self.keys_to_optimize.extend(['cchis', 'schis'])
         self.params = self.create_param_list_from_build_params(self.build_params)
+        self.losses = []
 
     def prepare_protein(self, protein: SCNProtein):
         """Prepare protein for optimization by building hydrogens/init OpenMM."""
@@ -31,7 +45,7 @@ class BuildParamOptimizer(object):
         protein.fastbuild(add_hydrogens=True,
                           build_params=self.build_params,
                           inplace=True)
-        protein.initialize_openmm()
+        protein.initialize_openmm(nonbonded_interactions=False)
         return protein
 
     def create_param_list_from_build_params(self, build_params):
@@ -51,19 +65,23 @@ class BuildParamOptimizer(object):
                 self.build_params[root_atom][param_key] = optimized_params[i]
                 i += 1
 
-    def optimize(self, opt='LBFGS'):
+    def save_build_params(self, path):
+        """Write out build_params dict to path as pickle object."""
+        with open(path, "wb") as f:
+            pickle.dump(self.build_params, f)
+
+    def optimize(self, opt='LBFGS', lr=1e-5, steps=100):
         """Optimize self.build_params to minimize OpenMMEnergyH."""
         to_optim = self.params
         p = self.protein
 
-        self.losses = []
         self.build_params_history = [copy.deepcopy(self.params)]
 
         # LBFGS Loop
         if opt == 'LBFGS':
             # TODO Fails to optimize
-            self.opt = torch.optim.LBFGS(to_optim, lr=1e-5)
-            for i in tqdm(range(50)):
+            self.opt = torch.optim.LBFGS(to_optim, lr=lr)
+            for i in tqdm(range(steps)):
                 # Note keeping
                 self.build_params_history.append(
                     [copy.deepcopy(p.detach().cpu()) for p in to_optim])
@@ -88,8 +106,13 @@ class BuildParamOptimizer(object):
 
         # SGD Loop
         elif opt == 'SGD':
-            self.opt = torch.optim.SGD(to_optim, lr=1e-10)
-            for i in tqdm(range(100)):
+            self.opt = torch.optim.SGD(to_optim, lr=lr)
+            pbar = tqdm(range(steps), dynamic_ncols=True)
+            best_loss = None
+            counter = 0
+            patience = 10
+            epsilon = 1e-4
+            for i in pbar:
                 # Note keeping
                 self.build_params_history.append(
                     [copy.deepcopy(p.detach().cpu()) for p in to_optim])
@@ -107,8 +130,19 @@ class BuildParamOptimizer(object):
                 loss = self.energy_loss.apply(p, p.hcoords)
                 loss.backward()
                 lossnp = float(loss.detach().cpu().numpy())
+                if (best_loss is None or
+                    (lossnp < best_loss and np.abs(best_loss - lossnp) > epsilon)):
+                    best_loss = lossnp
+                    counter = 0
+                elif counter > patience:
+                    print("Stopping early.")
+                    break
+                elif counter < patience:
+                    counter += 1
                 self.losses.append(lossnp)
                 self.opt.step()
+
+                pbar.set_postfix({'loss': f"{lossnp:.2f}"})
 
         self.update_complete_build_params_with_optimized_params(to_optim)
         return self.build_params
@@ -116,9 +150,16 @@ class BuildParamOptimizer(object):
 
 def main():
     """Minimize the build parameters for an example alphabet protein."""
-    bpo = BuildParamOptimizer(alphabet_protein(), ffname=OPENMM_FORCEFIELDS)
-    new_build_params = bpo.optimize(opt='SGD')
-    print(new_build_params)
+    p = alphabet_protein()
+    bpo = BuildParamOptimizer(p,
+                              opt_bond_lengths=True,
+                              opt_thetas=True,
+                              opt_chis=True,
+                              ffname=OPENMM_FORCEFIELDS)
+    build_params = bpo.optimize(opt='SGD', lr=1e-6, steps=10000)
+    fn = pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl")
+    with open(fn, "wb") as f:
+        pickle.dump(build_params, f)
 
 
 if __name__ == "__main__":

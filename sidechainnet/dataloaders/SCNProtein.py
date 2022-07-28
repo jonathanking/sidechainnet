@@ -409,7 +409,7 @@ class SCNProtein(object):
         self.positions = np.array(self.positions)
         return self.topology, self.positions
 
-    def initialize_openmm(self):
+    def initialize_openmm(self, nonbonded_interactions=True):
         """Create top., pos., modeller, forcefield, system, integrator, & simulation."""
         self.get_openmm_repr()
         self.modeller = Modeller(self.topology, self.positions)
@@ -420,6 +420,9 @@ class SCNProtein(object):
                                                    constraints=HBonds)
         self.integrator = LangevinMiddleIntegrator(300 * kelvin, 1 / picosecond,
                                                    0.004 * picoseconds)
+        if not nonbonded_interactions:
+            print(f"Removing {self.system.getForce(3)}.")
+            self.system.removeForce(3)
         if OPENMM_PLATFORM == "CUDA":
             self.platform = Platform.getPlatformByName('CUDA')
             properties = {'DeviceIndex': '0', 'Precision': 'double'}

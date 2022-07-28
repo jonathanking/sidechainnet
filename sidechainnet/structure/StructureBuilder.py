@@ -90,8 +90,7 @@ class StructureBuilder(object):
         if (self.coords is not None and self.coords.shape[-1] != 3):
             raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
                              f"You have provided {tuple(self.coords.shape)}.")
-        if (self.coords is not None and
-            (self.coords.shape[0]) != len(self.seq_as_str) and
+        if (self.coords is not None and (self.coords.shape[0]) != len(self.seq_as_str) and
             (self.coords.shape[0]) != len(self.seq_as_str)):
             raise ValueError(
                 f"The length of the coordinate matrix must match the sequence length. "
@@ -289,20 +288,24 @@ class StructureBuilder(object):
             other_protein.numpy()
             other_protein_copy = other_protein.copy()
             # Remove rows with nans
-            other_protein_copy_coords_nonans = other_protein_copy.coords[
-                ~np.isnan(other_protein_copy.coords).any(axis=1)]
+            other_protein_copy_coords = other_protein_copy.coords.reshape(-1, 3)
+            other_protein_copy_coords_nonans = other_protein_copy_coords[
+                ~np.isnan(other_protein_copy_coords).any(axis=-1)]
             if torch.is_tensor(self.coords):
                 self.coords = self.coords.detach().cpu().numpy()
-            coords_copy = copy.deepcopy(self.coords)
-            coords_copy_nonans = coords_copy[~np.isnan(coords_copy).any(axis=1)]
+            coords_copy = copy.deepcopy(self.coords).reshape(-1, 3)
+            coords_copy_nonans = coords_copy[~np.isnan(coords_copy).any(axis=-1)]
             # Perform alignment between non-nan coords
             t = pr.calcTransformation(other_protein_copy_coords_nonans,
                                       coords_copy_nonans)
-            aligned_coords = t.apply(other_protein_copy.coords)
+            aligned_coords = t.apply(other_protein_copy_coords)
             # Update coords in other protein
-            other_protein_copy.coords = aligned_coords
+            other_protein_copy.coords = aligned_coords.reshape(len(other_protein_copy),
+                                                               -1, 3)
             if other_protein_copy.has_hydrogens:
-                other_protein_copy.hcoords = t.apply(other_protein_copy.hcoords)
+                other_protein_copy.hcoords = t.apply(
+                    other_protein_copy.hcoords.reshape(-1, 3)).reshape(
+                        len(other_protein_copy), -1, 3)
                 other_protein_copy.coords = other_protein_copy.hcoords
             # Add viz to model
             other_protein_copy.sb = None
@@ -315,21 +318,21 @@ class StructureBuilder(object):
             view.setStyle(style)
         elif other_protein is not None:
             style1 = {
-                'cartoon': {
-                    'color': '#599BFB'
-                },
+                # 'cartoon': {
+                #     'color': '#599BFB'
+                # },
                 'stick': {
                     'radius': .07,
-                    'color': '#599BFB'
+                    'color': '#599BFB'  # Blue
                 }
             }
             style2 = {
-                'cartoon': {
-                    'color': '#FB5960'
-                },
+                # 'cartoon': {
+                #     'color': '#FB5960'
+                # },
                 'stick': {
                     'radius': .15,
-                    'color': '#FB5960'
+                    'color': '#FB5960'  # Red, other
                 }
             }
             view.setStyle({"model": 0}, style1)
@@ -484,15 +487,15 @@ class ResidueBuilder(object):
         if self.prev_res:
             self.pts["C-"] = self.prev_res.bb[2]
         else:
-            self.pts["C-"] = compute_fictious_atom_for_res1(self.pts["N"],
-                                                             self.pts["CA"],
-                                                             self.pts["C"])
+            self.pts["C-"] = compute_fictious_atom_for_res1(self.pts["N"], self.pts["CA"],
+                                                            self.pts["C"])
 
         last_torsion = None
         for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
                 _get_residue_build_iter(self.name, SC_HBUILD_INFO, self.device)):
-                # TODO may be out of date; originally used SC_BUILD_INFO
-            raise ValueError("Warning: Trying to use normal structure builder after update.")
+            # TODO may be out of date; originally used SC_BUILD_INFO
+            raise ValueError(
+                "Warning: Trying to use normal structure builder after update.")
             # Select appropriate 3 points to build from
             if i == 0:
                 a, b, c = self.pts["C-"], self.pts["N"], self.pts["CA"]

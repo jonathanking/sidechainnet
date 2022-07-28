@@ -1,8 +1,11 @@
 # Pytorch saved files and associated ProteinNet files
 *.pt
-*.pkl
 *_ids.txt
 *.pdb
+sidechain*pkl
+training*pkl
+validation.pkl
+data/*/*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

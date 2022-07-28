@@ -18,6 +18,11 @@ nan = torch.nan
 
 @pytest.fixture
 def p():
+    return get_p()
+
+
+def get_p():
+    """Create and return a length-5 example protein, 'WLDLE'."""
     # 1st line uses the new measurement methodology for X0
     # 2nd line below uses default tetrahedral geom to place CB atom with X0
     angles = torch.tensor([
@@ -625,8 +630,8 @@ def test_alphabet():
 
 def test_alphabet_build():
     p = alphabet_protein()
-    p.to_pdb("./alphabet_build01.pdb")
-    p.fastbuild(inplace=True)
-    p.to_pdb("./alphabet_build02.pdb")
+    # p.to_pdb("./alphabet_build01.pdb")
+    # p.fastbuild(inplace=True)
+    # p.to_pdb("./alphabet_build02.pdb")
     p.fastbuild(add_hydrogens=True, inplace=True)
-    p.to_pdb("./alphabet_build03_hy.pdb")
+    p.to_pdb("/home/jok120/Downloads/build_alfa04.pdb")
