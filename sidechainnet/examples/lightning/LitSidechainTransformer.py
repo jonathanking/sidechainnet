@@ -358,7 +358,8 @@ class LitSidechainTransformer(pl.LightningModule):
         # Basic structure-based losses/metrics; Computed rarely if training with MSE only
         if (("openmm" in self.hparams.loss_name and
              self.global_step >= self.hparams.opt_begin_mse_openmm_step) or
-                self.global_step % self.hparams.check_struct_metrics_every_n_steps == 0):
+                (self.global_step % self.hparams.check_struct_metrics_every_n_steps == 0)
+                or self.trainer.state.stage not in ["train", "tune"]):
             loss_dict['rmsd'] = pred_helper.rmsd()
             loss_dict['drmsd'] = pred_helper.drmsd()
             loss_dict['lndrmsd'] = pred_helper.lndrmsd()

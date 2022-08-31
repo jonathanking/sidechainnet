@@ -228,57 +228,20 @@ class SCNProtein(object):
         if self.positions is None and add_hydrogens:
             self.initialize_openmm()
             self.update_positions()
+
+        self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                coords,
+                                                has_hydrogens=add_hydrogens)
         return coords
 
     def build_coords_from_angles(self, angles=None, add_hydrogens=False):
         """Build protein coordinates iff no StructureBuilder already exists."""
-        if angles is None:
-            angles = self.angles
-        if self.sb is None:
-            self.sb = sidechainnet.StructureBuilder(self.seq, angles, has_hydrogens=False)
-            if add_hydrogens:
-                if self.sb.coords == None:
-                    self.coords = self.sb.build()
-                self.sb.add_hydrogens()
-                self.hcoords = self.sb.coords
-            else:
-                self.coords = self.sb.build()
-                self.hcoords = self.coords
-        else:
-            print(f"StructureBuilder already exists for {self.id}. Coords not rebuilt.")
-        return self.hcoords
+        raise ValueError("Use fastbuild instead.")
+
 
     def add_hydrogens(self, from_angles=False, angles=None, coords=None):
         """Add hydrogens to the internal protein structure representation."""
-        if (isinstance(self.angles, torch.Tensor) and
-                torch.isnan(self.angles).all(dim=1).any()) or isinstance(
-                    self.angles, np.ndarray) and np.isnan(self.angles).all(axis=1).any():
-            raise ValueError("Adding hydrogens to structures with missing residues is not"
-                             " supported.")
-        if angles is None:
-            angles = self.angles
-        if from_angles:
-            self.sb = structure.StructureBuilder(self.seq,
-                                                 ang=angles,
-                                                 device=self.device,
-                                                 has_hydrogens=False)
-            self.sb.build()
-        elif coords is not None:
-            self.sb = structure.StructureBuilder(self.seq,
-                                                 crd=coords,
-                                                 device=self.device,
-                                                 has_hydrogens=False)
-        else:
-            self.sb = structure.StructureBuilder(self.seq,
-                                                 crd=self.coords,
-                                                 device=self.device,
-                                                 has_hydrogens=self.has_hydrogens)
-        self.sb.add_hydrogens()
-        self.hcoords = self.sb.coords
-        self.has_hydrogens = True
-        if self.positions is None:
-            self.initialize_openmm()
-        self.update_positions()
+        raise ValueError("Use fastbuild.")
 
     ##########################################
     #        OPENMM PRIMARY FUNCTIONS        #
@@ -383,7 +346,9 @@ class SCNProtein(object):
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 # If this atom is a PAD character or non-existent terminal atom, skip
                 # TODO more graciously handle pads for terminal residues
-                if an == "PAD" or (an in ["OXT", "H2", "H3"] and np.isnan(c).any()) or (residue_code == 'P' and an == 'H'):
+                if an == "PAD" or (an in ["OXT", "H2", "H3"] and
+                                   np.isnan(c).any()) or (residue_code == 'P' and
+                                                          an == 'H'):
                     hcoord_idx += 1
                     continue
                 # Handle missing atoms

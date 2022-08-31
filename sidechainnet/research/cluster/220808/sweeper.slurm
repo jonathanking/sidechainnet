@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=scn-hfastbuild
+#SBATCH --job-name=scn-swp
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=2
 #SBATCH --time=2-00:00:00
-#SBATCH --partition=any_gpu
+#SBATCH --partition=dept_gpu
 #SBATCH --exclude=g122
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220803/%A_%6a.out"
-#SBATCH -c 2
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220808/%A_%6a.out"
+#SBATCH -c 16
 
 ############################
 ##       Description      ##
@@ -24,7 +24,6 @@ GIT_BRANCH="dkoes-research_openmm"
 SCN_PYTHON="/net/pulsar/home/koes/jok120/anaconda3/envs/sidechainnetv2/bin/python"
 TRAIN_PL="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/train_pl.py"
 SCN_DATA1="/net/pulsar/home/koes/jok120/scnmin220519/scn_minimized.pkl"
-# CMD_FILE="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220803/hfastbuild_cmds.txt"
 
 ############################
 ##       Environment      ##
@@ -50,17 +49,11 @@ git checkout $GIT_BRANCH
 echo "Updated repo."
 
 ############################
-##     Array Job Exec.    ##
+##     Sweep Job Exec.    ##
 ############################
-cmd=`sed "${SLURM_ARRAY_TASK_ID}q;d" /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220803/hfastbuild_cmds.txt`
-
-if [ "$cmd" != "" ]; then 
-    # Because our commands will have variables (like SCN_PYTHON, TRAIN_PL), we substitute them
-    cmd=$(eval echo "$cmd")
-    echo "Running ${cmd}"
-    eval $cmd;
-else
-    echo "Line $SLURM_ARRAY_TASK_ID is empty in /net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220602/overfit_scale_cmds.txt."
-fi 
+export WANDB_DIR="/scr/jok120/wandb"
+mkdir -p /scr/jok120/wandb
+WANDB_DIR="/scr/jok120/wandb" wandb agent --count 1 jonathanking/openmm-loss/jeuglmsh
+echo "Completed wandb agent."
 
 exit 0

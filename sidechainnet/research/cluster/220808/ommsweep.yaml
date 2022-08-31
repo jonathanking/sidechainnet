@@ -1,0 +1,188 @@
+program: sidechainnet/research/cluster/train_pl.py
+method: bayes
+metric:
+  goal: maximize
+  name: test/gdc_all
+
+parameters:
+  check_struct_metrics_every_n_steps:
+    value: 100
+  
+  loss_weight_omm:
+    max: 100
+    min: 0
+    distribution: uniform
+
+  loss_weight_mse:
+    max: 1000
+    min: 0
+    distribution: uniform
+
+  viz_structures_every_n_steps:
+    value: 100
+
+  opt_begin_mse_openmm_step:
+    max: 10000
+    min: 0
+    distribution: int_uniform
+
+  opt_lr_scheduling_metric:
+    value: train/gdc_all_step
+
+  complete_structures_only:
+    values:
+      - "true"
+      - "false"
+    distribution: categorical
+
+  gradient_clip_algorithm:
+    values:
+      - value
+      - norm
+    distribution: categorical
+  
+  early_stopping_patience:
+    max: 20
+    min: 5
+    distribution: int_uniform
+  
+  val_check_interval:
+    value: .25
+
+  accumulate_grad_batches:
+    max: 10
+    min: 1
+    distribution: int_uniform
+  
+  transformer_activation:
+    values:
+      - relu
+      - gelu
+    distribution: categorical
+  
+  stochastic_weight_avg:
+    values:
+      - "true"
+      - "false"
+    distribution: categorical
+  
+  filter_by_resolution:
+    value: "true"
+
+  enable_model_summary:
+    value: "true"
+
+  enable_checkpointing:
+    value: "true"
+  
+  opt_noam_lr_factor:
+    max: 0.75
+    min: 0.125
+    distribution: uniform
+
+  opt_n_warmup_steps:
+    values: [500, 1000, 2000, 5000, 10000]
+  
+  opt_lr_scheduling:
+    values:
+      - noam
+    distribution: categorical
+  
+  log_every_n_steps:
+    value: 10
+
+  opt_weight_decay:
+    max: 0.0001
+    min: 0.000005
+    distribution: uniform
+  
+  dynamic_batching:
+    values:
+      - "true"
+      - "false"
+    distribution: categorical
+  
+  d_seq_embedding:
+    values: [16, 32, 128, 256, 512, 1024]
+
+  local_scn_path:
+    value: /net/pulsar/home/koes/jok120/scnmin220519/scn_minimized.pkl
+
+  embed_sequence:
+    values:
+      - "true"
+      - "false"
+    distribution: categorical
+
+  deterministic:
+    value: "true"
+  
+  d_feedforward:
+    values: [256, 512, 1024, 2048]
+
+  opt_patience:
+    max: 4
+    min: 1
+    distribution: int_uniform
+  
+
+  num_workers:
+    value: 6
+
+  batch_size:
+    values: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+
+  loss_name:
+    values:
+      - mse
+      - mse_openmm
+    distribution: categorical
+  
+  opt_name:
+    values:
+      - adam
+      - sgd
+    distribution: categorical
+
+  enable_progress_bar:
+    value: "false"
+
+  n_layers:
+    max: 48
+    min: 1
+    distribution: int_uniform
+
+  shuffle:
+    values:
+      - "true"
+      - false
+    distribution: categorical
+
+  n_heads:
+    values: [1, 2, 4, 8, 16, 32, 64]
+
+  dropout:
+    max: 0.3
+    min: 0.05
+    distribution: uniform
+
+  opt_lr:
+    max: 0.1
+    min: 0.00000001
+    distribution: uniform
+
+  model:
+    values:
+      - scn-trans-enc
+    distribution: categorical
+
+  d_out:
+    value: 12
+  
+  seed:
+    max: 10000
+    min: 0
+    distribution: int_uniform
+
+  d_in:
+    values: [16, 32, 128, 256, 512, 1024, 2048]

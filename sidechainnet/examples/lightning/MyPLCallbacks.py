@@ -51,14 +51,24 @@ class VisualizeStructuresEveryNSteps(pl.Callback):
         p.numpy()
         pdbfile = os.path.join(pl_module.save_dir, "pdbs",
                                f"{pl_module.global_step:07}_{p.id}_pred.pdb")
+        # Note that we must reshape the 2dim coord tensors back into 3dim for viz. The
+        # prediction helper flattens coords for easier comparison with loss functions.
+        p.coords = p.coords.reshape(len(p), -1, 3)
+        p.hcoords = p.hcoords.reshape(len(p), -1, 3)
         p.to_pdb(pdbfile)
         wandb.log({"structures/train/molecule": wandb.Molecule(pdbfile)})
+        p.coords = p.coords.reshape(-1, 3)
+        p.hcoords = p.hcoords.reshape(-1, 3)
 
         ptrue = pred_helper.batch_true[0]
         ptrue_pdbfile = os.path.join(pl_module.save_dir, "pdbs",
                                      f"{pl_module.global_step:07}_{p.id}_true.pdb")
         try:
+            ptrue.hcoords = ptrue.hcoords.reshape(len(p), -1, 3)
+            ptrue.coords = ptrue.coords.reshape(len(p), -1, 3)
             ptrue.to_pdb(ptrue_pdbfile)
+            ptrue.hcoords = ptrue.hcoords.reshape(-1, 3)
+            ptrue.coords = ptrue.coords.reshape(-1, 3)
         except ValueError as e:
             print(ptrue, "failed to save to a PDB file.")
             print(ptrue.seq)

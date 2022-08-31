@@ -52,17 +52,17 @@ class AnglePredictionHelper(object):
         self._unpadded_coords = []
 
     def build_structures_from_angles(self):
-        """Call build_coords_from_angles on each underlying SCNProtein for comparison."""
+        """Call fastbuild on each underlying SCNProtein for comparison."""
         # Build true structures
         for p in self.batch_true:
             assert p.sb is None, "Protein has already been built."
-            p.build_coords_from_angles()
+            p.fastbuild(add_hydrogens=False, inplace=True)
             # TODO Note that this builds with 0 padding, why is this default?
 
         # Build predicted structures
         for p in self.batch_pred:
             assert p.sb is None, "Protein has already been built."
-            p.build_coords_from_angles()
+            p.fastbuild(add_hydrogens=False, inplace=True)
 
         self.structures_built = True
         # TODO may be parallelized
@@ -118,14 +118,15 @@ class AnglePredictionHelper(object):
             for i, (t, p) in enumerate(zip(self.batch_true, self.batch_pred)):
                 if remove_padding and len(self._unpadded_coords) < len(self.batch_true):
                     self._unpadded_coords = []
-                    a = self._remove_padding(t.coords, t.coords)
-                    b = self._remove_padding(t.coords, p.coords)
+                    # Remove padding and flatten for comparison
+                    a = self._remove_padding(t.coords.reshape(-1, 3), t.coords.reshape(-1, 3))
+                    b = self._remove_padding(t.coords.reshape(-1, 3), p.coords.reshape(-1, 3))
                     self._unpadded_coords.append((a, b))
                 elif remove_padding:
                     a, b = self._unpadded_coords[i]
                 else:
-                    a = t.coords
-                    b = p.coords
+                    a = t.coords.reshape(-1, 3)
+                    b = p.coords.reshape(-1, 3)
 
                 if make_numpy:
                     a = a.detach().numpy()
@@ -261,7 +262,8 @@ class AnglePredictionHelper(object):
         for p in self.batch_pred:
             p.cuda()
             # If structures have not been built, build them from angles.
-            p.add_hydrogens(from_angles=not self.structures_built)
+            if not self.structures_built:
+                p.fastbuild(inplace=True, add_hydrogens=True)
             eloss = loss_fn.apply(p, p.hcoords)
             if ~torch.isfinite(eloss):
                 continue

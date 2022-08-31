@@ -4,7 +4,7 @@ import math
 import numpy as np
 from numba import njit
 import torch
-from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_HBUILD_INFO
+from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP

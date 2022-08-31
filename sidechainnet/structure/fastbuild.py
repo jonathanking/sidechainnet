@@ -373,6 +373,7 @@ def _make_carbon_tensors(bb_build_info):
 # build data for every residue. CA atom build info is organized into a data with data
 # labels as keys, and vectors of values ordered by residue identity.
 
+# TODO  reimplement support for heavy atom only building
 SC_HEAVY_ATOM_BUILD_PARAMS = {
     # Nothing extends from Nitrogen, so no data is needed here.
     'N': None,
@@ -563,8 +564,10 @@ def make_coords(seq, angles, build_params, add_hydrogens=False):
     build_params describes what atoms to make and how.
     """
     if not add_hydrogens:
-        print("WARNING: Must transfer optimized build_params from all atom optimized"
-              " build_params.")
+        # TODO implement support for building without hydrogens
+        # print("WARNING: Must transfer optimized build_params from all atom optimized"
+        #       " build_params.")
+        pass
     if build_params is None:
         build_params = SC_HEAVY_ATOM_BUILD_PARAMS if not add_hydrogens else SC_ALL_ATOM_BUILD_PARAMS
 

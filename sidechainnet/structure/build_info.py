@@ -27,6 +27,7 @@ SIDECHAIN DATA FORMAT
 import copy
 import re
 import numpy as np
+import pkg_resources
 
 
 PI = np.pi
@@ -707,7 +708,9 @@ NUM_COORDS_PER_RES_W_HYDROGENS = _MAX_NUM_ATOMS_HYDROGEN
 
 def _create_atomname_lookup():
     """Create a dictionary mapping resname3 to dict mapping atom_name to atom_type."""
-    with open("/home/jok120/build/amber16/dat/leap/lib/amino12.lib", "r") as f:
+    amino12 = pkg_resources.resource_filename("sidechainnet",
+                                              "resources/amino12.lib")
+    with open(amino12, "r") as f:
         text = f.read()
     atom_name_lookup = {}
     amino_name_info = re.findall(
@@ -795,7 +798,7 @@ class ForceFieldLookupHelper(object):
         return value
 
 
-def create_complete_hydrogen_build_param_dict():
+def create_complete_hydrogen_build_info_dict():
     """Create a Python dictionary that describes all necessary info for building atoms."""
     # We need to record the following information: bond lengths, bond angles
     new_build_info = copy.deepcopy(_RAW_BUILD_INFO)
@@ -804,8 +807,9 @@ def create_complete_hydrogen_build_param_dict():
     atom_type_map = _create_atomname_lookup()
 
     # We also make ready a way to lookup forcefield parameter values from raw files
-    base = '/home/jok120/build/amber16/dat/leap/parm/'
-    ff_helper = ForceFieldLookupHelper(base + "frcmod.ff14SB", base + "parm10.dat")
+    frcmod = pkg_resources.resource_filename("sidechainnet", "resources/frcmod.ff14SB")
+    parm10 = pkg_resources.resource_filename("sidechainnet", "resources/parm10.dat")
+    ff_helper = ForceFieldLookupHelper(frcmod, parm10)
 
     # Now, let's generate the types of the bonds and angles we will need to lookup
     for resname, resinfo in _RAW_BUILD_INFO.items():
@@ -829,7 +833,7 @@ def create_complete_hydrogen_build_param_dict():
     return new_build_info
 
 
-SC_HBUILD_INFO = create_complete_hydrogen_build_param_dict()
+SC_HBUILD_INFO = create_complete_hydrogen_build_info_dict()
 from sidechainnet.structure.fastbuild import AA1to3
 
 ATOM_MAP_HEAVY = {}
@@ -851,7 +855,7 @@ for a, aaa in AA1to3.items():
 if __name__ == "__main__":
     import pprint
     # import json
-    hbp = create_complete_hydrogen_build_param_dict()
+    hbp = create_complete_hydrogen_build_info_dict()
     hbp_str = pprint.pformat(hbp, indent=1, width=90, compact=False)
     with open("hbp.py", "w") as f:
         # f.write(json.dumps(hbp, indent=2))
