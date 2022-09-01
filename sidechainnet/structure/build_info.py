@@ -352,7 +352,7 @@ _RAW_BUILD_INFO = {
             'p',                         # CB
             'p',                         # CG
             'p',                         # CD1
-            ('hi', 'CD1', -2 * PI / 3),  # CD2,  # TODO Do not measure/predict this angle
+            ('hi', 'CD1', -2 * PI / 3),  # CD2,
             ('hi', 'CB', 2 * PI / 3),    # HA
             ('hi', 'CG', 2 * PI / 3),    # HB2
             ('hi', 'CG', -2 * PI / 3),   # HB3
@@ -540,7 +540,7 @@ _RAW_BUILD_INFO = {
         ]
     },
     'TRP': {
-        'torsion-names': [  # TODO cw-na-h is not defined for trp, so we use CN-NA-H
+        'torsion-names': [
             'C-N-CA-CB',
             'N-CA-CB-CG',
             'CA-CB-CG-CD1',

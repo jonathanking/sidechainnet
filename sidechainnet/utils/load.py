@@ -106,11 +106,11 @@ def load(casp_version=12,
          filter_by_resolution=False,
          complete_structures_only=False,
          local_scn_path=None,
-         scn_dataset=False,
+         scn_dataset=True,
          shuffle=True,
          **kwargs):
     #: Okay
-    """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
+    """Load and return the specified SidechainNet dataset in the specified manner.
 
     This function flexibly allows the user to load SidechainNet in a format that is most
     convenient to them. The user can specify which version and "thinning" of the dataset
@@ -120,6 +120,8 @@ def load(casp_version=12,
     loaded and batched when provided as DataLoaders (aggregate_model_input, collate_fn,
     batch_size, seq_as_one_hot, dynamic_batching, num_workers,
     optimize_for_cpu_parallelism, and train_eval_downsample.)
+
+    By default, the data is returned as a SCNDataset object, to facilitate inspection.
 
     Args:
         casp_version (int, optional): CASP version to load (7-12). Defaults to 12.
@@ -187,7 +189,7 @@ def load(casp_version=12,
         local_scn_path (str, optional): The path for a locally saved SidechainNet file.
             This is especially useful for loading custom SidechainNet datasets.
         scn_dataset (bool, optional): If True, return a sidechainnet.SCNDataset object
-            for conveniently accessing properties of the data.
+            for conveniently accessing properties of the data. Default True.
             (See sidechainnet.SCNDataset) for more information.
         shuffle (bool, optional): Default True. If True, yields random batches from the
             dataloader instead of in-order (length ascending). Does not apply when a
@@ -197,11 +199,17 @@ def load(casp_version=12,
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
         'valid-X') to either more dictionaries containing protein data ('seq', 'ang',
         'crd', etc.) or to PyTorch DataLoaders that can be used for training. See below.
+        
+        Option 0 (SCNDataset, default):
+            By default, scn.load returns a SCNDataset object. This object has the
+            following properties:
+                - indexing by integer or ProteinNet IDs yields SCNProtein objects.
+                - is iterable.
 
         Option 1 (Python dictionary):
-            By default, the function returns a dictionary that is organized by training/
-            validation/testing splits. For example, the following code loads CASP 12 with
-            the 30% thinning option:
+            If scn_dataset=False, the function returns a dictionary that is organized by
+            training/validation/testing splits. For example, the following code loads CASP
+            12 with the 30% thinning option:
 
                 >>> import sidechainnet as scn
                 >>> data = scn.load(12, 30)
@@ -258,7 +266,6 @@ def load(casp_version=12,
                 ....    prediction = model(sequence, pssm)
                 ....    ...
     """
-    # TODO Make scndataset loading default
     if local_scn_path:
         local_path = local_scn_path
     else:

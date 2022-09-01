@@ -115,7 +115,7 @@ def compute_sidechain_dihedrals(residue, prev_residue):
     for t_name, t_val in zip(torsion_names[1:],
                              SC_HBUILD_INFO[residue.getResname()]["torsion-vals"][1:]):
         # Only record torsional angles that are relevant (i.e. not planar).
-        # All torsion values that vary are marked with 'p' in SC_BUILD_INFO
+        # All torsion values that vary are marked with 'p' in SC_HBUILD_INFO
         if t_val != "p":
             break
         atom_names = t_name.split("-")
