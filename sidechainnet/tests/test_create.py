@@ -34,6 +34,6 @@ def test_generate_all():
 
 def test_generate_all_from_proteinnet():
     generate_all_from_proteinnet("/home/jok120/proteinnet/data/",
-                                 "/home/jok120/scn220502",
+                                 "/home/jok120/scn220901test",
                                  limit=None,
                                  regenerate_scdata=True)

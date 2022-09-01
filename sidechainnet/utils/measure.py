@@ -270,7 +270,8 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
             try:
                 res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
                                           prev_ang)
-            except ValueError:
+            except ValueError as e:
+                print(e)
                 print("STANDARDIZE_RESIDUE")
                 print(chain)
                 print(res)

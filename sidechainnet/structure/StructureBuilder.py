@@ -491,11 +491,8 @@ class ResidueBuilder(object):
                                                             self.pts["C"])
 
         last_torsion = None
-        for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
+        for i, (bond_len, angle, torsion, atom_names) in enumerate(
                 _get_residue_build_iter(self.name, SC_HBUILD_INFO, self.device)):
-            # TODO may be out of date; originally used SC_BUILD_INFO
-            raise ValueError(
-                "Warning: Trying to use normal structure builder after update.")
             # Select appropriate 3 points to build from
             if i == 0:
                 a, b, c = self.pts["C-"], self.pts["N"], self.pts["CA"]
@@ -508,14 +505,7 @@ class ResidueBuilder(object):
             elif type(torsion) is str and torsion == "i" and last_torsion is not None:
                 torsion = last_torsion - np.pi
 
-            new_pt = nerf(a,
-                          b,
-                          c,
-                          bond_len,
-                          angle,
-                          torsion,
-                          l_bc=pbond_len,
-                          nerf_method=self.nerf_method)
+            new_pt = nerf(a, b, c, bond_len, angle, torsion)
             self.pts[atom_names[-1]] = new_pt
             self.sc.append(new_pt)
             last_torsion = torsion
@@ -566,20 +556,25 @@ def _get_residue_build_iter(res, build_dictionary, device):
         (sidechainnet.structure.structure.nerf).
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
-    bond_vals = (
-        torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"])
-    pbond_vals = [
-        torch.tensor(
-            BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32, device=device)
-    ] + [torch.tensor(b, dtype=torch.float32, device=device) for b in r["bonds-vals"]
-        ][:-1]
-    angle_vals = (
-        torch.tensor(a, dtype=torch.float32, device=device) for a in r["angles-vals"])
-    torsion_vals = (torch.tensor(t, dtype=torch.float32, device=device)
-                    if t not in ["p", "i"] else t for t in r["torsion-vals"])
-    return iter(
-        zip(pbond_vals, bond_vals, angle_vals, torsion_vals,
-            (t.split("-") for t in r["torsion-names"])))
+    bond_vals = []
+    angle_vals = []
+    torsion_vals = []
+    atom_names = []
+
+    for i in range(len(r['bond-vals'])):
+        if r['torsion-names'][i].split("-")[-1].startswith("H"):
+            # We have reached the end of the heavy atoms
+            break
+        bond_vals.append(
+            torch.tensor(r['bond-vals'][i], dtype=torch.float32, device=device))
+        angle_vals.append(
+            torch.tensor(r['angle-vals'][i], dtype=torch.float32, device=device))
+        torsion_vals.append(
+            torch.tensor(r['torsion-vals'][i], dtype=torch.float32, device=device
+                        ) if r['torsion-vals'][i] not in ["p", "i"] else r['torsion-vals'][i])
+        atom_names.append(r["torsion-names"][i].split("-"))
+
+    return iter(zip(bond_vals, angle_vals, torsion_vals, atom_names))
 
 
 def _convert_seq_to_str(seq):
