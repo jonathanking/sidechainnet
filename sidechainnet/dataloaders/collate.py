@@ -11,11 +11,10 @@ from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.download import MAX_SEQ_LEN
 
-
-Batch = collections.namedtuple("Batch",
-                               "pids seqs msks evos secs angs "
-                               "crds int_seqs seq_evo_sec resolutions is_modified "
-                               "lengths str_seqs")
+Batch = collections.namedtuple(
+    "Batch", "pids seqs msks evos secs angs "
+    "crds int_seqs seq_evo_sec resolutions is_modified "
+    "lengths str_seqs")
 
 
 def get_collate_fn(aggregate_input, seqs_as_onehot=None):
@@ -60,7 +59,8 @@ def get_collate_fn(aggregate_input, seqs_as_onehot=None):
         """
         # Instead of working with a list of tuples, we extract out each category of info
         # so it can be padded and re-provided to the user.
-        pnids, sequences, masks, pssms, secs, angles, coords, resolutions, mods, str_seqs = list(zip(*insts))
+        pnids, sequences, masks, pssms, secs, angles, coords, resolutions, mods, str_seqs = list(
+            zip(*insts))
         lengths = tuple(len(s) for s in sequences)
         max_batch_len = max(lengths)
 
@@ -248,13 +248,20 @@ def prepare_dataloaders(data,
             downsample=train_eval_downsample))
 
     valid_loaders = {}
-    for vsplit in VALID_SPLITS:
-        valid_loader = torch.utils.data.DataLoader(ProteinDataset(
-            data[vsplit], vsplit, data['settings'], data['date']),
-                                                   num_workers=num_workers,
-                                                   batch_size=batch_size,
-                                                   collate_fn=collate_fn)
-        valid_loaders[vsplit] = valid_loader
+    valid_splits = [splitname for splitname in data.keys() if "valid" in splitname]
+    for vsplit in valid_splits:
+        try:
+            valid_loader = torch.utils.data.DataLoader(ProteinDataset(
+                data[vsplit],
+                vsplit,
+                data['settings'],
+                data['date']),
+                                                       num_workers=1,
+                                                       batch_size=batch_size,
+                                                       collate_fn=collate_fn)
+            valid_loaders[vsplit] = valid_loader
+        except KeyError:
+            pass
 
     test_loader = torch.utils.data.DataLoader(ProteinDataset(data['test'], 'test',
                                                              data['settings'],
@@ -268,7 +275,7 @@ def prepare_dataloaders(data,
         'train-eval': train_eval_loader,
         'test': test_loader
     }
-    dataloaders.update({vsplit: valid_loaders[vsplit] for vsplit in VALID_SPLITS})
+    dataloaders.update(valid_loaders)
 
     return dataloaders
 
