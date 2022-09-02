@@ -73,7 +73,8 @@ class SCNMinimizer(object):
                 opt.zero_grad()
 
             # Rebuild the coordinates from the angles
-            p.add_hydrogens(from_angles=True, angles=to_optim)
+            p.angles = to_optim
+            p.fastbuild(add_hydrogens=True, inplace=True)
 
             # Compute the loss on the coordinates
             loss = energy_loss.apply(p, p.hcoords)
