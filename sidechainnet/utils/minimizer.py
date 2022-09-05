@@ -101,7 +101,8 @@ class SCNMinimizer(object):
         #     plt.show()
 
         # Update final structure
-        p.add_hydrogens(from_angles=True, angles=to_optim)
+        p.angles = to_optim
+        p.fastbuild(add_hydrogens=True, inplace=True)
         p.angles = to_optim.detach().cpu().numpy()
         p.hcoords = p.coords = p.hcoords.detach().cpu().numpy()
 
