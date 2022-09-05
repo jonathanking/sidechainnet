@@ -108,6 +108,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         mask = manually_correct_mask(pnid, pn_entry, mask)
         new_entry["ang"] = expand_data_with_mask(ang, mask)
         new_entry["crd"] = expand_data_with_mask(crd, mask)
+        new_entry["crd"] = new_entry["crd"].reshape(len(new_entry["seq"]), -1, 3)
         new_entry["sec"] = expand_data_with_mask(dssp, mask)
         new_entry["ums"] = make_unmodified_seq_entry(new_entry["seq"], unmod_seq, mask)
         new_entry["mod"] = expand_data_with_mask(is_mod, mask)
@@ -117,7 +118,7 @@ def combine(pn_entry, sc_entry, aligner, pnid):
         length = len(pn_entry["primary"])
         for k, v in new_entry.items():
             if k == "crd":
-                if len(v) // NUM_COORDS_PER_RES != length:
+                if len(v) != length:
                     return {}, "failed"
             elif k == "ums":
                 if len(v.split(" ")) != length:
