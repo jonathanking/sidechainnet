@@ -28,6 +28,7 @@ import copy
 import re
 import numpy as np
 import pkg_resources
+import torch
 
 
 PI = np.pi
@@ -833,6 +834,19 @@ def create_complete_hydrogen_build_info_dict():
     return new_build_info
 
 
+def create_heavyatom_mask_tensor():
+    """Create a mask tensor that is 0 for atoms that are not in the heavy atom set."""
+    import sidechainnet.structure.fastbuild as fastbuild
+    is_heavy_atom = torch.zeros(20, NUM_COORDS_PER_RES_W_HYDROGENS)
+    for aa_name, aa_index in fastbuild.AA2NUM.items():
+        if len(aa_name) > 1:
+            continue
+        for atom_name_index, atom_name in enumerate(ATOM_MAP_H[aa_name]):
+            if (not atom_name.startswith("H") and atom_name != 'PAD'):
+                is_heavy_atom[aa_index, atom_name_index] = 1
+    return is_heavy_atom.long()
+
+
 SC_HBUILD_INFO = create_complete_hydrogen_build_info_dict()
 from sidechainnet.structure.fastbuild import AA1to3
 
@@ -851,6 +865,9 @@ for a, aaa in AA1to3.items():
         continue
     ATOM_MAP_H[a] = ["N", "CA", "C", "O", "OXT", "H", "H2", "H3"] + SC_HBUILD_INFO[aaa]['atom-names']
     ATOM_MAP_H[a].extend(["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[a])))
+
+HEAVY_ATOM_MASK_TENSOR = create_heavyatom_mask_tensor()
+
 
 if __name__ == "__main__":
     import pprint

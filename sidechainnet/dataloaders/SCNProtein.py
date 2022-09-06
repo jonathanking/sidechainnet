@@ -547,26 +547,26 @@ class SCNProtein(object):
         new_list[pad_idx:pad_idx + len(terminal_atom_names)] = terminal_atom_names
         return new_list
 
-    def hydrogenrep_to_heavyatomrep(self, hcoords=None):
+    def hydrogenrep_to_heavyatomrep(self, hcoords=None, inplace=False):
         """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
-        # TODO Update with new h rep
-        to_stack = []
         if hcoords is None:
             hcoords = self.hcoords
 
-        for i, s in enumerate(self.seq3.split(" ")):
-            num_heavy = 4 + len(SC_HBUILD_INFO[s]['torsion-names'])
-            h_start = i * hy.NUM_COORDS_PER_RES_W_HYDROGENS
-            h_end = h_start + num_heavy
+        new_coords = torch.zeros(len(hcoords), NUM_COORDS_PER_RES, 3) * GLOBAL_PAD_CHAR
+ 
+        mask = HEAVY_ATOM_MASK_TENSOR[self.int_seq]
+        for i, (resmask, res) in enumerate(zip(mask, hcoords)):
+            newres = res[resmask.bool()]
+            new_coords[i, :len(newres)] = newres
+        
+        if inplace:
+            self.hcoords = self.coords = new_coords
+            self.sb = None
+            self.has_hydrogens = False
 
-            n_pad = NUM_COORDS_PER_RES - num_heavy
+        return new_coords
 
-            to_stack.extend([
-                hcoords[h_start:h_end],
-                torch.ones(n_pad, 3, requires_grad=True) * GLOBAL_PAD_CHAR
-            ])
 
-        return torch.cat(to_stack)
 
     def cuda(self):
         """Move coords, hcoords, and angles to the default CUDA torch device."""
@@ -698,6 +698,7 @@ class SCNProtein(object):
             if data is not None:
                 setattr(self, at, data[n_removed_left:n_removed_right])
         # Trim coordinate data
+        assert len(self.coords.shape) == 3, 'Must have coords shape like (LxNx3).'
         if self.coords is not None:
             self.coords = self.coords[n_removed_left:n_removed_right]
         if self.hcoords is not None:
