@@ -418,11 +418,10 @@ def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUI
     return bi
 
 
-# with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
-#   "rb") as f:
-# SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
-SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
-# TODO Reminimize build params
+with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
+          "rb") as f:
+    SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
+# SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
 
 
 ###################################################

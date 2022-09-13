@@ -76,6 +76,7 @@ class BuildParamOptimizer(object):
         p = self.protein
 
         self.build_params_history = [copy.deepcopy(self.params)]
+        pbar = tqdm(range(steps), dynamic_ncols=True)
 
         # LBFGS Loop
         if opt == 'LBFGS':
@@ -98,17 +99,17 @@ class BuildParamOptimizer(object):
                     loss.backward()
                     loss_np = float(loss.detach().numpy())
                     p._last_loss = loss_np
-                    self.losses.append(loss_np)
                     return loss
 
                 self.opt.step(closure)
-                print(p._last_loss)
+                pbar.set_postfix({'loss': f"{p._last_loss:.2f}"})
 
         # SGD Loop
         elif opt == 'SGD':
-            self.opt = torch.optim.SGD(to_optim, lr=lr)
-            pbar = tqdm(range(steps), dynamic_ncols=True)
+            self.opt = torch.optim.SGD(to_optim, lr=lr, momentum=0.9)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt, 'min', verbose=True)
             best_loss = None
+            best_params_so_far = None
             counter = 0
             patience = 10
             epsilon = 1e-4
@@ -133,6 +134,7 @@ class BuildParamOptimizer(object):
                 if (best_loss is None or
                     (lossnp < best_loss and np.abs(best_loss - lossnp) > epsilon)):
                     best_loss = lossnp
+                    best_params_so_far = copy.deepcopy(to_optim)
                     counter = 0
                 elif counter > patience:
                     print("Stopping early.")
@@ -141,10 +143,11 @@ class BuildParamOptimizer(object):
                     counter += 1
                 self.losses.append(lossnp)
                 self.opt.step()
+                scheduler.step(lossnp)
 
                 pbar.set_postfix({'loss': f"{lossnp:.2f}"})
 
-        self.update_complete_build_params_with_optimized_params(to_optim)
+        self.update_complete_build_params_with_optimized_params(best_params_so_far)
         return self.build_params
 
 
@@ -156,7 +159,8 @@ def main():
                               opt_thetas=True,
                               opt_chis=True,
                               ffname=OPENMM_FORCEFIELDS)
-    build_params = bpo.optimize(opt='SGD', lr=1e-6, steps=10000)
+    build_params = bpo.optimize(opt='SGD', lr=1e-6, steps=100000)
+    # build_params = bpo.optimize(opt='LBFGS', lr=1e-4, steps=10000)
     fn = pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl")
     with open(fn, "wb") as f:
         pickle.dump(build_params, f)

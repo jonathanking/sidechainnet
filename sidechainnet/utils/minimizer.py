@@ -45,7 +45,7 @@ class SCNMinimizer(object):
         if not use_sgd:
             opt = torch.optim.LBFGS(
                 [to_optim],
-                lr=1e-4,
+                lr=1e-5,
                 max_iter=20,  # Def 20
                 max_eval=None,
                 tolerance_grad=1e-07,
@@ -96,7 +96,7 @@ class SCNMinimizer(object):
                 print(lossnp)
             return loss
 
-        for i in range(100):
+        for i in range(10000):
             # Early Stopping and Loss Evaluation
             loss = energy_loss.apply(p, p.hcoords)
             if loss < best_loss_so_far and torch.abs(loss - best_loss_so_far) > 20:
@@ -139,12 +139,6 @@ class SCNMinimizer(object):
                 scheduler.step(loss)
                 losses.append(float(loss.detach().cpu().numpy()))
 
-        # Plot the minimization performance
-        sns.lineplot(data=losses)
-        plt.title("Protein Potential Energy")
-        plt.xlabel("Optimization Step")
-        if path is not None:
-            plt.savefig(path.replace(".pkl", ".png"))
         # if verbose:
         #     plt.show()
 
@@ -152,6 +146,13 @@ class SCNMinimizer(object):
             print("The protein was not minimized correctly.")
             plt.savefig(path.replace(".pkl", ".png").replace("/min/", "/failed/"))
             raise ValueError("The protein was not minimized correctly.")
+
+        # Plot the minimization performance
+        sns.lineplot(data=losses)
+        plt.title("Protein Potential Energy")
+        plt.xlabel("Optimization Step")
+        if path is not None:
+            plt.savefig(path.replace(".pkl", ".png"))
 
         # Update final structure
         p.angles = best_angles_so_far
