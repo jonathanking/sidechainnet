@@ -24,6 +24,8 @@ import warnings
 import numpy as np
 import openmm
 import prody
+import sidechainnet
+import sidechainnet.structure.fastbuild as fastbuild
 import torch
 from openmm import Platform
 from openmm.app import Topology
@@ -33,17 +35,16 @@ from openmm.app.modeller import Modeller
 from openmm.app.pdbfile import PDBFile
 from openmm.openmm import LangevinMiddleIntegrator
 from openmm.unit import kelvin, nanometer, picosecond, picoseconds
-
-import sidechainnet
-import sidechainnet.structure.fastbuild as fastbuild
-from sidechainnet.utils.download import MAX_SEQ_LEN
-import sidechainnet.structure.HydrogenBuilder as hy
-from sidechainnet import structure
-from sidechainnet.structure.build_info import ATOM_MAP_H, NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS, SC_HBUILD_INFO
-from sidechainnet.structure.build_info import ATOM_MAP_HEAVY
+from sidechainnet.structure.build_info import (ATOM_MAP_H, ATOM_MAP_HEAVY,
+                                               GLOBAL_PAD_CHAR,
+                                               HEAVY_ATOM_MASK_TENSOR,
+                                               NUM_COORDS_PER_RES,
+                                               NUM_COORDS_PER_RES_W_HYDROGENS,
+                                               SC_HBUILD_INFO)
 from sidechainnet.structure.structure import coord_generator
-from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
-from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary
+from sidechainnet.utils.download import MAX_SEQ_LEN
+from sidechainnet.utils.sequence import (ONE_TO_THREE_LETTER_MAP, VOCAB,
+                                         DSSPVocabulary)
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
 OPENMM_PLATFORM = "CPU"  # CUDA"  # CUDA or CPU
@@ -220,24 +221,24 @@ class SCNProtein(object):
                                                self.angles,
                                                build_params=build_params,
                                                add_hydrogens=add_hydrogens)
+
         if inplace:
             self.coords = self.hcoords = coords
             self.has_hydrogens = add_hydrogens
             self.sb = None
-            return
+        else:
+            self.sb = sidechainnet.StructureBuilder(self.seq,
+                                                    coords,
+                                                    has_hydrogens=add_hydrogens)
         if self.positions is None and add_hydrogens:
             self.initialize_openmm()
             self.update_positions()
 
-        self.sb = sidechainnet.StructureBuilder(self.seq,
-                                                coords,
-                                                has_hydrogens=add_hydrogens)
         return coords
 
     def build_coords_from_angles(self, angles=None, add_hydrogens=False):
         """Build protein coordinates iff no StructureBuilder already exists."""
         raise ValueError("Use fastbuild instead.")
-
 
     def add_hydrogens(self, from_angles=False, angles=None, coords=None):
         """Add hydrogens to the internal protein structure representation."""
@@ -565,8 +566,6 @@ class SCNProtein(object):
             self.has_hydrogens = False
 
         return new_coords
-
-
 
     def cuda(self):
         """Move coords, hcoords, and angles to the default CUDA torch device."""

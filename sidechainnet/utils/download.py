@@ -502,7 +502,7 @@ def get_resolution_from_pdbid(pdbid):
     Args:
         pdbid (string): RCSB PDB identifier.
     """
-    sleep(np.random.randint(0, 3))
+    sleep(np.random.randint(0, 8))
     query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
                     "\"){pdbx_vrpt_summary{PDB_resolution}}}")
     r = requests.get(query_string, headers={"User-Agent": "Mozilla/5.0"})

@@ -326,11 +326,31 @@ def _make_nitrogen_tensors():
     ndict['offsets'][20:40, 2] = -2 * np.pi / 3
 
     ndict['cchis'][20:40, 1:] = np.cos(np.deg2rad(109.5))  # tetrahedral geom
+    ndict['schis'][20:40, 1:] = np.sin(np.deg2rad(109.5))  # tetrahedral geom
 
-    # Do not build a hydrogen on the nitrogen for all prolines
-    ndict['types'][AA2NUM['P'], 0] = 0
-    ndict['types'][AA2NUM['NP'], 0] = 0
-    ndict['types'][AA2NUM['CP'], 0] = 0
+    # Proline modifications; Difficult to build when at Nterminal; location is approx.
+    # Do not build Hydrogens on the nitrogen for prolines, except for N-terminal
+    ndict['types'][AA2NUM['P'], :] = 0
+    ndict['types'][AA2NUM['CP'], :] = 0
+    ndict['types'][AA2NUM['NP'], 0] = 1
+
+    # Placing the first H on NPRO
+    firstH = 90
+    ndict['cthetas'][AA2NUM['NP'], 0] = np.cos(np.deg2rad(firstH))
+    ndict['sthetas'][AA2NUM['NP'], 0] = np.sin(np.deg2rad(firstH))
+
+    # Placing H2 on NPRO at the same location of H
+    ndict['cthetas'][AA2NUM['NP'], 1] = np.cos(np.deg2rad(firstH))
+    ndict['sthetas'][AA2NUM['NP'], 1] = np.sin(np.deg2rad(firstH))
+
+    # Defining the offset from H for H2 and H3
+    ndict['offsets'][AA2NUM['NP'], 1] = np.deg2rad(0)
+    ndict['offsets'][AA2NUM['NP'], 2] = np.deg2rad(112.9)
+
+    # Rotating H3
+    h3off = firstH - 35
+    ndict['cthetas'][AA2NUM['NP'], 2] = np.cos(np.deg2rad(h3off))
+    ndict['sthetas'][AA2NUM['NP'], 2] = np.sin(np.deg2rad(h3off))
 
     return ndict
 
@@ -398,16 +418,24 @@ def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUI
     return bi
 
 
-with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
-          "rb") as f:
-    SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
+# with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
+#   "rb") as f:
+# SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
+SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
+# TODO Reminimize build params
+
 
 ###################################################
 # Coordinates
 ###################################################
 
 
-def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info, bb_ang=None):
+def build_coords_from_source(backbone_mats,
+                             seq_aa_index,
+                             ang,
+                             build_info,
+                             bb_ang=None,
+                             base_atom=None):
     """Create sidechain coordinates from backbone matrices given relevant auxilliary data.
 
     Our goal is to generate arrays for each datum (bond length, thetas, chis) necessary
@@ -446,6 +474,7 @@ def build_coords_from_source(backbone_mats, seq_aa_index, ang, build_info, bb_an
     # We 1st identify the residues in the seq that are building an atom on this level i=0.
     # True if type of 0th atom is not 0 (aka an atom is being built, not true for Glycine)
     prevbuildmask = types[:, 0].bool()
+
     # We then select BB transformation matrices for the residues that will build an atom
     prevmats = backbone_mats[prevbuildmask]
     matrices.append(prevmats)
@@ -632,8 +661,12 @@ def make_coords(seq, angles, build_params, add_hydrogens=False):
     # Create hydrogens for nitrogens
     if build_params['N']:  # nH
         nang = (np.pi + ang[:L, ang_name_map['omega']]).unsqueeze(-1)
-        ncoords, n_params = build_coords_from_source(ncacM[0::3], seq_aa_index, nang,
-                                                     build_params['N'])
+        ncoords, n_params = build_coords_from_source(ncacM[0::3],
+                                                     seq_aa_index,
+                                                     nang,
+                                                     build_params['N'],
+                                                     base_atom='N',
+                                                     bb_ang=ang[1:, :3])
     else:
         ncoords, n_params = torch.zeros(L, 0, 3, dtype=dtype, device=device), dict()
 

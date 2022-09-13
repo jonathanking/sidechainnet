@@ -6,7 +6,7 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --partition=any_gpu
 #SBATCH --exclude=g122
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220901/out6/%A_%6a.out"
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220905/%A_%6a.out"
 
 ############################
 ##       Description      ##
@@ -58,9 +58,9 @@ echo "Updated repo."
 ##     Array Job Exec.    ##
 ############################
 SCRIPT_PATH="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/utils/minimize_scn.py"
-DATAPATH="/net/pulsar/home/koes/jok120/scn220901/sidechainnet_casp${CASP_V}_${CASP_T}.pkl"
-UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220901/unmin"
-MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220901/min"
+DATAPATH="/net/pulsar/home/koes/jok120/scn220905/sidechainnet_casp${CASP_V}_${CASP_T}.pkl"
+UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220905/unmin"
+MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220905/min"
 
 if [[ $JOB_TYPE == setup ]]
 then
