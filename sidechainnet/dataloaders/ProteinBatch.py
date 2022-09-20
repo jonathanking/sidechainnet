@@ -151,7 +151,7 @@ class ProteinBatch(object):
         elif dtype == "crd":
             for item in items:
                 z = np.full(
-                    (self.max_len * NUM_COORDS_PER_RES - len(item), item.shape[-1]),
+                    (self.max_len - len(item), NUM_COORDS_PER_RES, item.shape[-1]),
                     GLOBAL_PAD_CHAR)
                 c = np.concatenate((item, z), axis=0)
                 batch.append(c)
