@@ -1,4 +1,4 @@
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR, NUM_COORDS_PER_RES
 from sidechainnet.utils.download import MAX_SEQ_LEN
 
 from sidechainnet.utils.sequence import VOCAB, DSSPVocabulary
@@ -140,9 +140,9 @@ class ProteinBatch(object):
             batch = batch[:, :MAX_SEQ_LEN]
             batch = torch.as_tensor(batch, device=self.device, dtype=torch.long)
         elif dtype in ["pssm", "ang"]:
-            # Mask other features with 0-vectors of a matching shape
+            # Mask other features with nan-vectors of a matching shape
             for item in items:
-                z = np.zeros((self.max_len - len(item), item.shape[-1]))
+                z = np.full((self.max_len - len(item), item.shape[-1]), GLOBAL_PAD_CHAR)
                 c = np.concatenate((item, z), axis=0)
                 batch.append(c)
             batch = np.array(batch)
@@ -150,8 +150,9 @@ class ProteinBatch(object):
             batch = torch.as_tensor(batch, device=self.device, dtype=torch.float32)
         elif dtype == "crd":
             for item in items:
-                z = np.zeros(
-                    (self.max_len * NUM_COORDS_PER_RES - len(item), item.shape[-1]))
+                z = np.full(
+                    (self.max_len * NUM_COORDS_PER_RES - len(item), item.shape[-1]),
+                    GLOBAL_PAD_CHAR)
                 c = np.concatenate((item, z), axis=0)
                 batch.append(c)
             batch = np.array(batch)
@@ -169,7 +170,7 @@ class ProteinBatch(object):
 
     def cpu(self):
         self.device = torch.device('cpu')
-    
+
     def torch(self):
         for p in self:
             p.torch()
