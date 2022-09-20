@@ -156,8 +156,7 @@ class ProteinBatch(object):
                 c = np.concatenate((item, z), axis=0)
                 batch.append(c)
             batch = np.array(batch)
-            # There are multiple rows per res, so we allow the coord matrix to be larger
-            batch = batch[:, :MAX_SEQ_LEN * NUM_COORDS_PER_RES]
+            batch = batch[:, :MAX_SEQ_LEN]
             batch = torch.as_tensor(batch, device=self.device, dtype=torch.float32)
 
         return batch
