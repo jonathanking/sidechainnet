@@ -34,6 +34,8 @@ class BatchedStructureBuilder(object):
             ValueError: May raise ValueError when asked to generate structures from angles
             for structures that have missing angles.
         """
+        raise NotImplementedError(
+            "BatchedStructureBuilder is deprecated. Please see ProteinBatch.")
         # Validate input data
         if (ang_batch is None and crd_batch is None) or (ang_batch is not None and
                                                          crd_batch is not None):
@@ -169,6 +171,7 @@ def unpad_tensors(sequence, other):
     Returns:
         Sequence and other tensors with the batch-level padding removed.
     """
+    raise NotImplementedError("Unpadding tensors via this function is not supported.")
     batch_mask = sequence.ne(VOCAB.pad_id)
     sequence = sequence[batch_mask]
 

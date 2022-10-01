@@ -24,6 +24,8 @@ def compute_batch_drmsd(true_coordinates, pred_coordinates, seq, verbose=False):
         torch.Tensor: Geometric mean of DRMSD values for each protein in the batch.
             Lower is better.
     """
+    raise NotImplementedError(
+        "Modify this function to work with the new coordinate format.")
     drmsds = torch.tensor(0.0)
     raw_drmsds = torch.tensor(0.0)
     for pc, tc, s in zip(pred_coordinates, true_coordinates, seq):

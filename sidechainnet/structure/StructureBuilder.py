@@ -167,6 +167,8 @@ class StructureBuilder(object):
             (numpy.ndarray, torch.Tensor): An array or tensor of the generated coordinates
             with shape ((L X NUM_COORDS_PER_RES) X 3).
         """
+        raise ValueError(
+            "This method is deprecated. Please use the SCNProtein.fastbuild().")
         # If a StructureBuilder does not have angles, build returns its coordinates
         if self.ang is None:
             return self.coords
@@ -219,6 +221,8 @@ class StructureBuilder(object):
 
     def add_hydrogens(self):
         """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
+        raise ValueError(
+            "This method is deprecated. Please use the SCNProtein.fastbuild().")
         if self.coords is None or not len(self.coords):
             raise ValueError("Cannot add hydrogens to a structure whose heavy atoms have"
                              " not yet been built.")
@@ -574,8 +578,8 @@ def _get_residue_build_iter(res, build_dictionary, device):
         angle_vals.append(
             torch.tensor(r['angle-vals'][i], dtype=torch.float32, device=device))
         torsion_vals.append(
-            torch.tensor(r['torsion-vals'][i], dtype=torch.float32, device=device
-                        ) if r['torsion-vals'][i] not in ["p", "i"] else r['torsion-vals'][i])
+            torch.tensor(r['torsion-vals'][i], dtype=torch.float32, device=device)
+            if r['torsion-vals'][i] not in ["p", "i"] else r['torsion-vals'][i])
         atom_names.append(r["torsion-names"][i].split("-"))
 
     return iter(zip(bond_vals, angle_vals, torsion_vals, atom_names))

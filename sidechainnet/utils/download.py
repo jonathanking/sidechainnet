@@ -1,5 +1,6 @@
 """Functions for downloading protein structure data from RCSB PDB using the ProDy pkg."""
 
+import copy
 import multiprocessing
 import os
 import pickle
@@ -18,6 +19,7 @@ import tqdm
 import sidechainnet.utils.errors as errors
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
+from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 
 # TODO Make max seq len argument
 MAX_SEQ_LEN = 750  # An arbitrarily large upper-bound on sequence lengths
@@ -219,8 +221,37 @@ def get_sidechain_data(pnids, limit, num_cores=multiprocessing.cpu_count()):
             if "msg" in r and r["msg"] == "MODIFIED_MODEL":
                 model_warning_file.write(f"{pnid}\n")
                 del r["msg"]
-            all_data[pnid] = r
+            if pnid == "1GJJ_A_1":
+                partA, partB = correct_1GJJ_A_1(r)
+                all_data[pnid + "1"] = partA
+                all_data[pnid + "2"] = partB
+            else:
+                all_data[pnid] = r
     return all_data, all_errors
+
+
+def correct_1GJJ_A_1(data):
+    """Correct the sidechain data for 1GJJ_A_1, which has two separate chains.
+
+    The file uploaded to RCSB PDB contains two overlapping domains so a manual adjustment
+    is required. See https://github.com/jonathanking/sidechainnet/issues/38 for more
+    details.
+    """
+    partA = copy.deepcopy(data)
+    partB = copy.deepcopy(data)
+    for key in data.keys():
+        if key == 'ums':
+            res_list = data[key].split()
+            partA[key] = " ".join(res_list[0:50])
+            partB[key] = " ".join(res_list[110:153])
+        elif key == 'crd':
+            partA[key] = partA[key][0:50 * NUM_COORDS_PER_RES]
+            partB[key] = partA[key][110 * NUM_COORDS_PER_RES:153 * NUM_COORDS_PER_RES]
+        else:
+            partA[key] = partA[key][0:50 * NUM_COORDS_PER_RES]
+            partB[key] = partA[key][110 * NUM_COORDS_PER_RES:153 * NUM_COORDS_PER_RES]
+
+    return partA, partB
 
 
 def process_id(pnid):

@@ -41,7 +41,6 @@ from sidechainnet.utils.errors import write_errors_to_files
 from sidechainnet.utils.manual_adjustment import (manually_adjust_data,
                                                   manually_correct_mask,
                                                   needs_manual_adjustment)
-from sidechainnet.utils.measure import NUM_COORDS_PER_RES
 from sidechainnet.utils.organize import get_validation_split_identifiers_from_pnid_list, load_data, organize_data, save_data
 from sidechainnet.utils.parse import parse_raw_proteinnet
 
