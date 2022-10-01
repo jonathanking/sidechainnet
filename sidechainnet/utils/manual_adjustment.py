@@ -1,11 +1,12 @@
 """A module for the handling of specific, problematic ProteinNet entries."""
 
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
-from sidechainnet.utils.align import binary_mask_to_str
+import copy
 
 
 def manually_correct_mask(pnid, pn_entry, mask):
     """Corrects a protein sequence mask for a given ProteinNet ID."""
+    from sidechainnet.utils.align import binary_mask_to_str
     if pnid == "3TDN_1_A":
         # In this case, the default mask from ProteinNet was actually correct. The
         # protein's sequence has two equal scoring alignments, but the aligners typically
@@ -56,3 +57,29 @@ def manually_adjust_data(pnid, sc_entry):
         sc_entry["crd"] = sc_entry["crd"][:-NUM_COORDS_PER_RES * 2]
 
     return sc_entry
+
+
+def correct_1GJJ_A_1(data):
+    """Correct the sidechain data for 1GJJ_A_1, which has two separate chains.
+
+    The file uploaded to RCSB PDB contains two overlapping domains so a manual adjustment
+    is required. See https://github.com/jonathanking/sidechainnet/issues/38 for more
+    details.
+    """
+    partA = copy.deepcopy(data)
+    partB = copy.deepcopy(data)
+    for key in data.keys():
+        if key == 'ums':
+            res_list = data[key]
+            partA[key] = res_list[0:50]
+            partB[key] = res_list[50:]
+        elif key == 'crd':
+            partA[key] = partA[key][0:50 * NUM_COORDS_PER_RES]
+            partB[key] = partB[key][50 * NUM_COORDS_PER_RES:]
+        elif key == 'res':
+            continue
+        else:
+            partA[key] = partA[key][0:50]
+            partB[key] = partB[key][50:]
+
+    return partA, partB

@@ -1,6 +1,5 @@
 """Functions for downloading protein structure data from RCSB PDB using the ProDy pkg."""
 
-import copy
 import multiprocessing
 import os
 import pickle
@@ -19,7 +18,7 @@ import tqdm
 import sidechainnet.utils.errors as errors
 from sidechainnet.utils.measure import get_seq_coords_and_angles, no_nans_infs_allzeros
 from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summary_file, parse_dssp_file
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
+from sidechainnet.utils.manual_adjustment import correct_1GJJ_A_1
 
 # TODO Make max seq len argument
 MAX_SEQ_LEN = 750  # An arbitrarily large upper-bound on sequence lengths
@@ -38,6 +37,7 @@ D_AMINO_ACID_CODES = [
 ]
 ASTRAL_ID_MAPPING = None
 PROTEIN_DSSP_DATA = None
+
 
 def _reinit_global_valid_splits(new_splits):
     """Reinitialize global validation split variables when customizing dataset splits."""
@@ -119,17 +119,21 @@ def download_sidechain_data(pnids,
         os.makedirs("errors")
 
     # Try loading pre-parsed data from CASP12/100 to speed up dataset generation.
-    already_downloaded_data = "sidechain-only_12_100.pkl"
-    already_downloaded_data = os.path.join(sidechainnet_out_dir, already_downloaded_data)
     new_pnids = [p for p in pnids]
-    already_parsed_ids = []
-    if os.path.exists(already_downloaded_data):
-        with open(already_downloaded_data, "rb") as f:
-            existing_data = pickle.load(f)
-        already_parsed_ids = [p for p in pnids if p in existing_data]
-        new_pnids = [p for p in pnids if p not in existing_data]
-        print(f"Will download {len(pnids)-len(new_pnids)} fewer pnids that were already"
-              " processed.")
+    if not regenerate_scdata:
+        already_downloaded_data = "sidechain-only_12_100.pkl"
+        already_downloaded_data = os.path.join(sidechainnet_out_dir,
+                                               already_downloaded_data)
+
+        already_parsed_ids = []
+        if os.path.exists(already_downloaded_data):
+            with open(already_downloaded_data, "rb") as f:
+                existing_data = pickle.load(f)
+            already_parsed_ids = [p for p in pnids if p in existing_data]
+            new_pnids = [p for p in pnids if p not in existing_data]
+            print(
+                f"Will download {len(pnids)-len(new_pnids)} fewer pnids that were already"
+                " processed.")
 
     # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(new_pnids, limit, num_cores)
@@ -202,10 +206,7 @@ def get_sidechain_data(pnids, limit, num_cores=multiprocessing.cpu_count()):
     remaining_pnids += pnids_ok_parallel
     print("Downloading remaining", len(remaining_pnids), " sequentially.")
 
-    pbar = tqdm.tqdm(pnids,
-                     total=len(remaining_pnids),
-                     dynamic_ncols=True,
-                     smoothing=0)
+    pbar = tqdm.tqdm(pnids, total=len(remaining_pnids), dynamic_ncols=True, smoothing=0)
     for pnid in remaining_pnids:
         pbar.set_description(pnid)
         results.append(process_id(pnid))
@@ -221,37 +222,13 @@ def get_sidechain_data(pnids, limit, num_cores=multiprocessing.cpu_count()):
             if "msg" in r and r["msg"] == "MODIFIED_MODEL":
                 model_warning_file.write(f"{pnid}\n")
                 del r["msg"]
-            if pnid == "1GJJ_A_1":
+            if pnid == "1GJJ_1_A":
                 partA, partB = correct_1GJJ_A_1(r)
                 all_data[pnid + "1"] = partA
                 all_data[pnid + "2"] = partB
             else:
                 all_data[pnid] = r
     return all_data, all_errors
-
-
-def correct_1GJJ_A_1(data):
-    """Correct the sidechain data for 1GJJ_A_1, which has two separate chains.
-
-    The file uploaded to RCSB PDB contains two overlapping domains so a manual adjustment
-    is required. See https://github.com/jonathanking/sidechainnet/issues/38 for more
-    details.
-    """
-    partA = copy.deepcopy(data)
-    partB = copy.deepcopy(data)
-    for key in data.keys():
-        if key == 'ums':
-            res_list = data[key].split()
-            partA[key] = " ".join(res_list[0:50])
-            partB[key] = " ".join(res_list[110:153])
-        elif key == 'crd':
-            partA[key] = partA[key][0:50 * NUM_COORDS_PER_RES]
-            partB[key] = partA[key][110 * NUM_COORDS_PER_RES:153 * NUM_COORDS_PER_RES]
-        else:
-            partA[key] = partA[key][0:50 * NUM_COORDS_PER_RES]
-            partB[key] = partA[key][110 * NUM_COORDS_PER_RES:153 * NUM_COORDS_PER_RES]
-
-    return partA, partB
 
 
 def process_id(pnid):
