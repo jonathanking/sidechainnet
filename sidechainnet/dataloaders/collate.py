@@ -60,7 +60,6 @@ def prepare_dataloaders(data,
             its components (sequence, mask pssm).
         batch_size: Batch size to use when yielding batches from a DataLoader.
     """
-    from sidechainnet.utils.download import VALID_SPLITS
     if collate_fn is None:
         collate_fn = protein_batch_collate_fn
 

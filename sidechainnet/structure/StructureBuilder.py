@@ -189,10 +189,14 @@ class StructureBuilder(object):
             self.coords += res.build()
             prev_res = res
 
-        if not self.is_numpy:
-            self.coords = torch.stack(self.coords).double()
+        if self.data_type == 'numpy' and torch.is_tensor(self.coords[0]):
+            self.coords = torch.stack(self.coords)
+            self.coords = self.coords.detach().numpy()
+        elif self.data_type == 'numpy' and isinstance(self.coords[0], np.ndarray):
+            self.coords = np.stack(self.coords)
         else:
-            self.coords = np.stack([c.detach().numpy() for c in self.coords])
+            self.coords = torch.stack(self.coords)
+            self.data_type = 'torch'
 
         return self.coords
 

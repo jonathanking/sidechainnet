@@ -3,6 +3,8 @@ import copy
 import pickle
 import numpy as np
 import pkg_resources
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from tqdm import tqdm
 import torch
@@ -105,13 +107,22 @@ class BuildParamOptimizer(object):
                 pbar.set_postfix({'loss': f"{p._last_loss:.2f}"})
 
         # SGD Loop
-        elif opt == 'SGD':
-            self.opt = torch.optim.SGD(to_optim, lr=lr, momentum=0.9)
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt, 'min', verbose=True)
+        elif opt == 'SGD' or opt == 'adam':
+            if opt == 'adam':
+                self.opt = torch.optim.Adam(to_optim, lr=lr)
+            elif opt == "SGD":
+                self.opt = torch.optim.SGD(to_optim, lr=lr, momentum=0.9)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt,
+                                                                   'min',
+                                                                   verbose=True,
+                                                                   threshold=1e-4,
+                                                                   threshold_mode='abs',
+                                                                   factor=.5,
+                                                                   patience=20)
             best_loss = None
             best_params_so_far = None
             counter = 0
-            patience = 10
+            patience = 20
             epsilon = 1e-4
             for i in pbar:
                 # Note keeping
@@ -147,6 +158,14 @@ class BuildParamOptimizer(object):
 
                 pbar.set_postfix({'loss': f"{lossnp:.2f}"})
 
+        sns.lineplot(data=self.losses)
+        plt.title("Protein Potential Energy with BuildParams")
+        plt.xlabel("Optimization Step")
+        plt.savefig(
+            pkg_resources.resource_filename("sidechainnet",
+                                            "resources/build_params.pkl").replace(
+                                                "pkl", "png"))
+
         self.update_complete_build_params_with_optimized_params(best_params_so_far)
         return self.build_params
 
@@ -159,7 +178,8 @@ def main():
                               opt_thetas=True,
                               opt_chis=True,
                               ffname=OPENMM_FORCEFIELDS)
-    build_params = bpo.optimize(opt='SGD', lr=1e-6, steps=100000)
+    # build_params = bpo.optimize(opt='SGD', lr=1e-6, steps=100000)
+    build_params = bpo.optimize(opt='adam', lr=1e-3, steps=100_000)
     # build_params = bpo.optimize(opt='LBFGS', lr=1e-4, steps=10000)
     fn = pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl")
     with open(fn, "wb") as f:

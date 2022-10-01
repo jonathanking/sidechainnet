@@ -267,7 +267,7 @@ Project structure (continuous integration, docs, testing) based on the
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.
 
 ## References
-1. [SidechainNet: An All-Atom Protein Structure Dataset for Machine Learning](https://arxiv.org/abs/2010.08162). J.E. King, D. Koes. arXiv (2020).
+1. [SidechainNet: An All-Atom Protein Structure Dataset for Machine Learning](https://doi.org/10.1002/prot.26169). J.E. King, D. Koes. Proteins: Structure, Function, and Bioinformatics (Vol. 89, Issue 11, pp. 1489–1496). Wiley. (2021).
 1. [ProteinNet: a standardized data set for machine learning of protein structure.](https://doi.org/10.1186/s12859-019-2932-0). M. AlQuraishi. BMC Bioinformatics 20, 311 (2019).
 2. [3dmol.js: molecular visualization with WebGL.](https://doi.org/10.1093/bioinformatics/btu829) N. Rego and D. Koes. Bioinformatics, 31(8):1322–1324, (2014).
  
