@@ -112,7 +112,6 @@ def test_openmm_energy_h():
     openmmf = OpenMMEnergyH()
     p = load_p(start=38, l=2)
     p.add_hydrogens()
-    loss = openmmf.apply(p, p.hcoords)
     _input = p, p.hcoords
     test = gradcheck(openmmf.apply, _input, check_undefined_grad=True)
     print(test)

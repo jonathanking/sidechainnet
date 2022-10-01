@@ -98,6 +98,13 @@ class SCNProtein(object):
         self.device = 'cpu'
         self._hcoords_for_openmm = None
 
+    @classmethod
+    def from_pkl(cls, pkl_file):
+        """Create a SCNProtein from a pickle file (inverse of SCNProtein.to_pkl)."""
+        with open(pkl_file, "rb") as f:
+            datadict = pickle.load(f)
+        return cls(**datadict)
+
     @property
     def sequence(self):
         """Return the protein's sequence in 1-letter amino acid codes."""

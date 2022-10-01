@@ -418,10 +418,10 @@ def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUI
     return bi
 
 
-with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
-          "rb") as f:
-    SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
-# SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
+# with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
+#           "rb") as f:
+#     SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
+SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
 
 
 ###################################################
@@ -668,6 +668,10 @@ def make_coords(seq, angles, build_params, add_hydrogens=False):
                                                      bb_ang=ang[1:, :3])
     else:
         ncoords, n_params = torch.zeros(L, 0, 3, dtype=dtype, device=device), dict()
+
+    # Remove H, keep H2 and H3 for NPRO
+    if seq[0] == 'P':
+        ncoords[0, 0] *= torch.nan
 
     # Construct all sidechain atoms by iteratively applying TMats starting from CA
     scang = (2 * np.pi - angles_cp.to(device)[:, SC_ANGLES_START_POS:])

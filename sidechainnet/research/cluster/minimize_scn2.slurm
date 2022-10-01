@@ -1,21 +1,21 @@
 #!/bin/bash
-#SBATCH --job-name=scnmin
+#SBATCH --job-name=scnmin2
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:0
 #SBATCH --ntasks-per-node=4
-#SBATCH --time=14-00:00:00
+#SBATCH --time=28-00:00:00
 #SBATCH --partition=dept_cpu
 #SBATCH --exclude=g122,g001
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220915/%A_%6a.out"
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/220916/%A_%6a.out"
 
 ############################
 ##       Description      ##
 ############################
 # This slurm script will help minimize a SidechainNet dataset.
 # This file is meant to be run in 3 steps.
-#   1. Run sbatch --export=ALL,JOB_TYPE=setup,CASP_V=7,CASP_T=30 THISFILE.
+#   1. Run sbatch --export=ALL,JOB_TYPE=setup,CASP_V=12,CASP_T=100 THISFILE.
 #           This splits up the desired sidechainnet file into individual protein files.
-#   2. Run sbatch --export=ALL,JOB_TYPE=process_index,CASP_V=7,CASP_T=30 --array 0-N_PROTEINS-1 THISFILE
+#   2. Run sbatch --export=ALL,JOB_TYPE=process_index,CASP_V=12,CASP_T=100 --array 0-N_PROTEINS-1 THISFILE
 #           This minimizes each protein file independently.
 #   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=7,CASP_T=30 THISFILE.
 #           This collapses the minimized structures into a single minimized dataset.
@@ -59,8 +59,8 @@ echo "Updated repo."
 ############################
 SCRIPT_PATH="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/utils/minimize_scn.py"
 DATAPATH="/net/pulsar/home/koes/jok120/scn220905/sidechainnet_casp${CASP_V}_${CASP_T}.pkl"
-UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220905/unmin"
-MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220915/min"
+UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin220930/unmin"
+MIN_PATH="/net/pulsar/home/koes/jok120/scnmin220930/min"
 
 if [[ $JOB_TYPE == setup ]]
 then
