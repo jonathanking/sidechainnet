@@ -57,6 +57,11 @@ def create_parser():
                               type=str,
                               default=None,
                               help="Weights and Biases run name.")
+    program_args.add_argument("--tags",
+                              type=str,
+                              default="",
+                              help="Tags to use on weights and biases, split only by"
+                              "commas, e.g. 'baseline,dropout0'.")
 
     # Data arguments
     data_args = parser.add_argument_group("Data")
@@ -233,7 +238,9 @@ def init_wandb(use_cluster, project, entity, model, dict_args):
         dir=wandb_dir,
         save_code=True,
         log_model=True,
-        name=dict_args['name'])  # TODO add id='runid' to resume (e.g. 19j0mxjk)
+        name=dict_args['name'],
+        tags=[tag for tag in dict_args['tags'].split(",") if tag] if dict_args['tags'] else None) 
+    # TODO add id='runid' to resume (e.g. 19j0mxjk)
     logger.experiment.config.update(dict_args, allow_val_change=True)
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -273,8 +280,8 @@ def main():
         if args.gradient_clip_algorithm is None else args.gradient_clip_algorithm,
         auto_select_gpus=True,
     )
-    # dict_args.pop('gradient_clip_val')
-    # dict_args.pop('gradient_clip_algorithm')
+    # Disable progress bar for SLURM jobs
+    dict_args['enable_progress_bar'] = "SLURM_JOBID" not in os.environ
 
     # Prepare torch
     pl.seed_everything(args.seed)
