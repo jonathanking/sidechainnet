@@ -120,12 +120,13 @@ def download_sidechain_data(pnids,
 
     # Try loading pre-parsed data from CASP12/100 to speed up dataset generation.
     new_pnids = [p for p in pnids]
+    already_parsed_ids = []
+    existing_data = None
     if not regenerate_scdata:
         already_downloaded_data = "sidechain-only_12_100.pkl"
         already_downloaded_data = os.path.join(sidechainnet_out_dir,
                                                already_downloaded_data)
 
-        already_parsed_ids = []
         if os.path.exists(already_downloaded_data):
             with open(already_downloaded_data, "rb") as f:
                 existing_data = pickle.load(f)
@@ -137,8 +138,9 @@ def download_sidechain_data(pnids,
 
     # Download the sidechain data as a dictionary and report errors.
     sc_data, pnids_errors = get_sidechain_data(new_pnids, limit, num_cores)
-    for p in already_parsed_ids:
-        sc_data[p] = existing_data[p]
+    if already_parsed_ids and existing_data is not None:
+        for p in already_parsed_ids:
+            sc_data[p] = existing_data[p]
     save_data(sc_data, output_path)
     errors.report_errors(pnids_errors, total_pnids=len(pnids[:limit]))
 
