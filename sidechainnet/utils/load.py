@@ -284,9 +284,6 @@ def load(casp_version=12,
         local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
         scn_dict = _load_dict(local_path)
 
-    # Patch for removing 1GJJ_1_A, see Issue #38
-    scn_dict = scn.utils.manual_adjustment._repair_1GJJ_1_A(scn_dict)
-
     scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
 
     # By default, the load function returns a dictionary
