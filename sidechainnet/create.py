@@ -75,7 +75,10 @@ def combine(pn_entry, sc_entry, aligner, pnid):
 
     # If there is no corresponding ProteinNet entry, we create a template entry
     if pn_entry is None:
-        seq = get_sequence_from_pnid(pnid)
+        if "1GJJ" in pnid:
+            seq = sc_entry['seq']
+        else:
+            seq = get_sequence_from_pnid(pnid)
         pn_entry = {
             "primary": seq,
             "evolutionary": np.zeros((len(seq), 21)),
