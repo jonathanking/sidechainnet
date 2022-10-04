@@ -147,7 +147,7 @@ class SCNMinimizer(object):
                 if lr_decay:
                     scheduler.step(loss)
 
-                if loss < best_loss_so_far and torch.abs(loss - best_loss_so_far) > 10:
+                if loss < best_loss_so_far and torch.abs(loss - best_loss_so_far) > 15:
                     best_loss_so_far = loss
                     best_angles_so_far = to_optim
                     best_loss_updated = True
