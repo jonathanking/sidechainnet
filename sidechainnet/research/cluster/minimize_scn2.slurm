@@ -17,7 +17,7 @@
 #           This splits up the desired sidechainnet file into individual protein files.
 #   2. Run sbatch --export=ALL,JOB_TYPE=process_index,CASP_V=12,CASP_T=100 --array 0-N_PROTEINS-1 THISFILE
 #           This minimizes each protein file independently.
-#   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=7,CASP_T=30 THISFILE.
+#   3. Run sbatch --export=ALL,JOB_TYPE=cleanup,CASP_V=12,CASP_T=100 THISFILE.
 #           This collapses the minimized structures into a single minimized dataset.
 echo "Running job ${SLURM_JOB_ID} on node ${SLURMD_NODENAME}."
 
