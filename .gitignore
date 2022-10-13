@@ -134,3 +134,4 @@ resources/dev/*
 *.chkpt
 sidechainnet/utils/minimize_old.py
 sidechainnet/utils/openmmpdb.py
+sidechainnet/research/analysis/plots
