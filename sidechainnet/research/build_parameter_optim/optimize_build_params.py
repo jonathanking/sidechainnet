@@ -1,5 +1,6 @@
 """Load SC_HBUILD_INFO and optimize the corresponding build_params to minimize energy."""
 import copy
+from distutils.command.build import build
 import pickle
 import numpy as np
 import pkg_resources
@@ -34,11 +35,30 @@ class BuildParamOptimizer(object):
         if opt_bond_lengths:
             self.keys_to_optimize.append('bond_lengths')
         if opt_thetas:
-            self.keys_to_optimize.extend(['cthetas', 'sthetas'])
+            self.keys_to_optimize.append('thetas')
         if opt_chis:
-            self.keys_to_optimize.extend(['cchis', 'schis'])
-        self.params = self.create_param_list_from_build_params(self.build_params)
+            self.keys_to_optimize.append('chis')
+
         self.losses = []
+
+        # Create chis and thetas tensors from sin/cos values for optimization, since
+        # sins and cosines cannot be optimized directly.
+        for root_atom in ['N', 'CA', 'C']:
+            if "thetas" in self.keys_to_optimize:
+                self.build_params[root_atom]["thetas"] = torch.atan2(
+                    self.build_params[root_atom]["sthetas"],
+                    self.build_params[root_atom]["cthetas"])
+            if "chis" in self.keys_to_optimize:
+                self.build_params[root_atom]["chis"] = torch.atan2(
+                    self.build_params[root_atom]["schis"],
+                    self.build_params[root_atom]["cchis"])
+
+        self.params = self.create_param_list_from_build_params(self.build_params)
+
+    @staticmethod
+    def to_sin_cos(angles):
+        """Convert angles to sin and cos values."""
+        return torch.sin(angles), torch.cos(angles)
 
     def prepare_protein(self, protein: SCNProtein):
         """Prepare protein for optimization by building hydrogens/init OpenMM."""
@@ -64,7 +84,14 @@ class BuildParamOptimizer(object):
         i = 0
         for root_atom in ['N', 'CA', 'C']:
             for param_key in self.keys_to_optimize:
-                self.build_params[root_atom][param_key] = optimized_params[i]
+                if param_key == "thetas":
+                    self.build_params[root_atom]["sthetas"], self.build_params[root_atom][
+                        "cthetas"] = self.to_sin_cos(optimized_params[i])
+                elif param_key == "chis":
+                    self.build_params[root_atom]["schis"], self.build_params[root_atom][
+                        "cchis"] = self.to_sin_cos(optimized_params[i])
+                else:
+                    self.build_params[root_atom][param_key] = optimized_params[i]
                 i += 1
 
     def save_build_params(self, path):
@@ -179,8 +206,8 @@ def main():
                               opt_chis=True,
                               ffname=OPENMM_FORCEFIELDS)
     # build_params = bpo.optimize(opt='SGD', lr=1e-6, steps=100000)
-    build_params = bpo.optimize(opt='adam', lr=1e-3, steps=100_000)
-    # build_params = bpo.optimize(opt='LBFGS', lr=1e-4, steps=10000)
+    build_params = bpo.optimize(opt='adam', lr=1e-3, steps=25000)
+    # build_params = bpo.optimize(opt='LBFGS', lr=1e-4, steps=1000)
     fn = pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl")
     with open(fn, "wb") as f:
         pickle.dump(build_params, f)

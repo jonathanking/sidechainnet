@@ -26,6 +26,7 @@ import openmm
 import prody
 import sidechainnet
 import sidechainnet.structure.fastbuild as fastbuild
+from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 import torch
 from openmm import Platform
 from openmm.app import Topology
@@ -36,15 +37,13 @@ from openmm.app.pdbfile import PDBFile
 from openmm.openmm import LangevinMiddleIntegrator
 from openmm.unit import kelvin, nanometer, picosecond, picoseconds
 from sidechainnet.structure.build_info import (ATOM_MAP_H, ATOM_MAP_HEAVY,
-                                               GLOBAL_PAD_CHAR,
-                                               HEAVY_ATOM_MASK_TENSOR,
+                                               GLOBAL_PAD_CHAR, HEAVY_ATOM_MASK_TENSOR,
                                                NUM_COORDS_PER_RES,
                                                NUM_COORDS_PER_RES_W_HYDROGENS,
                                                SC_HBUILD_INFO)
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.download import MAX_SEQ_LEN
-from sidechainnet.utils.sequence import (ONE_TO_THREE_LETTER_MAP, VOCAB,
-                                         DSSPVocabulary)
+from sidechainnet.utils.sequence import (ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary)
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
 OPENMM_PLATFORM = "CPU"  # CUDA"  # CUDA or CPU
@@ -269,6 +268,14 @@ class SCNProtein(object):
                                                                getForces=True)
         self.starting_energy = self.starting_state.getPotentialEnergy()
         return self.starting_energy
+
+    def get_energy_loss(self, nonbonded_interactions=True):
+        """Return potential energy loss of the system given current atom positions."""
+        if not self.openmm_initialized or nonbonded_interactions:
+            self.initialize_openmm(nonbonded_interactions=nonbonded_interactions)
+        eloss_fn = OpenMMEnergyH()
+        eloss = eloss_fn.apply(self, self.hcoords)
+        return eloss
 
     def get_forces(self, pprint=False):
         """Return tensor of forces as requested."""
@@ -561,12 +568,12 @@ class SCNProtein(object):
             hcoords = self.hcoords
 
         new_coords = torch.zeros(len(hcoords), NUM_COORDS_PER_RES, 3) * GLOBAL_PAD_CHAR
- 
+
         mask = HEAVY_ATOM_MASK_TENSOR[self.int_seq]
         for i, (resmask, res) in enumerate(zip(mask, hcoords)):
             newres = res[resmask.bool()]
             new_coords[i, :len(newres)] = newres
-        
+
         if inplace:
             self.hcoords = self.coords = new_coords
             self.sb = None

@@ -417,7 +417,7 @@ def filter_dictionary_by_missing_residues(raw_data):
 
 
 def load_pdb(filename, pdbid="", include_resolution=False, scnprotein=True):
-    """Return a dictionary containing SidechainNet-relevant data for a given PDB file.
+    """Return a SCNProtein containing SidechainNet-relevant data for a given PDB file.
 
     Args:
         filename (str): Path to existing PDB file.
@@ -426,20 +426,25 @@ def load_pdb(filename, pdbid="", include_resolution=False, scnprotein=True):
             structure resolution based off of the given pdb_id.
 
     Returns:
-        scndata (dict): A dictionary holding the parsed data attributes of the protein
-        structure. Below is a description of the keys:
+        scndata (SCNProtein): A SCNProtein object containing information parsed from the
+            specified PDB file. If scnprotein is set to false, the data is returned as a
+            dictionary holding the parsed data attributes of the protein
+            structure. Below is a description of the keys:
 
-            The key 'seq' is a 1-letter amino acid sequence.
-            The key 'coords' is a (L x NUM_COORDS_PER_RES) x 3 numpy array.
-            The key 'angs' is a L x NUM_ANGLES numpy array.
-            The key 'is_nonstd' is a L x 1 numpy array with binary values. 1 represents
-                that the amino acid at that position was a non-standard amino acid that
-                has been modified by SidechainNet into its standard form.
-            The key 'unmodified_seq' refers to the original amino acid sequence
-                of the protein structure. Some non-standard amino acids are converted into
-                their standard form by SidechainNet before measurement. In this case, the
-                unmodified_seq variable will contain the original (3-letter code) seq.
-            The key 'resolution' is the resolution of the structure as listed on the PDB.
+                The key 'seq' is a 1-letter amino acid sequence.
+                The key 'coords' is a (L x NUM_COORDS_PER_RES) x 3 numpy array.
+                The key 'angs' is a L x NUM_ANGLES numpy array.
+                The key 'is_nonstd' is a L x 1 numpy array with binary values. 1
+                    represents that the amino acid at that position was a non-standard
+                    amino acid that has been modified by SidechainNet into its standard
+                    form.
+                The key 'unmodified_seq' refers to the original amino acid sequence
+                    of the protein structure. Some non-standard amino acids are converted
+                    into their standard form by SidechainNet before measurement. In this
+                    case, the unmodified_seq variable will contain the original
+                    (3-letter code) seq.
+                The key 'resolution' is the resolution of the structure as listed on the
+                    PDB.
     """
     # First, use Prody to parse the PDB file
     chain = pr.parsePDB(filename)
