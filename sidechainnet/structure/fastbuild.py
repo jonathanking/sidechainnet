@@ -394,19 +394,26 @@ def _make_carbon_tensors(bb_build_info):
 # labels as keys, and vectors of values ordered by residue identity.
 
 # TODO  reimplement support for heavy atom only building
-SC_HEAVY_ATOM_BUILD_PARAMS = {
-    # Nothing extends from Nitrogen, so no data is needed here.
-    'N': None,
-    # Many atoms potentially extend from alpha Carbons. Data is organized by res identity.
-    # i.e. 'bond_lengths' : 20 x 10,  'types' : 20 x 10
-    # Items are meant to be selected from this dictionary to match the sequence that will
-    # be built.
-    'CA': _make_sc_heavy_atom_tensors(SC_HBUILD_INFO),
-    'HA': None,
-    # Carbonyl carbons are built off of the backbone C. Each residue builds this oxygen
-    # in the same way, so we simply repeat the relevant build info data per res identity.
-    'C': _make_carbon_tensors(BB_BUILD_INFO)
-}
+def get_heavy_atom_build_params():
+    """Return a dictionary of build parameters for heavy atoms.
+
+    Returns:
+        dict: A dictionary of build parameters for heavy atoms.
+    """
+    bi = {
+        # Nothing extends from Nitrogen, so no data is needed here.
+        'N': None,
+        # Many atoms potentially extend from alpha Carbons. Data is organized by res id.
+        # i.e. 'bond_lengths' : 20 x 10,  'types' : 20 x 10
+        # Items are meant to be selected from this dict to match the sequence that will
+        # be built.
+        'CA': _make_sc_heavy_atom_tensors(SC_HBUILD_INFO),
+        'HA': None,
+        # Carbonyl carbons are built off of the backbone C. Each res builds this oxygen
+        # in the same way, so we simply repeat the relevant build info data per res id.
+        'C': _make_carbon_tensors(BB_BUILD_INFO)
+    }
+    return bi
 
 
 def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUILD_INFO):
@@ -418,10 +425,46 @@ def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUI
     return bi
 
 
+def _update_buildparams_for_heavy_atoms_with_full_buildparams(heavy_bp, full_bp):
+    """Copy build parameters from minimized all atom dictionary to heavy atom dict."""
+    nres = len(AA)
+    ncoords = NUM_COORDS_PER_RES_W_HYDROGENS - (
+        len(_SUPPORTED_TERMINAL_ATOMS) + len(set(_BACKBONE_ATOMS + ['H']))
+    )
+    assert ncoords == 19
+    for a in range(nres):
+        A = AA[a]
+        if len(A) == 2:
+            # If this residue is an N or C terminal residue, the atoms built off of the
+            # alpha Carbon are identical to the non-terminal residue version
+            A = A[1]
+        a3 = AA1to3[A]
+        info = SC_HBUILD_INFO[a3]
+        i = 0
+        for i in range(ncoords):
+            an = info['torsion-names'][i].split('-')[-1].strip() if i < len(
+                info['torsion-vals']) else None
+            if i >= len(info['torsion-vals']) or an.startswith("H"):
+                break
+
+        heavy_bp['CA']['bond_lengths'][a, :i] = full_bp['CA']['bond_lengths'][a, :i]
+        heavy_bp['CA']['cthetas'][a, :i] = full_bp['CA']['cthetas'][a, :i]
+        heavy_bp['CA']['sthetas'][a, :i] = full_bp['CA']['sthetas'][a, :i]
+        heavy_bp['CA']['cchis'][a, :i] = full_bp['CA']['cchis'][a, :i]
+        heavy_bp['CA']['schis'][a, :i] = full_bp['CA']['schis'][a, :i]
+        heavy_bp['CA']['types'][a, :i] = full_bp['CA']['types'][a, :i]
+        heavy_bp['CA']['offsets'][a, :i] = full_bp['CA']['offsets'][a, :i]
+        heavy_bp['CA']['sources'][a, :i] = full_bp['CA']['sources'][a, :i]
+
+    return heavy_bp
+
+
 with open(pkg_resources.resource_filename("sidechainnet", "resources/build_params.pkl"),
           "rb") as f:
     SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
 # SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
+SC_HEAVY_ATOM_BUILD_PARAMS = _update_buildparams_for_heavy_atoms_with_full_buildparams(
+    SC_ALL_ATOM_BUILD_PARAMS)
 
 
 ###################################################
@@ -666,12 +709,12 @@ def make_coords(seq, angles, build_params, add_hydrogens=False):
                                                      build_params['N'],
                                                      base_atom='N',
                                                      bb_ang=ang[1:, :3])
+        # Remove H, keep H2 and H3 for NPRO
+        if seq[0] == 'P':
+            ncoords[0, 0] *= torch.nan
     else:
         ncoords, n_params = torch.zeros(L, 0, 3, dtype=dtype, device=device), dict()
 
-    # Remove H, keep H2 and H3 for NPRO
-    if seq[0] == 'P':
-        ncoords[0, 0] *= torch.nan
 
     # Construct all sidechain atoms by iteratively applying TMats starting from CA
     scang = (2 * np.pi - angles_cp.to(device)[:, SC_ANGLES_START_POS:])
