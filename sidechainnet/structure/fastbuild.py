@@ -428,9 +428,8 @@ def get_all_atom_build_params(sc_build_info=SC_HBUILD_INFO, bb_build_info=BB_BUI
 def _update_buildparams_for_heavy_atoms_with_full_buildparams(heavy_bp, full_bp):
     """Copy build parameters from minimized all atom dictionary to heavy atom dict."""
     nres = len(AA)
-    ncoords = NUM_COORDS_PER_RES_W_HYDROGENS - (
-        len(_SUPPORTED_TERMINAL_ATOMS) + len(set(_BACKBONE_ATOMS + ['H']))
-    )
+    ncoords = NUM_COORDS_PER_RES_W_HYDROGENS - (len(_SUPPORTED_TERMINAL_ATOMS) +
+                                                len(set(_BACKBONE_ATOMS + ['H'])))
     assert ncoords == 19
     for a in range(nres):
         A = AA[a]
@@ -463,9 +462,9 @@ with open(pkg_resources.resource_filename("sidechainnet", "resources/build_param
           "rb") as f:
     SC_ALL_ATOM_BUILD_PARAMS = pickle.load(f)
 # SC_ALL_ATOM_BUILD_PARAMS = get_all_atom_build_params()
+SC_HEAVY_ATOM_BUILD_PARAMS = get_heavy_atom_build_params()
 SC_HEAVY_ATOM_BUILD_PARAMS = _update_buildparams_for_heavy_atoms_with_full_buildparams(
-    SC_ALL_ATOM_BUILD_PARAMS)
-
+    SC_HEAVY_ATOM_BUILD_PARAMS, SC_ALL_ATOM_BUILD_PARAMS)
 
 ###################################################
 # Coordinates
@@ -502,7 +501,8 @@ def build_coords_from_source(backbone_mats,
     offsets = build_info['offsets'][seq_aa_index].to(device).type(dtype)
     types = build_info['types'][seq_aa_index].to(device)
     sources = build_info['sources'][seq_aa_index].to(device).long()
-    names = [build_info['names'][idx] for idx in seq_aa_index] if 'names' in build_info else None
+    names = [build_info['names'][idx] for idx in seq_aa_index
+            ] if 'names' in build_info else None
 
     # Create empty sidechain coordinate tensor and starting coordinate at origin
     MAX = bond_lengths.shape[1]  # always equal to the maximum num sidechain atoms per res
@@ -597,7 +597,8 @@ def build_coords_from_source(backbone_mats,
                     # change prevmat to earlier matrix
                     # We select the matrix from k+1 because when k==-1,
                     # we want the first matrix in the list
-                    prevmats[LLmask[prevbuildmask]] = matrices[k + 1][LLmask[masks[k +1]]]
+                    prevmats[LLmask[prevbuildmask]] = matrices[k + 1][LLmask[masks[k +
+                                                                                   1]]]
 
         # We can finally update the globally-referenced TMats through multiplication
         prevmats = prevmats[buildmask[prevbuildmask]] @ tmats_for_level_i
@@ -714,7 +715,6 @@ def make_coords(seq, angles, build_params, add_hydrogens=False):
             ncoords[0, 0] *= torch.nan
     else:
         ncoords, n_params = torch.zeros(L, 0, 3, dtype=dtype, device=device), dict()
-
 
     # Construct all sidechain atoms by iteratively applying TMats starting from CA
     scang = (2 * np.pi - angles_cp.to(device)[:, SC_ANGLES_START_POS:])
