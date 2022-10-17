@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=scnmin2
+#SBATCH --job-name=scnmin2.1
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:0
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=1
 #SBATCH --time=28-00:00:00
 #SBATCH --partition=dept_cpu
 #SBATCH --exclude=g122,g001
-#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/221001/%A_%6a.out"
+#SBATCH --output="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/research/cluster/221013/%A_%6a.out"
 
 ############################
 ##       Description      ##
@@ -60,7 +60,7 @@ echo "Updated repo."
 SCRIPT_PATH="/net/pulsar/home/koes/jok120/repos/sidechainnet/sidechainnet/utils/minimize_scn.py"
 DATAPATH="/net/pulsar/home/koes/jok120/scn221001/sidechainnet_casp${CASP_V}_${CASP_T}.pkl"
 UNMIN_PATH="/net/pulsar/home/koes/jok120/scnmin221001/unmin"
-MIN_PATH="/net/pulsar/home/koes/jok120/scnmin221001/min"
+MIN_PATH="/net/pulsar/home/koes/jok120/scnmin221013/min"
 
 if [[ $JOB_TYPE == setup ]]
 then
