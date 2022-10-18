@@ -50,21 +50,25 @@ def process_index(index, unmin_path, min_path):
         datadict = pickle.load(f)
     protein = SCNProtein(**datadict)
 
-    print(f"Minimizing Protein {protein.id}.")
-    m = SCNMinimizer()
     try:
-        m.minimize_scnprotein(protein, use_sgd=False, verbose=True, path=output_path)
+        print(f"Minimizing Protein {protein.id}.")
+        process_protein_obj(protein, output_path)
     except ValueError as e:
         print(e, end="\n\n")
         traceback.print_exc()
         with open(os.path.join(parent, "failed", protein.id + ".txt"), "w") as f:
             f.write(traceback.format_exc())
         exit(0)
-
     protein.numpy()
     protein.pickle(output_path)
     protein.to_pdb(output_path.replace(".pkl", ".pdb"))
     print("Minimized protein written to", output_path)
+
+
+def process_protein_obj(protein, output_path=None):
+    """Minimize a single protein object with LBFGS."""
+    m = SCNMinimizer()
+    m.minimize_scnprotein(protein, use_sgd=False, verbose=True, path=output_path)
 
 
 def get_filename_from_index_path(index, path):

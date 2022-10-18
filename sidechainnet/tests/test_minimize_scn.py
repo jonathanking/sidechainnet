@@ -4,6 +4,8 @@ import sidechainnet as scn
 from sidechainnet.create import create
 from sidechainnet.utils.download import process_id
 from sidechainnet.utils.minimize_scn import do_pickle, process_index
+from sidechainnet.examples import get_alphabet_protein
+from sidechainnet.utils.minimizer import SCNMinimizer
 
 
 def test_minimize_10p1JB0_12_X():
@@ -11,8 +13,17 @@ def test_minimize_10p1JB0_12_X():
     min_path = "/net/pulsar/home/koes/jok120/scnmin220905/min"
 
     # process_index(0, unmin_path, min_path)
-    process_index(1, unmin_path, min_path)
+    # process_index(1, unmin_path, min_path)
     # process_index(2, unmin_path, min_path)
+    # process_protein_obj
+
+
+def test_minimize_alpha():
+    protein = get_alphabet_protein()
+    print(f"Minimizing Protein {protein.id}.")
+    m = SCNMinimizer()
+    m.minimize_scnprotein(protein, use_sgd=False, verbose=True, path="./test_minimize_alpha")
+
 
 
 def test_process_raw_10p1JB0_12_X():
@@ -31,6 +42,7 @@ def test_better_generate():
 
 
 if __name__ == "__main__":
-    test_minimize_10p1JB0_12_X()
+    # test_minimize_10p1JB0_12_X()
     # test_process_raw_10p1JB0_12_X()
     # test_better_generate()
+    test_minimize_alpha()

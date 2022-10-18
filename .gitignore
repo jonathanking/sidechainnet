@@ -135,3 +135,5 @@ resources/dev/*
 sidechainnet/utils/minimize_old.py
 sidechainnet/utils/openmmpdb.py
 sidechainnet/research/analysis/plots
+*.prof_stats*
+test_minimize_alpha.png

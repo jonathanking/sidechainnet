@@ -1,6 +1,7 @@
 import argparse
 import os
 import multiprocessing as mp
+import sys
 
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as callbacks
@@ -239,7 +240,7 @@ def init_wandb(use_cluster, project, entity, model, dict_args):
         save_code=True,
         log_model=True,
         name=dict_args['name'],
-        tags=[tag for tag in dict_args['tags'].split(",") if tag] if dict_args['tags'] else None) 
+        tags=[tag for tag in dict_args['tags'].split(",") if tag] if dict_args['tags'] else None)
     # TODO add id='runid' to resume (e.g. 19j0mxjk)
     logger.experiment.config.update(dict_args, allow_val_change=True)
     n_params = sum(p.numel() for p in model.parameters())
@@ -314,7 +315,9 @@ def main():
         logger=wandb_logger,
         default_root_dir=model.save_dir,
     )
-    print(args, "\n")
+    print("sys.argv:\n" + " ".join(sys.argv[:]))
+    print("dict_args:\n", args, "\n")
+
 
     # Make callbacks
     my_callbacks = []
