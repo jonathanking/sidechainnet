@@ -7,6 +7,8 @@ import pickle
 import sys
 import traceback
 from tqdm import tqdm
+from datetime import timedelta
+import time
 
 import sidechainnet as scn
 from sidechainnet.dataloaders.SCNDataset import SCNDataset
@@ -38,6 +40,7 @@ def do_pickle(protein):
 
 def process_index(index, unmin_path, min_path):
     """Minimize a single protein by its index in the sorted list of files."""
+    start_time = time.time()
     parent, _ = os.path.split(min_path)
     os.makedirs(os.path.join(parent, "failed"), exist_ok=True)
     os.makedirs(min_path, exist_ok=True)
@@ -63,6 +66,9 @@ def process_index(index, unmin_path, min_path):
     protein.pickle(output_path)
     protein.to_pdb(output_path.replace(".pkl", ".pdb"))
     print("Minimized protein written to", output_path)
+
+    end_time = time.time()
+    print("Elapsed time:", str(timedelta(seconds=end_time - start_time)))
 
 
 def process_protein_obj(protein, output_path=None):

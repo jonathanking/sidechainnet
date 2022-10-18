@@ -147,12 +147,12 @@ class SCNMinimizer(object):
                 if lr_decay:
                     scheduler.step(loss)
 
-                if loss < best_loss_so_far and torch.abs(loss - best_loss_so_far) > 15:
+                if loss < best_loss_so_far and torch.abs(loss - best_loss_so_far) > 20:
                     best_loss_so_far = loss
                     best_angles_so_far = to_optim
                     best_loss_updated = True
                     epoch_last_best_loss_seen = i
-                    print(f"Epoch {i}: Loss has been updated. ", loss)
+                    print(f"Epoch {i}: Loss has been updated.")
                 elif i - epoch_last_best_loss_seen > patience:
                     print(f"Stopping early after {i} epochs.", loss)
                     stopped_early = True
