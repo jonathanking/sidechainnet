@@ -73,7 +73,7 @@ then
     python $SCRIPT_PATH process_index $DATAPATH $UNMIN_PATH $MIN_PATH $SLURM_ARRAY_TASK_ID
 elif [[ $JOB_TYPE == cleanup ]]
 then
-    echo "Cleaning up files (merging minimized SidechainNet files into a single dict)."
+    echo "Cleaning up files (merging minimized SidechainNet files into a single dict). See $MIN_PATH for output."
     python $SCRIPT_PATH cleanup $DATAPATH $UNMIN_PATH $MIN_PATH 0
 else
     echo "$JOB_TYPE is not a valid command."
