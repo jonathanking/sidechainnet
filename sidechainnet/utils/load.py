@@ -108,6 +108,7 @@ def load(casp_version=12,
          local_scn_path=None,
          scn_dataset=True,
          shuffle=True,
+         trim_edges=False,
          **kwargs):
     #: Okay
     """Load and return the specified SidechainNet dataset in the specified manner.
@@ -194,6 +195,8 @@ def load(casp_version=12,
         shuffle (bool, optional): Default True. If True, yields random batches from the
             dataloader instead of in-order (length ascending). Does not apply when a
             dataloader is not requested.
+        trim_edges (bool, optional): If True, trim missing residues from the beginning
+            and end of the protein sequence. Default False.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
@@ -292,7 +295,7 @@ def load(casp_version=12,
     elif not with_pytorch and scn_dataset:
         return SCNDataset(scn_dict,
                           complete_structures_only=complete_structures_only,
-                          trim_edges=True)
+                          trim_edges=trim_edges)
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
             scn_dict,

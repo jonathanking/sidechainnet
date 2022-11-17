@@ -277,7 +277,7 @@ def gdt_ts(true, pred):
     Returns:
         gdt_ts: Value of GDT_TS.
     """
-    pass
+    raise NotImplementedError()
 
 
 def gdc_all(true, pred, k=10):
