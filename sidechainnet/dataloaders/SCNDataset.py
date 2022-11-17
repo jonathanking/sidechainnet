@@ -14,9 +14,11 @@ SCNProteins may be iterated over or selected from the SCNDataset.
 """
 import copy
 import datetime
+import os
 import pickle
 import numpy as np
 import torch
+import tqdm
 
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 from sidechainnet.utils.organize import compute_angle_means, EMPTY_SPLIT_DICT
@@ -246,6 +248,29 @@ class SCNDataset(torch.utils.data.Dataset):
             pickle.dump(complete_dict, f)
 
         return
+
+    def get_pnids(self):
+        """Return a list of all protein IDs in the dataset."""
+        return sorted(list(self.ids_to_SCNProtein.keys()))
+
+    def to_fasta(self, path, ids=None):
+        """Save the dataset to a FASTA file with one line per protein."""
+        if ids is None:
+            ids = self.get_pnids()
+        with open(path, "w") as f:
+            for pid in ids:
+                p = self[pid]
+                f.write(f">{p.id}\n{p.seq}\n")
+
+    def to_fastas(self, path, ids=None):
+        """Save the dataset to a directory of FASTA files, one per protein."""
+        if ids is None:
+            ids = self.get_pnids()
+        os.makedirs(path, exist_ok=True)
+        for pid in tqdm.tqdm(ids):
+            p = self[pid]
+            with open(os.path.join(path, f"{p.id}.fasta"), "w") as f:
+                f.write(f">{p.id}\n{p.seq}\n")
 
 
 if __name__ == "__main__":
