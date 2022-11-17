@@ -64,6 +64,12 @@ def get_padded_second_seq_from_alignment(al):
     return alignment_str
 
 
+def get_padded_first_seq_from_alignment(al):
+    """For a single alignment, return the first padded string."""
+    alignment_str = str(al).split("\n")[0]
+    return alignment_str
+
+
 def locate_char(c, s):
     """Returns a list of indices of character c in string s."""
     return [i for i, l in enumerate(s) if l == c]
