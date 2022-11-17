@@ -1,4 +1,4 @@
-from sidechainnet.tests.test_fastbuild import alphabet_protein
+from sidechainnet.examples import alphabet_protein
 from sidechainnet.research.build_parameter_optim.optimize_build_params import BuildParamOptimizer
 
 
