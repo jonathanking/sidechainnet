@@ -139,4 +139,5 @@ sidechainnet/research/analysis/plots
 test_minimize_alpha.png
 sidechainnet/research/reconfigure_alignments/**/*.txt
 sidechainnet/research/reconfigure_alignments/**/*.pkl
+sidechainnet/research/evaluate_energy/**/*.csv
 seq_dict.pkl

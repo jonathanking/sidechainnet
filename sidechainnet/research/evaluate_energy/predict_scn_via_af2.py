@@ -15,6 +15,8 @@ HHSEARCH = "/home/jok120/anaconda3/envs/openfold_venv/bin/hhsearch"
 KALIGN = "/home/jok120/anaconda3/envs/openfold_venv/bin/kalign"
 ALIGN_DIR = "/scr/scn_roda"
 
+META_FASTA_FILE = "/home/jok120/10#META2.fa"
+
 
 def main():
     # Parse arguments
@@ -33,14 +35,14 @@ def main():
     scn_dataset = scn.load(local_scn_path=scn_path)
 
     # Load the minimized SidechainNet
-    scn_minimized = scn.load(local_scn_path=scn_min_path)
+    scn_minimized = scn.load(local_scn_path=scn_min_path, sort_by_length='ascending')
 
     # Create the required fasta files
-    scn_dataset.to_fastas(fasta_out_dir, ids=scn_minimized.get_pnids())
-    # scn_dataset.to_fasta("/home/jok120/10#META.fa", ids=scn_minimized.get_pnids())
+    # scn_dataset.to_fastas(fasta_out_dir, ids=scn_minimized.get_pnids())
+    scn_dataset.to_fasta(META_FASTA_FILE, ids=scn_minimized.get_pnids())
 
     # Start a new AlphaFold2 run on the command line
-    command = create_af2_cmd(fasta_out_dir, pred_out_dir)
+    command = create_af2_cmd(fasta_out_dir, pred_out_dir, META_FASTA_FILE)
 
     print("Starting AlphaFold2 run...")
     print(command)
@@ -56,12 +58,11 @@ def main():
     print("AlphaFold2 run complete.")
 
 
-def create_af2_cmd(fasta_out_dir, pred_out_dir, config_preset="model_1_ptm"):
+def create_af2_cmd(fasta_out_dir, pred_out_dir, meta_fasta_file=None, config_preset="model_1_ptm"):
     """Create the command to run AlphaFold2 via the OpenFold package."""
-    # FASTA_DIR="/scr/experiments/221101/fastas"
-    # OUT_DIR="/scr/experiments/221101/out1"
+    meta_fasta_text = f"--use_meta_fasta_file={meta_fasta_file}" if meta_fasta_file is not None else ""
     cmd = f"""/home/jok120/anaconda3/envs/openfold_venv/bin/python \
-        /home/jok120/openfold/run_pretrained_openfold.py \
+        /scr/openfold/run_pretrained_openfold.py \
         {fasta_out_dir} \
         {MMCIF_FILES} \
         --output_dir {pred_out_dir} \
@@ -76,7 +77,9 @@ def create_af2_cmd(fasta_out_dir, pred_out_dir, config_preset="model_1_ptm"):
         --jackhmmer_binary_path {JACKHMMER} \
         --hhblits_binary_path {HHBLITS} \
         --hhsearch_binary_path {HHSEARCH} \
-        --kalign_binary_path {KALIGN}
+        --kalign_binary_path {KALIGN} \
+        --save_outputs \
+        {meta_fasta_text}
     """
     return cmd
 
@@ -87,5 +90,5 @@ if __name__ == "__main__":
         "/home/jok120/scn221001/sidechainnet_casp12_100.pkl",
         "/home/jok120/scnmin221013/scn_minimized.pkl",
         "/scr/experiments/221114/fastas",
-        "/scr/experiments/221114/out2"]
+        "/scr/experiments/221114/out3"]
     main()

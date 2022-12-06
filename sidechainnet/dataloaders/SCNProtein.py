@@ -24,6 +24,8 @@ import warnings
 import numpy as np
 import openmm
 import prody
+import sidechainnet as scn
+from sidechainnet.utils.download import get_resolution_from_pdbid
 import sidechainnet
 import sidechainnet.structure.fastbuild as fastbuild
 from sidechainnet.utils.openmm_loss import OpenMMEnergyH
@@ -35,7 +37,7 @@ from openmm.app.forcefield import ForceField, HBonds
 from openmm.app.modeller import Modeller
 from openmm.app.pdbfile import PDBFile
 from openmm.openmm import LangevinMiddleIntegrator
-from openmm.unit import kelvin, nanometer, picosecond, picoseconds
+from openmm.unit import kelvin, nanometer, picosecond, picoseconds, angstrom, mole, kilojoule
 from sidechainnet.structure.build_info import (ATOM_MAP_H, ATOM_MAP_HEAVY,
                                                GLOBAL_PAD_CHAR, HEAVY_ATOM_MASK_TENSOR,
                                                NUM_COORDS_PER_RES,
@@ -44,9 +46,11 @@ from sidechainnet.structure.build_info import (ATOM_MAP_H, ATOM_MAP_HEAVY,
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.download import MAX_SEQ_LEN
 from sidechainnet.utils.sequence import (ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary)
+import simtk.unit as unit
 
 OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
 OPENMM_PLATFORM = "CPU"  # CUDA"  # CUDA or CPU
+SEED = 1234
 
 
 class SCNProtein(object):
@@ -103,6 +107,42 @@ class SCNProtein(object):
         with open(pkl_file, "rb") as f:
             datadict = pickle.load(f)
         return cls(**datadict)
+
+    @classmethod
+    def from_pdb(cls, filename, pdbid="", include_resolution=False):
+        """Create a SCNProtein from a PDB file. Warning: does not support gaps.
+
+        Args:
+            filename (str): Path to existing PDB file.
+            pdbid (str): 4-letter string representing the PDB Identifier.
+            include_resolution (bool, default=False): If True, query the PDB for the protein
+                structure resolution based off of the given pdb_id.
+
+        Returns:
+            A SCNProtein object containing the coorinates, angles, and sequence parsed
+            from the PDB file.
+        """
+        # TODO: Raise an alarm if the user is working with files that have gaps
+        # First, use Prody to parse the PDB file
+        chain = prody.parsePDB(filename)
+        # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
+        (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
+         is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain,
+                                                                  replace_nonstd=True)
+        scndata = {
+            "coordinates": coords_np.reshape(len(observed_sequence), -1, 3),
+            "angles": dihedrals_np,
+            "sequence": observed_sequence,
+            "unmodified_seq": unmodified_sequence,
+            "mask": "+" * len(observed_sequence),
+            "is_modified": is_nonstd,
+            "id": pdbid,
+        }
+        # If requested, look up the resolution of the given PDB ID
+        if include_resolution:
+            assert pdbid, "You must provide a PDB ID to look up the resolution."
+            scndata['resolution'] = get_resolution_from_pdbid(pdbid)
+        return cls(**scndata)
 
     @property
     def sequence(self):
@@ -223,6 +263,8 @@ class SCNProtein(object):
 
     def fastbuild(self, add_hydrogens=False, build_params=None, inplace=False):
         """Build protein coordinates from angles."""
+        if self.is_numpy:
+            self.torch()
         coords, params = fastbuild.make_coords(self.seq,
                                                self.angles,
                                                build_params=build_params,
@@ -236,9 +278,6 @@ class SCNProtein(object):
             self.sb = sidechainnet.StructureBuilder(self.seq,
                                                     coords,
                                                     has_hydrogens=add_hydrogens)
-        if self.positions is None and add_hydrogens:
-            self.initialize_openmm()
-            self.update_positions()
 
         return coords
 
@@ -254,24 +293,64 @@ class SCNProtein(object):
     #        OPENMM PRIMARY FUNCTIONS        #
     ##########################################
 
-    def get_energy(self):
+    def _convert_pdbfixer_positions_to_quantities(self):
+        """Convert positions to quantities."""
+        self.pdbfixer.positions *= unit.nanometers
+
+    def _undo_pdbfixer_positions_to_quantities(self):
+        """Unconvert positions to quantities."""
+        self.pdbfixer.positions /= unit.nanometers
+
+    def _add_missing_via_pdbfixer_and_init_openmm(self,
+                                                  seed=SEED,
+                                                  add_hydrogens_via_openmm=False):
+        self.get_openmm_repr()
+        self.make_pdbfixer()
+        self._convert_pdbfixer_positions_to_quantities()
+        self.pdbfixer.findMissingResidues()
+        self.pdbfixer.findMissingAtoms()
+        self.pdbfixer.addMissingAtoms(seed=SEED)
+        self.pdbfixer.addMissingHydrogens(pH=7.0,
+                                          seed=SEED,
+                                          forcefield=ForceField(*self.openmm_forcefields))
+        self._undo_pdbfixer_positions_to_quantities()
+        self.positions = self.pdbfixer.positions
+        self.topology = self.pdbfixer.topology
+        self.initialize_openmm(skip_get_openmm_repr=True,
+                               add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+
+    def get_energy(self,
+                   add_missing=False,
+                   add_hydrogens_via_openmm=False,
+                   return_unitless_kjmol=False):
         """Return potential energy of the system given current atom positions."""
+        if not self.has_hydrogens and not (add_hydrogens_via_openmm or add_missing):
+            raise ValueError("Cannot compute energy without hydrogens.")
+        if add_missing:
+            try:
+                self._add_missing_via_pdbfixer_and_init_openmm(
+                    seed=SEED, add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+            except openmm.OpenMMException as e:
+                if "Particle coordinate is nan" in str(e):
+                    # The system exploded when adding atoms. Try a different seed.
+                    self._add_missing_via_pdbfixer_and_init_openmm(
+                        seed=SEED+1, add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+
         if not self.openmm_initialized:
-            self.initialize_openmm()
-        # if self.has_missing_atoms:
-        #     self.make_pdbfixer()
-        #     self.pdbfixer.findMissingAtoms()
-        #     self.pdbfixer.addMissingAtoms()
-        #     self.positions = self.pdbfixer.positions
+            self.initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+
         self.simulation.context.setPositions(self.positions)
         self.starting_state = self.simulation.context.getState(getEnergy=True,
                                                                getForces=True)
         self.starting_energy = self.starting_state.getPotentialEnergy()
-        return self.starting_energy
+        if return_unitless_kjmol:
+            return self.starting_energy.value_in_unit(unit.kilojoule_per_mole)
+        else:
+            return self.starting_energy
 
     def get_energy_loss(self, nonbonded_interactions=True):
         """Return potential energy loss of the system given current atom positions."""
-        if not self.openmm_initialized or nonbonded_interactions:
+        if not self.openmm_initialized or not nonbonded_interactions:
             self.initialize_openmm(nonbonded_interactions=nonbonded_interactions)
         eloss_fn = OpenMMEnergyH()
         eloss = eloss_fn.apply(self, self.hcoords)
@@ -285,8 +364,9 @@ class SCNProtein(object):
         if not self.starting_energy:
             self.get_energy()
 
-        # Compute forces with OpenMM
-        self._forces_raw = self.starting_state.getForces(asNumpy=True)
+        # Compute forces with OpenMM, but convert to a value with angstroms and kJ/mol
+        self._forces_raw = self.starting_state.getForces(asNumpy=True).value_in_unit(
+            kilojoule / (angstrom * mole))
 
         # Assign forces from OpenMM to their places in the hydrogen coord representation
         self.forces[self.hcoord_to_pos_map_keys] = self._forces_raw[
@@ -294,7 +374,7 @@ class SCNProtein(object):
 
         if pprint:
             atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
-            return
+            # return
 
         return self.forces
 
@@ -307,6 +387,10 @@ class SCNProtein(object):
 
     def update_hydrogens_for_openmm(self, hcoords):
         """Use a set of hydrogen coords to update OpenMM data for this protein."""
+        if not self.openmm_initialized:
+            self.initialize_openmm()
+        #     self.update_positions()
+
         mask = self.get_hydrogen_coord_mask()
         self._hcoords_for_openmm = torch.nan_to_num(hcoords * mask, nan=0.0)
         self.update_positions(self._hcoords_for_openmm)  # Use our openmm only hcoords
@@ -328,7 +412,9 @@ class SCNProtein(object):
         # and passes it to the CPU as a numpy array so that OpenMM can read it
         hcoords = hcoords.detach().cpu().numpy() if not isinstance(
             hcoords, np.ndarray) else hcoords
-        # A mapping is used to correct for small differences between the Torch/OpenMM pos
+        # We must also convert hcoords from Angstroms to nanometers for Openmm
+        hcoords = hcoords / 10.0
+        # A mapping is used to define the relationship between hcoords and positions
         self.positions[self.hcoord_to_pos_map_values] = hcoords.reshape(
             -1, 3)[self.hcoord_to_pos_map_keys]
         return self.positions  # TODO numba JIT compile
@@ -348,6 +434,8 @@ class SCNProtein(object):
         chain = self.topology.addChain()
         hcoords = self.hcoords.cpu().detach().numpy(
         ) if not self.is_numpy else self.hcoords
+        # hcoords are always stored in Angstroms, but OpenMM wants nanometers
+        hcoords = hcoords / 10.0
         coord_gen = coord_generator(hcoords)
         self.has_missing_atoms = False
         for i, (residue_code, coords, mask_char, atom_names) in enumerate(
@@ -368,6 +456,7 @@ class SCNProtein(object):
                     continue
                 # Handle missing atoms
                 if np.isnan(c).any():
+                    # print(c)
                     raise ValueError("Cannot construct an OpenMM Representation with "
                                      f"missing atoms ({i} {residue_name} {self}).")
                     self.has_missing_atoms = True
@@ -389,11 +478,17 @@ class SCNProtein(object):
         self.positions = np.array(self.positions)
         return self.topology, self.positions
 
-    def initialize_openmm(self, nonbonded_interactions=True):
+    def initialize_openmm(self,
+                          nonbonded_interactions=True,
+                          skip_get_openmm_repr=False,
+                          add_hydrogens_via_openmm=False):
         """Create top., pos., modeller, forcefield, system, integrator, & simulation."""
-        self.get_openmm_repr()
+        if not skip_get_openmm_repr:
+            self.get_openmm_repr()
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*self.openmm_forcefields)
+        if add_hydrogens_via_openmm:
+            self.modeller.addHydrogens(forcefield=self.forcefield, seed=SEED)
         self.system = self.forcefield.createSystem(self.modeller.topology,
                                                    nonbondedMethod=openmm.app.NoCutoff,
                                                    nonbondedCutoff=1 * nanometer,
