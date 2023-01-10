@@ -11,12 +11,32 @@
 
 from glob import glob
 import os
+import signal
 import sys
 from typing import List
 
 import sidechainnet as scn
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 import openmm.unit as unit
+
+# The following comes from https://stackoverflow.com/a/63546765/2780645
+from contextlib import contextmanager
+import signal
+import time
+
+
+@contextmanager
+def timeout(duration):
+
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f'block timedout after {duration} seconds')
+
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(duration)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
 
 
 def load_proteins_from_folder(pnid, folder, scncomplete, scnmin):
@@ -85,35 +105,43 @@ def main():
     out_csv_path = sys.argv[4]
 
     # Load SidechainNet min
-    scnmin = scn.load(local_scn_path=scnmin_path, trim_edges=False)
+    scnmin = scn.load(local_scn_path=scnmin_path, trim_edges=False, sort_by_length='descending')
 
     # Load SidechainNet complete
     scncomplete = scn.load(local_scn_path=scn_path, trim_edges=False)
 
     # Compute energies and write to CSV for comparison
-    with open(out_csv_path, "a") as f:
-        # f.write(
-        # "pnid,native,minimized,native_eloss,minimized_eloss,af2norelax,af2relax\n")
+    write_mode = "a"
+    with open(out_csv_path, write_mode) as f:
+        if write_mode == "w":
+            f.write(
+                "pnid,native,minimized,native_eloss,minimized_eloss,af2norelax,af2relax\n"
+            )
         skip_start = True
-        failed_id = "1S1N_1_A"
+        failed_id = "2EHO_d2ehoi2"
         for p in scnmin:
             if skip_start and p.id != failed_id:
                 continue
             elif skip_start and p.id == failed_id:
                 skip_start = False
-                continue
-            proteins = load_proteins_from_folder(p.id, prediction_dir, scncomplete,
-                                                 scnmin)
-            if proteins is None:
-                continue
-            energies = compute_energies(proteins)
-            row = f"{p.id},{energies['native']},{energies['minimized']}," + \
-                f"{energies['native_eloss']},{energies['minimized_eloss']}," + \
-                f"{energies['af2norelax']},{energies['af2relax']}\n"
-            f.write(row)
-            print(row.strip())
+                pass
+            try:
+                with timeout(30):
+                    proteins = load_proteins_from_folder(p.id, prediction_dir, scncomplete,
+                                                        scnmin)
+                    if proteins is None:
+                        continue
+                    energies = compute_energies(proteins)
+                    row = f"{p.id},{energies['native']},{energies['minimized']}," + \
+                        f"{energies['native_eloss']},{energies['minimized_eloss']}," + \
+                        f"{energies['af2norelax']},{energies['af2relax']}\n"
+                    f.write(row)
+                    print(row.strip())
 
-            f.flush()
+                    f.flush()
+            except TimeoutError:
+                print(f"Timed out for {p.id}")
+                continue
             # print(f"{p.id} written successfully.")
 
 
@@ -125,9 +153,9 @@ def compute_energies(proteins: dict):
             protein.trim_edges()
             assert len(protein) == len(proteins["minimized"]), "Lengths do not match."
         try:
-            energies[name] = protein.get_energy(
-                add_missing=True,
-                add_hydrogens_via_openmm=True).value_in_unit(unit.kilojoule_per_mole)
+            energies[name] = protein.get_energy(add_missing=True,
+                                                add_hydrogens_via_openmm=False,
+                                                return_unitless_kjmol=True)
         except ValueError:
             energies[name] = None
 
@@ -149,6 +177,6 @@ if __name__ == "__main__":
         "/scr/experiments/221114/out2/predictions",  # AF2 predictions
         "/home/jok120/scn221001/sidechainnet_casp12_100.pkl",  # Complete scn path
         "/home/jok120/scnmin221013/scn_minimized.pkl",  # Minimized scn path
-        "/home/jok120/sidechainnet/sidechainnet/research/evaluate_energy/result04.csv"  # Output CSV
+        "/home/jok120/sidechainnet/sidechainnet/research/evaluate_energy/result07.csv"  # Output CSV
     ]
     main()

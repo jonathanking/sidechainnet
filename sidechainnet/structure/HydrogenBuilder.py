@@ -4,7 +4,7 @@ import math
 import numpy as np
 from numba import njit
 import torch
-from sidechainnet.structure.build_info import BB_BUILD_INFO, NUM_COORDS_PER_RES
+from sidechainnet.structure.build_info import ATOM_MAP_H, BB_BUILD_INFO, NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
@@ -12,8 +12,7 @@ from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 # ARG has 24 atoms including Hs (see amino12.lib)  + 2 terminal H + 1 terminal OXT
 # 3 of these are backbone heavy atom (N, CA, C), 1 is bb Oxygen, 1 is N-H
 # 27 (total incl 3 term) - 3 term - 5 bb (N, CA, C, O, NH) = 19 sc atoms extending from CA
-NUM_COORDS_PER_RES_W_HYDROGENS = 27
-
+# NUM_COORDS_PER_RES_W_HYDROGENS = 27
 
 METHYL_ANGLE = torch.tensor(np.deg2rad(109.5))
 METHYL_LEN = torch.tensor(1.09)
@@ -30,6 +29,7 @@ AMINE_LEN = torch.tensor(1.01)
 OXT_LEN = torch.tensor(BB_BUILD_INFO['BONDLENS']['c-oh'])
 RAD120TORCH = torch.tensor(2 * np.pi / 3)
 THIOL_ROT = torch.tensor(1.23045715359)
+# TODO-JK update with minimized values
 
 # yapf: disable
 HYDROGEN_NAMES = {
@@ -167,13 +167,9 @@ class HydrogenBuilder(object):
     def build_hydrogens(self):
         """Add hydrogens to internal protein structure."""
         # TODO assumes only one continuous chain (and 1 set of N & C terminals)
-        coords = coord_generator(self.coords,
-                                 NUM_COORDS_PER_RES,
-                                 remove_padding=True,
-                                 seq=self.seq)
         new_coords = []
         prev_res_atoms = None
-        for i, (aa, crd) in enumerate(zip(self.seq, coords)):
+        for i, (aa, crd) in enumerate(zip(self.seq, self.coords)):
             # Add empty hydrogen coordinates for missing residues
             # TODO Check hydrogen generation with nans
             if self.isnan(crd).all():
@@ -186,20 +182,35 @@ class HydrogenBuilder(object):
             # Create an organized mapping from atom name to Catesian coordinates
             d = {name: xyz for (name, xyz) in zip(self.atom_map[aa], crd)}
             atoms = AtomHolder(
-                d, default=None
+                d,
+                default=torch.zeros(3, device=crd.device, dtype=crd.dtype) *
+                torch.nan
             )  # default=self.empty_coord would allow building hydrogens from missing coords
             # Generate hydrogen positions as array/tensor
-            hydrogen_positions = self.get_hydrogens_for_res(
+            hydrogen_positions_dict = self.get_hydrogens_for_res(
                 aa,
                 atoms,
                 prev_res_atoms,
                 n_terminal=i == 0,
                 c_terminal=i == len(self.seq) - 1)
+            d.update(hydrogen_positions_dict)
+            atoms = AtomHolder(d, default=torch.zeros(3, device=crd.device, dtype=crd.dtype) *
+                torch.nan)
+
+            new_coord = torch.zeros(NUM_COORDS_PER_RES_W_HYDROGENS,
+                                    3,
+                                    dtype=self.coords.dtype,
+                                    device=self.coords.device) * torch.nan
+            for j, atomname in enumerate(ATOM_MAP_H[aa]):
+                if atomname == "PAD":
+                    continue
+                new_coord[j] = atoms[atomname]
+
             # Append Hydrogens immediately after heavy atoms, followed by PADs to L=26
-            new_coords.append(self.concatenate((crd, hydrogen_positions)))
+            new_coords.append(new_coord)
             prev_res_atoms = atoms
         # TODO are these on the correct device?
-        self.reduced_coords = self.concatenate(new_coords)
+        self.reduced_coords = self.stack(new_coords)
         return self.reduced_coords
 
     # Utility functions
@@ -688,18 +699,26 @@ class HydrogenBuilder(object):
                               c_terminal=False):
         """Return a padded array of hydrogens for a given res name & atom coord tuple."""
         hs = []
+        hdict = {}
         # Special Cases
         if n_terminal:
             h, h2, h3 = self.get_methyl_hydrogens(c.N, c.CA, c.C, length=self.amine_len)
             self.terminal_atoms.update({"H2": h2, "H3": h3})
-            hs.append(h)  # Used as normal amine hydrogen, H
+            # hs.append(h)  # Used as normal amine hydrogen, H
+            hdict["H"] = h
+            hdict["H2"] = h2
+            hdict["H3"] = h3
         # All amino acids except proline have an amide-hydrogen along the backbone
         if prevc and resname != "P":
-            hs.append(self.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
+            # hs.append(self.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True))
+            hdict["H"] = self.get_amide_methine_hydrogen(prevc.C, c.N, c.CA, amide=True)
         # If the amino acid is not Glycine, we can add an sp3-hybridized H to CA
         if resname != "G":
             cah = self.get_single_sp3_hydrogen(center=c.CA, R1=c.N, R2=c.C, R3=c.CB)
-            hs.append(cah)
+            # hs.append(cah)
+            hdict['HA'] = cah
+        else:
+            hdict['HA'] = torch.zeros(3, dtype=c.CA.dtype, device=c.CA.device) * np.nan
 
         # Now, we can add the remaining unique hydrogens for each amino acid
         if resname == "A":
@@ -744,18 +763,29 @@ class HydrogenBuilder(object):
             hs.extend(self.val(c))
 
         # Terminal atoms
-        if n_terminal:
-            hs.extend([self.terminal_atoms["H2"], self.terminal_atoms["H3"]])
+        # if n_terminal:
+        #     hs.extend([self.terminal_atoms["H2"], self.terminal_atoms["H3"]])
         if c_terminal:
             oxt = self.get_amide_methine_hydrogen(c.CA, c.C, c.O, oxt=True)
-            self.terminal_atoms.update({"OXT": oxt})
-            hs.append(oxt)
+            # self.terminal_atoms.update({"OXT": oxt})
+            # hs.append(oxt)
+            hdict["OXT"] = oxt
 
-        hs = self.pad_hydrogens(resname, hs)
+        # hs = self.pad_hydrogens(resname, hs)
         if self.device == 'cuda':
             hs = [h.cuda() for h in hs]
 
-        return self.stack(hs, 0)
+        # return self.stack(hs, 0)
+
+        expected_hydrogens = HYDROGEN_NAMES[ONE_TO_THREE_LETTER_MAP[resname]]
+        # Delete H and HA from expected_hydrogens
+        if "H" in expected_hydrogens:
+            expected_hydrogens.remove("H")
+        if "HA" in expected_hydrogens:
+            expected_hydrogens.remove("HA")
+        assert len(expected_hydrogens) == len(hs)
+        hdict.update({hname: hvalue for hname, hvalue in zip(expected_hydrogens, hs)})
+        return hdict
 
 
 class AtomHolder(dict):
@@ -774,8 +804,16 @@ class AtomHolder(dict):
     def __getattr__(self, name):
         if name in self:
             return self[name]
-        elif self.default:
-            return self.default.copy()
+        elif self.default is not None:
+            return self.default.clone()
+        else:
+            raise AttributeError(f"No attribute named {name}.")
+    
+    def __getitem__(self, name):
+        if name in self:
+            return self.__dict__[name]
+        elif self.default is not None:
+            return self.default.clone()
         else:
             raise AttributeError(f"No attribute named {name}.")
 
@@ -785,6 +823,10 @@ class AtomHolder(dict):
     def __setitem__(self, key, value):
         super(AtomHolder, self).__setitem__(key, value)
         self.__dict__.update({key: value})
+
+    def __update__(self, dictionary):
+        for k, v in dictionary.items():
+            self[k] = v
 
 
 ###########################################

@@ -15,13 +15,12 @@ from typing import Sequence, Tuple
 import sidechainnet as scn
 import os
 import Bio.SeqIO
-import A3MIO
+# import A3MIO
 import pickle
 from tqdm import tqdm
 from Bio import Align
 from Bio.Align import substitution_matrices
 
-from sidechainnet.utils.download import get_pdbid_from_pnid
 from sidechainnet.utils.align import (get_mask_from_alignment,
                                       get_padded_second_seq_from_alignment,
                                       get_padded_first_seq_from_alignment)
@@ -243,10 +242,13 @@ def main(roda_alignment_dir, new_alignment_dir):
     seq_dict = {}
     # default_aligner = get_aligner()
     count = 0
-    for pmin_id in tqdm(scn_minimized.get_pnids(), smoothing=0):
+    for pmin_id in tqdm(scn_minimized.get_pnids(), smoothing=0, dynamic_ncols=True):
         p = d[pmin_id]
-        make_new_alignment_dir(new_alignment_dir, p.id)
+        # make_new_alignment_dir(new_alignment_dir, p.id)
         roda_dirname = get_roda_dirname(roda_alignment_dir, p.id)
+        # Get the last folder from the roda_dirname, which should be pdbid_chid
+        make_new_alignment_dir(new_alignment_dir, os.path.basename(roda_dirname))
+
 
         if roda_dirname is None:
             # If we can't find a corresponding directory, this is likely a CASP target
@@ -261,7 +263,7 @@ def main(roda_alignment_dir, new_alignment_dir):
 
         # Loop through all alignments for this protein
         for alignment_name in glob.glob(os.path.join(roda_dirname, 'a3m', "*.a3m")):
-            output_filename = os.path.join(new_alignment_dir, p.id,
+            output_filename = os.path.join(new_alignment_dir, os.path.basename(roda_dirname),
                                            os.path.basename(alignment_name))
             if os.path.isfile(output_filename):
                 # If we've already processed this alignment, skip it
@@ -282,7 +284,8 @@ def main(roda_alignment_dir, new_alignment_dir):
                 except IndexError:
                     # There is no hhr file for this alignment
                     continue
-                target_hhr_file = os.path.join(new_alignment_dir, p.id,
+                target_hhr_file = os.path.join(new_alignment_dir,
+                                               os.path.basename(roda_dirname),
                                                os.path.basename(source_hhr_file))
                 # Check if file exists; if it does not exist, copy it
                 if os.path.isfile(source_hhr_file) and not os.path.isfile(target_hhr_file):
@@ -325,5 +328,5 @@ def main(roda_alignment_dir, new_alignment_dir):
 
 if __name__ == "__main__":
     roda_dir = "/scr/roda/pdb"
-    new_dir = "/scr/scn_roda"
+    new_dir = "/scr/scn_roda2"
     main(roda_dir, new_dir)

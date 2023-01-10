@@ -7,7 +7,7 @@ import subprocess
 import sidechainnet as scn
 
 # Variables used to run AlphaFold2
-MMCIF_FILES = "/scr/alphafold_data/pdb_mmcif/mmcif_files/"
+MMCIF_FILES = "/scr/alphafold_data/pdb_mmcif/mmcif_files_for_roda/"
 DATA_ROOT = "/scr/alphafold_data"
 JACKHMMER = "/home/jok120/anaconda3/envs/openfold_venv/bin/jackhmmer"
 HHBLITS = "/home/jok120/anaconda3/envs/openfold_venv/bin/hhblits"

@@ -55,7 +55,6 @@ SEED = 1234
 
 class SCNProtein(object):
     """Represent one protein in SidechainNet. Created programmatically by SCNDataset."""
-
     def __init__(self, **kwargs) -> None:
         """Create a SCNProtein from keyword arguments."""
         super().__init__()
@@ -285,9 +284,23 @@ class SCNProtein(object):
         """Build protein coordinates iff no StructureBuilder already exists."""
         raise ValueError("Use fastbuild instead.")
 
-    def add_hydrogens(self, from_angles=False, angles=None, coords=None):
+    def add_hydrogens(self, add_to_heavy_atoms=False):
         """Add hydrogens to the internal protein structure representation."""
-        raise ValueError("Use fastbuild.")
+        if not add_to_heavy_atoms:
+            raise ValueError(
+                "Adding hydrogens without add_to_heavy_atoms==True is not "
+                "supported.\nDo you want to use fastbuild to build all atoms from angles "
+                "instead?")
+        self.hb = sidechainnet.structure.HydrogenBuilder.HydrogenBuilder(
+            self.seq, self.coords.double(), device='cuda')
+        self.hcoords = self.hb.build_hydrogens()
+        self.has_hydrogens = True
+
+    def get_unpadded_coords(self):
+        """Get coordinates without padding and without ATOMS_PER_RES dimension."""
+        unrolled_coords = self.coords.reshape(-1, 3)
+        real_valued_rows = (~torch.isnan(unrolled_coords)).any(dim=-1)
+        return unrolled_coords[real_valued_rows]
 
     ##########################################
     #        OPENMM PRIMARY FUNCTIONS        #
@@ -334,7 +347,7 @@ class SCNProtein(object):
                 if "Particle coordinate is nan" in str(e):
                     # The system exploded when adding atoms. Try a different seed.
                     self._add_missing_via_pdbfixer_and_init_openmm(
-                        seed=SEED+1, add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+                        seed=SEED + 1, add_hydrogens_via_openmm=add_hydrogens_via_openmm)
 
         if not self.openmm_initialized:
             self.initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
@@ -449,9 +462,9 @@ class SCNProtein(object):
             for j, (an, c) in enumerate(zip(atom_names, coords)):
                 # If this atom is a PAD character or non-existent terminal atom, skip
                 # TODO more graciously handle pads for terminal residues
-                if an == "PAD" or (an in ["OXT", "H2", "H3"] and
-                                   np.isnan(c).any()) or (residue_code == 'P' and
-                                                          an == 'H'):
+                if an == "PAD" or (an in ["OXT", "H2", "H3"]
+                                   and np.isnan(c).any()) or (residue_code == 'P'
+                                                              and an == 'H'):
                     hcoord_idx += 1
                     continue
                 # Handle missing atoms
@@ -772,19 +785,20 @@ class SCNProtein(object):
 
     def copy(self):
         """Duplicates the protein. Does not support OpenMM data."""
-        newp = SCNProtein(coordinates=self.coords.copy(),
-                          angles=self.angles.copy(),
-                          sequence=self.seq,
-                          unmodified_seq=self.unmodified_seq,
-                          mask=self.mask,
-                          evolutionary=self.evolutionary,
-                          secondary_structure=self.secondary_structure,
-                          resolution=self.resolution,
-                          is_modified=self.is_modified,
-                          id=self.id,
-                          split=self.split,
-                          add_sos_eos=self.add_sos_eos)
-        newp.hcoords = self.hcoords.copy()
+        newp = SCNProtein(
+            coordinates=self.coords.copy() if self.is_numpy else self.coords.clone(),
+            angles=self.angles.copy() if self.is_numpy else self.coords.clone(),
+            sequence=self.seq,
+            unmodified_seq=self.unmodified_seq,
+            mask=self.mask,
+            evolutionary=self.evolutionary,
+            secondary_structure=self.secondary_structure,
+            resolution=self.resolution,
+            is_modified=self.is_modified,
+            id=self.id,
+            split=self.split,
+            add_sos_eos=self.add_sos_eos)
+        newp.hcoords = self.hcoords.copy() if self.is_numpy else self.coords.clone()
         newp.has_hydrogens = self.has_hydrogens
         return newp
 
