@@ -54,8 +54,14 @@ class OpenMMEnergyH(torch.autograd.Function):
     """A force-field based loss function."""
 
     @staticmethod
-    def forward(ctx, protein, hcoords, force_scaling=1, force_clipping_val=1e6):
+    def forward(ctx, protein, hcoords, force_scaling=None, force_clipping_val=None):
         """Compute potential energy of the protein system and save atomic forces."""
+        # Set reasonable defaults
+        if force_scaling is None:
+            force_scaling = 1
+        if force_clipping_val is None:
+            force_clipping_val = 1e6
+
         # Update protein's hcoords, scaled behind the scenes to match OpenMM's units
         protein.update_hydrogens_for_openmm(hcoords)
 

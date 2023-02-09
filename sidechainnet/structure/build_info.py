@@ -872,8 +872,12 @@ HEAVY_ATOM_MASK_TENSOR = create_heavyatom_mask_tensor()
 if __name__ == "__main__":
     import pprint
     # import json
-    hbp = create_complete_hydrogen_build_info_dict()
-    hbp_str = pprint.pformat(hbp, indent=1, width=90, compact=False)
+    # hbp = create_complete_hydrogen_build_info_dict()
+    # hbp_str = pprint.pformat(hbp, indent=1, width=90, compact=False)
+    from sidechainnet.structure.fastbuild import SC_ALL_ATOM_BUILD_PARAMS
+    torch.set_printoptions(threshold=10000)
+    # TODO Must modify build param
+    hbp_str = pprint.pformat(SC_ALL_ATOM_BUILD_PARAMS, indent=1, width=90, compact=False)
     with open("hbp.py", "w") as f:
         # f.write(json.dumps(hbp, indent=2))
         f.write(hbp_str)
