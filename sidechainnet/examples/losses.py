@@ -151,7 +151,7 @@ def _tile(a, dim, n_tile):
 # Structure Based Losses
 
 
-def lddt_all(true, pred):
+def lddt_all(true, pred, atom_mask=None, residue_shape=None, cutoff=5):
     """Compute lDDT_all between true and predicted coordinate arrays.
 
     See original paper for formulation: https://doi.org/10.1002/prot.23177
@@ -169,6 +169,8 @@ def lddt_all(true, pred):
     nomenclatures, and by choosing the one giving the highest value. Technically, lDDT_all
     score should be computed for all."
 
+    # TODO Should support alternative atom naming/positions.
+
     Args:
         true (array): True atomic coordinates. MUST contain padding/be the shape of
             (NUM_COORDS_PER_RES x L) x 3.
@@ -182,35 +184,43 @@ def lddt_all(true, pred):
     pred_pairwise = pairwise_internal_dist(pred)
 
     def atomic_distances_of_the_same_residue_mask():
+        nonlocal residue_shape
+        if residue_shape is None:
+            residue_shape = NUM_COORDS_PER_RES
         n = len(true)  # number of atoms, must be a multiple of 14 aka heavy atom rep
-        assert n // NUM_COORDS_PER_RES, "The coordinates for lDDT must be padded."
+        assert n // residue_shape, "The coordinates for lDDT must be padded."
         # Make an empty mask matrix for the distance matrix
-        nc = NUM_COORDS_PER_RES
-        btwn_same_res_mask = torch.zeros((n, n), dtype=bool)
+        nc = residue_shape
+        btwn_same_res_mask = torch.zeros((n, n), dtype=bool, device=true.device)
         # Distances between atoms in the same residue can be found in blocks along the
-        # diagonal (every NUM_COORDS_PER_RES positions).
-        for i in range(len(true) // NUM_COORDS_PER_RES):
+        # diagonal (every residue_shape positions).
+        for i in range(len(true) // residue_shape):
             btwn_same_res_mask[i * nc:(i + 1) * nc, i * nc:(i + 1) * nc] = 1
         return btwn_same_res_mask
 
     # In the true structure, make a note of all interactions less than 5A away
-    true_pairwise_lt5_interation_mask = true_pairwise <= 5
+    true_pairwise_lt5_interation_mask = true_pairwise <= cutoff
     # Make a mask of all the atoms that are NOT part of the same residue
     not_the_same_residue_mask = ~atomic_distances_of_the_same_residue_mask()
     # Create a mask that obscures the duplicated distances in an NxN distance matrix
-    triu_mask = torch.ones(*true_pairwise.shape, dtype=torch.bool).triu(diagonal=1)
+    triu_mask = torch.ones(
+        *true_pairwise.shape,
+        dtype=torch.bool,
+        device=true_pairwise.device).triu(diagonal=1)
+    # Make a mask that obscures the distances between non-existant atoms
+    distance_exists_mask = torch.outer(atom_mask, atom_mask)
 
     # Select out the relevant interaction distances
     true_interactions = true_pairwise[triu_mask & true_pairwise_lt5_interation_mask &
-                                      not_the_same_residue_mask]
+                                      not_the_same_residue_mask & distance_exists_mask]
     pred_interactions = pred_pairwise[triu_mask & true_pairwise_lt5_interation_mask &
-                                      not_the_same_residue_mask]
+                                      not_the_same_residue_mask & distance_exists_mask]
 
     # Compare the interactions
     interaction_diff = torch.abs(true_interactions - pred_interactions)
 
     # Check if each interaction was within each threshold (4 x len(interactions))
-    thresholds = torch.tensor([.5, 1, 2, 4])
+    thresholds = torch.tensor([.5, 1, 2, 4], device=interaction_diff.device)
     passed_check = interaction_diff <= thresholds[:, None]
 
     # Compute the fraction passing at each threshold
@@ -222,12 +232,15 @@ def lddt_all(true, pred):
     return lddt_all_score
 
 
-def quasi_lddt_all(true, pred):
+def quasi_lddt_all(true, pred, cutoff=5):
     """Compute quasi-lDDT_all between true and predicted coordinate arrays.
 
     Includes atomic distances between atoms of the same residue. See lddt_all for the
     more complete implementation and documentation. lddt_all excludes distances between
     atoms in the same residue. This function does not require padding.
+
+    Given the same inputs, we expect this value to be just slightly higher than the value
+    of lddt_all, because atoms in the same residue will contribute favorably to the score.
 
     Args:
         true (array): True atomic coordinates. Must NOT contain padding.
@@ -241,9 +254,9 @@ def quasi_lddt_all(true, pred):
     pred_pairwise = pairwise_internal_dist(pred)
 
     # In the true structure, make a note of all interactions less than 5A away
-    true_pairwise_lt5_interation_mask = true_pairwise <= 5
+    true_pairwise_lt5_interation_mask = true_pairwise <= cutoff
     # Create a mask that obscures the duplicated distances in an NxN distance matrix
-    triu_mask = torch.ones(*true_pairwise.shape, dtype=torch.bool).triu(diagonal=1)
+    triu_mask = torch.ones(*true_pairwise.shape, dtype=torch.bool, device=true.device).triu(diagonal=1)
 
     # Select out the relevant interaction distances
     true_interactions = true_pairwise[triu_mask & true_pairwise_lt5_interation_mask]
@@ -253,7 +266,7 @@ def quasi_lddt_all(true, pred):
     interaction_diff = torch.abs(true_interactions - pred_interactions)
 
     # Check if each interaction was within each threshold (4 x len(interactions))
-    thresholds = torch.tensor([.5, 1, 2, 4])
+    thresholds = torch.tensor([.5, 1, 2, 4], device=true.device)
     passed_check = interaction_diff <= thresholds[:, None]
 
     # Compute the fraction passing at each threshold
@@ -277,10 +290,10 @@ def gdt_ts(true, pred):
     Returns:
         gdt_ts: Value of GDT_TS.
     """
-    pass
+    raise NotImplementedError()
 
 
-def gdc_all(true, pred, k=10):
+def gdc_all(true, pred, k=10, as_percent=True, skip_alignment=False):
     """Compute GDC_ALL between true and predicted coordinate arrays.
 
     According to the CASP definition:
@@ -306,8 +319,9 @@ def gdc_all(true, pred, k=10):
     Returns:
         gdc_all: Value of GDC_ALL.
     """
-    t = pr.calcTransformation(pred, true)
-    pred = t.apply(pred)
+    if not skip_alignment:
+        t = pr.calcTransformation(pred, true)
+        pred = t.apply(pred)
 
     thresholds = np.arange(1, k + 1) * 0.5
     distances = np.linalg.norm(true - pred, axis=1)
@@ -322,10 +336,13 @@ def gdc_all(true, pred, k=10):
     gdc_all = (np.arange(1, k + 1)[::-1] * gdc_p).sum()
     gdc_all = 2 * 100 * gdc_all / ((k + 1) * k)
 
+    if not as_percent:
+        gdc_all /= 100
+
     return gdc_all
 
 
-def tm_score(true, pred):
+def tm_score(true, pred, skip_alignment=False):
     """Compute TM Score between true and predicted coordinate arrays.
 
     See original paper for formulation: https://zhanggroup.org/TM-score/TM-score.pdf,
@@ -338,8 +355,9 @@ def tm_score(true, pred):
     Returns:
         tm_score: Value of TM Score.
     """
-    t = pr.calcTransformation(pred, true)
-    pred = t.apply(pred)
+    if not skip_alignment:
+        t = pr.calcTransformation(pred, true)
+        pred = t.apply(pred)
     distances = np.linalg.norm(true - pred, axis=1)
 
     L = len(true)

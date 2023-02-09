@@ -604,6 +604,8 @@ def get_pdbid_from_pnid(pnid, return_chain=False, include_is_astral=False):
     """
     chid = None
     is_astral = False
+    if pnid.startswith("TBM#") or pnid.startswith("FM#") or pnid.startswith("TBM-hard#"):
+        raise ValueError("TBM and FM (test set) entries are not supported.")
     # Try parsing the ID as a PDB ID. If it fails, assume it's an ASTRAL ID.
     try:
         pdbid, chnum, chid = pnid.split("_")

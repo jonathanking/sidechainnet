@@ -13,7 +13,7 @@ from sidechainnet.structure.build_info import BB_BUILD_INFO, SC_HBUILD_INFO
 from sidechainnet.structure.fastbuild import get_all_atom_build_params
 from sidechainnet.utils.openmm_loss import OpenMMEnergyH
 from sidechainnet.dataloaders.SCNProtein import OPENMM_FORCEFIELDS, SCNProtein
-from sidechainnet.tests.test_fastbuild import alphabet_protein
+from sidechainnet.examples import alphabet_protein
 
 
 class BuildParamOptimizer(object):
