@@ -8,19 +8,24 @@ from openfold.np.protein import Protein
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 from sidechainnet.structure.build_info import ATOM_MAP_HEAVY, NUM_COORDS_PER_RES
 from sidechainnet.utils.openmm_loss import OpenMMEnergyH, OpenMMEnergy
+from openfold.utils.feats import atom37_to_atom14
 
 import openfold
-from openfold.utils.feats import atom37_to_atom14
 
 _weight = argparse.Namespace()
 _weight.weight = 1.0
-openmm_config = {"force_scaling": 1/100, "force_clipping_val": 1e6, "weight": 1.0}
 
 
 def openmm_loss(
         model_output: Dict,  # Complete model output
         model_input: Dict,  # Complete model input
-        config: Dict,  # Config dict
+        force_scaling=None,
+        force_clipping_val=None,
+        scale_by_length=False,
+        squash=False,
+        squash_factor=100.0,
+        modified_sigmoid=False,
+        modified_sigmoid_params=(1,1,1,1),
 ) -> torch.Tensor:
     """Return a loss value based on the OpenMM energies of the predicted structures.
     
@@ -55,12 +60,21 @@ def openmm_loss(
         if "X" in protein.seq:
             # Skip proteins with unknown residues, they cannot have their energy computed
             continue
-        total_energy += loss.apply(protein,
-                             protein.hcoords,
-                             config['force_scaling'] / len(protein),
-                             config['force_clipping_val'])
+        protein_energy = loss.apply(protein,
+                                    protein.hcoords,
+                                    force_scaling,
+                                    force_clipping_val)
+        if scale_by_length:
+            protein_energy /= len(protein)
+        if squash and protein_energy > 0:
+            protein_energy = protein_energy * (squash_factor/(squash_factor+protein_energy))
+        elif modified_sigmoid:
+            a, b, c, d = modified_sigmoid_params
+            protein_energy = (1/a + torch.exp(-(d*protein_energy+b)/c))**(-1) - (a-1)
 
-    return total_energy * config['force_scaling'] / max(len(scn_proteins), 1), scn_proteins_no_hy, scn_proteins_gt
+        total_energy += protein_energy
+
+    return total_energy, scn_proteins_no_hy, scn_proteins_gt
 
 
 def iterate_over_model_input_output(model_input, model_output, ground_truth=False):
@@ -74,14 +88,12 @@ def iterate_over_model_input_output(model_input, model_output, ground_truth=Fals
         protein (SCNProtein): SidechainNet protein created from model input/output.
     """
     batch_size = model_input["aatype"].shape[0]
-    # batch_coords14a = atom37_to_atom14(model_output["final_atom_positions"],
-    #                                   model_input,
-    #                                   no_batch_dims=2)
+
     if ground_truth:
         batch_coords14 = model_input["all_atom_positions"]
+        batch_coords14 = atom37_to_atom14(batch_coords14, model_input, no_batch_dims=2)
     else:
-        batch_coords14 = model_output["sm"]["positions"][-1]
-        
+        batch_coords14 = model_output["sm"]["positions"][-1]  
 
     for i in range(batch_size):
         # Create sequence variable from model input
@@ -95,14 +107,14 @@ def iterate_over_model_input_output(model_input, model_output, ground_truth=Fals
         # seq_mask = seq_mask[:seq_length]
         # seq_mask = convert_openfold_seq_mask_to_str_seq_mask(seq_mask)
         # Because we are using a prediction that has no missing pieces, the mask should be all +
-        seq_mask = "+" * len(seq)
+        seq_mask = "".join(["+" if char == 1 else "-" for char in model_input["seq_mask"][i, :seq_length]])
 
         # Create atom14 variable from model output
         coords14 = batch_coords14[i]
         coords14 = coords14[:seq_length]
         coords15 = convert_openfold_atom14_to_scn_atom15(coords14, seq)
 
-        protein = SCNProtein(coordinates=coords15, sequence=seq, mask=seq_mask)
+        protein = SCNProtein(coordinates=coords15, sequence=seq, mask=seq_mask, id=model_input['name'][i])
 
         if "X" in protein.seq:
             # Skip proteins with unknown residues, they cannot have their energy computed

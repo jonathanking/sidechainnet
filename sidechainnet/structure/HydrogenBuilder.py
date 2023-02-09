@@ -8,11 +8,42 @@ from sidechainnet.structure.build_info import ATOM_MAP_H, BB_BUILD_INFO, NUM_COO
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
+from sidechainnet.structure.fastbuild import AA2NUM, SC_ALL_ATOM_BUILD_PARAMS
 
 # ARG has 24 atoms including Hs (see amino12.lib)  + 2 terminal H + 1 terminal OXT
 # 3 of these are backbone heavy atom (N, CA, C), 1 is bb Oxygen, 1 is N-H
 # 27 (total incl 3 term) - 3 term - 5 bb (N, CA, C, O, NH) = 19 sc atoms extending from CA
 # NUM_COORDS_PER_RES_W_HYDROGENS = 27
+
+
+# NOTE: The below function and value aquisition are unverified and likely incorrect.
+# NOTE: Only kept in case this direction is pursued in the future.
+# def _get_val_from_buildparams(key, residuecode, atomname, rootatom="CA", as_tensor=True):
+#     aanum = AA2NUM[residuecode]
+#     atombuildidx = SC_ALL_ATOM_BUILD_PARAMS[rootatom]["names"][aanum].index(atomname)
+#     value = SC_ALL_ATOM_BUILD_PARAMS[rootatom][key][aanum, atombuildidx]
+#     # Add the offest if it exists
+#     with torch.no_grad():
+#         value += SC_ALL_ATOM_BUILD_PARAMS[rootatom]["offsets"][aanum, atombuildidx]
+#     if as_tensor and not torch.is_tensor(value):
+#         value = torch.tensor(value)
+#     return value
+
+
+# METHYL_ANGLE = _get_val_from_buildparams("chis", "A", "HB1")
+# METHYL_LEN = _get_val_from_buildparams("bond_lengths", "A", "HB1")
+# METHYLENE_ANGLE = _get_val_from_buildparams("chis", "R", "HB2")
+# METHYLENE_LEN = _get_val_from_buildparams("bond_lengths", "R", "HB2")
+# SP3_LEN = _get_val_from_buildparams("bond_lengths", "I", "HB")
+# THIOL_ANGLE = _get_val_from_buildparams("chis", "C", "HG")
+# THIOL_LEN = _get_val_from_buildparams("bond_lengths", "C", "HG")
+# HYDROXYL_LEN = _get_val_from_buildparams("bond_lengths", "S", "HG")
+# AMIDE_LEN = _get_val_from_buildparams("bond_lengths", "R", "HE")
+# METHINE_LEN = _get_val_from_buildparams("bond_lengths", "H", "HE1")
+# AMINE_ANGLE = _get_val_from_buildparams("chis", "R", "HH11") 
+# AMINE_LEN = _get_val_from_buildparams("bond_lengths", "R", "HH11")
+# OXT_LEN = torch.tensor(BB_BUILD_INFO['BONDLENS']['c-oh'])
+
 
 METHYL_ANGLE = torch.tensor(np.deg2rad(109.5))
 METHYL_LEN = torch.tensor(1.09)
@@ -949,3 +980,10 @@ def _get_amide_methine_hydrogen_help(R1, center, R2, length, is_numpy):
         return _scale_np(-R1 - R2 + 2 * center, length) + center
     else:
         return _scale(-R1 - R2 + 2 * center, length) + center
+
+
+def main():
+    buildparams = SC_ALL_ATOM_BUILD_PARAMS
+
+if __name__ == "__main__":
+    main()
