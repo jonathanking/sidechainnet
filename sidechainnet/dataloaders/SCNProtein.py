@@ -245,6 +245,29 @@ class SCNProtein(object):
                                                         has_hydrogens=self.has_hydrogens)
         return self.sb.to_png(path)
 
+    def rmsd_to(self, other_scnprotein):
+        """Compute RMSD between two sequence-identical SCNProteins."""
+        assert self.seq == other_scnprotein.seq, "Proteins must have identical sequences."
+        unrolled_coords_a = self.coords.reshape(-1, 3)
+        real_valued_rows_a = (~torch.isnan(unrolled_coords_a)).any(dim=-1)
+        unrolled_coords_b = other_scnprotein.coords.reshape(-1, 3)
+        real_valued_rows_b = (~torch.isnan(unrolled_coords_b)).any(dim=-1)
+        a = unrolled_coords_a[real_valued_rows_a & real_valued_rows_b]
+        b = unrolled_coords_b[real_valued_rows_a & real_valued_rows_b]
+
+        if torch.is_tensor(a):
+            a = a.numpy()
+        if torch.is_tensor(b):
+            b = b.numpy()
+
+        t = prody.calcTransformation(a, b)
+        return prody.calcRMSD(t.apply(a), b)
+
+    @property
+    def unpadded_coords(self):
+        """Return unmasked coordinates."""
+        return self.get_unpadded_coords()
+
     @property
     def num_missing(self):
         """Return number of missing residues."""
