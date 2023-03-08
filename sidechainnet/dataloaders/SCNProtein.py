@@ -19,6 +19,7 @@ Other features:
     * write PDB files for proteins with SCNProtein.to_PDB()
 """
 import pickle
+import random
 import warnings
 
 import numpy as np
@@ -47,8 +48,7 @@ from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.download import MAX_SEQ_LEN
 from sidechainnet.utils.sequence import (ONE_TO_THREE_LETTER_MAP, VOCAB, DSSPVocabulary)
 import simtk.unit as unit
-
-OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
+OPENMM_FORCEFIELDS = ['amber14/protein.ff15ipq.xml', 'implicit/gbn.xml']
 OPENMM_PLATFORM = "CPU"  # CUDA"  # CUDA or CPU
 SEED = 1234
 
@@ -245,21 +245,37 @@ class SCNProtein(object):
                                                         has_hydrogens=self.has_hydrogens)
         return self.sb.to_png(path)
 
-    def rmsd_to(self, other_scnprotein):
-        """Compute RMSD between two sequence-identical SCNProteins."""
+    def rmsd(self, other_scnprotein):
+        """Compute all-atom RMSD between two sequence-identical SCNProteins."""
         assert self.seq == other_scnprotein.seq, "Proteins must have identical sequences."
         unrolled_coords_a = self.coords.reshape(-1, 3)
-        real_valued_rows_a = (~torch.isnan(unrolled_coords_a)).any(dim=-1)
         unrolled_coords_b = other_scnprotein.coords.reshape(-1, 3)
-        real_valued_rows_b = (~torch.isnan(unrolled_coords_b)).any(dim=-1)
+        if torch.is_tensor(unrolled_coords_a):
+            unrolled_coords_a = unrolled_coords_a.cpu().detach().numpy()
+        if torch.is_tensor(unrolled_coords_b):
+            unrolled_coords_b = unrolled_coords_b.cpu().detach().numpy()
+        real_valued_rows_a = (~np.isnan(unrolled_coords_a)).any(axis=-1)
+        real_valued_rows_b = (~np.isnan(unrolled_coords_b)).any(axis=-1)
         a = unrolled_coords_a[real_valued_rows_a & real_valued_rows_b]
         b = unrolled_coords_b[real_valued_rows_a & real_valued_rows_b]
-
-        if torch.is_tensor(a):
-            a = a.numpy()
-        if torch.is_tensor(b):
-            b = b.numpy()
-
+        t = prody.calcTransformation(a, b)
+        return prody.calcRMSD(t.apply(a), b)
+    
+    def get_ca_coords(self):
+        """Return a numpy array of the C-alpha coordinates."""
+        if torch.is_tensor(self.coords):
+            return self.coords[:, 1, :].cpu().detach().numpy()
+        else:
+            return self.coords[:, 1, :]
+    
+    def rmsd_ca(self, other_scnprotein):
+        """Compute C-alpha RMSD between two sequence-identical SCNProteins."""
+        ca1 = self.get_ca_coords()
+        ca2 = other_scnprotein.get_ca_coords()
+        real_valued_rows_a = (~np.isnan(ca1)).all(axis=-1)
+        real_valued_rows_b = (~np.isnan(ca2)).all(axis=-1)
+        a = ca1[real_valued_rows_a & real_valued_rows_b]
+        b = ca2[real_valued_rows_a & real_valued_rows_b]
         t = prody.calcTransformation(a, b)
         return prody.calcRMSD(t.apply(a), b)
 
@@ -314,10 +330,15 @@ class SCNProtein(object):
                 "Adding hydrogens without add_to_heavy_atoms==True is not "
                 "supported.\nDo you want to use fastbuild to build all atoms from angles "
                 "instead?")
+        starting_is_numpy = self.is_numpy
+        self.torch()
+        self.cuda()
         self.hb = sidechainnet.structure.HydrogenBuilder.HydrogenBuilder(
-            self.seq, self.coords.double(), device='cuda')
+            self.seq, self.coords.double(), device=self.device)
         self.hcoords = self.hb.build_hydrogens()
         self.has_hydrogens = True
+        if starting_is_numpy:
+            self.numpy()
 
     def get_unpadded_coords(self):
         """Get coordinates without padding and without ATOMS_PER_RES dimension."""
@@ -524,7 +545,11 @@ class SCNProtein(object):
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*self.openmm_forcefields)
         if add_hydrogens_via_openmm:
-            self.modeller.addHydrogens(forcefield=self.forcefield, seed=SEED)
+            random.seed(SEED)
+            self.modeller.addHydrogens(forcefield=self.forcefield)
+            self.has_hydrogens = True
+        if not self.has_hydrogens:
+            self.add_hydrogens(add_to_heavy_atoms=True)
         self.system = self.forcefield.createSystem(self.modeller.topology,
                                                    nonbondedMethod=openmm.app.NoCutoff,
                                                    nonbondedCutoff=1 * nanometer,
@@ -548,7 +573,7 @@ class SCNProtein(object):
         self.openmm_initialized = True
         self.simulation.context.setPositions(self.positions)
 
-    def get_hydrogen_coord_mask(self):
+    def get_hydrogen_coord_mask(self, zeros_instead_of_nans=False):
         """Return a torch tensor with nans representing pad characters in self.hcoords."""
         if self._hcoord_mask is not None:
             return self._hcoord_mask
@@ -568,6 +593,9 @@ class SCNProtein(object):
                     # Proline does not have H
                     self._hcoord_mask[i, 5, :] = torch.nan
                 self._hcoord_mask[i, pad_chars, :] = torch.nan
+            if zeros_instead_of_nans:
+                self._hcoord_mask[torch.isnan(self._hcoord_mask)] = 0
+            self._hcoord_mask = self._hcoord_mask.type(torch.bool)
             return self._hcoord_mask
 
     ##########################################
@@ -579,26 +607,28 @@ class SCNProtein(object):
         from pdbfixer import PDBFixer
         self.pdbfixer = PDBFixer(topology=self.topology,
                                  positions=self.positions,
-                                 sequence=self.openmm_seq,
-                                 use_topology=True)
+                                 sequence=self.openmm_seq)
         return self.pdbfixer
 
     def run_pdbfixer(self):
         """Add missing atoms to protein's PDBFixer representation."""
         self.pdbfixer.findMissingResidues()
         self.pdbfixer.findMissingAtoms()
-        print("Missing atoms", self.pdbfixer.missingAtoms)
-        # self.pdbfixer.findNonstandardResidues()
-        # self.pdbfixer.addMissingAtoms()
-        # self.pdbfixer.addMissingHydrogens(7.0)
+        # print("Missing atoms", self.pdbfixer.missingAtoms)
+        self.pdbfixer.findNonstandardResidues()
+        self.pdbfixer.addMissingAtoms()
+        self.pdbfixer.addMissingHydrogens(7.0)
 
-    def minimize(self, nonbonded_interactions=True):
+    def minimize(self, nonbonded_interactions=True, add_hydrogens_via_openmm=False):
         """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
+        assert self.has_hydrogens, "You must add hydrogens before minimizing. (self.fastbuild, self.add_hydrogens)"
         cutoff_method = openmm.app.NoCutoff if nonbonded_interactions else openmm.app.CutoffNonPeriodic
         cutoff_dist = 1 * nanometer if nonbonded_interactions else 1e-5 * nanometer
         constraints = HBonds if nonbonded_interactions else None
         if not hasattr(self, "topology") or self.topology is None:
-            self.initialize_openmm()
+            self.initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+        if not self.has_hydrogens:
+            self.add_hydrogens(add_to_heavy_atoms=True)
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*self.openmm_forcefields)
         self.system = self.forcefield.createSystem(self.modeller.topology,
@@ -626,7 +656,21 @@ class SCNProtein(object):
                                                       getForces=True)
         self.ending_energy = self.state.getPotentialEnergy()
         self.ending_positions = np.asarray(self.state.getPositions(asNumpy=True))
+        self.update_hcoords_from_openmm_positions(self.ending_positions)
         return self.ending_energy - self.starting_energy
+    
+    def update_hcoords_from_openmm_positions(self, openmm_positions):
+        """Update self.hcoords from OpenMM positions."""
+        self.has_hydrogens = True
+        # create a tensor filled with nans of the correct shape
+        self.hcoords = torch.full_like(self.hcoords, float("nan"))
+        # fill in the positions
+        # self.hcoords[self.get_hydrogen_coord_mask(zeros_instead_of_nans=True)] = torch.from_numpy(openmm_positions)
+        self.hcoords
+        self.positions[self.hcoord_to_pos_map_values] = hcoords.reshape(
+            -1, 3)[self.hcoord_to_pos_map_keys]
+        self.coords = self.hcoords
+
 
     def write_ending_positions_to_pdbfile(self, filename):
         with open(filename, 'w') as f:
@@ -722,9 +766,9 @@ class SCNProtein(object):
             self.hcoords = self.hcoords.cuda()
         else:
             self.hcoords = torch.tensor(self.hcoords, device='cuda')
-        if isinstance(self.angles, torch.Tensor):
+        if self.angles is not None and isinstance(self.angles, torch.Tensor):
             self.angles = self.angles.cuda()
-        else:
+        elif self.angles is not None:
             self.angles = torch.tensor(self.angles, device='cuda')
         self.device = 'cuda'
         self.is_numpy = False
@@ -758,11 +802,11 @@ class SCNProtein(object):
 
     def torch(self):
         """Change coords, hcoords, and angles to torch.tensor objects."""
-        if not torch.is_tensor(self.coords):
+        if not torch.is_tensor(self.coords) and self.coords is not None:
             self.coords = torch.tensor(self.coords)
-        if not torch.is_tensor(self.hcoords):
+        if not torch.is_tensor(self.hcoords) and self.hcoords is not None:
             self.hcoords = torch.tensor(self.hcoords)
-        if not torch.is_tensor(self.angles):
+        if not torch.is_tensor(self.angles) and self.angles is not None:
             self.angles = torch.tensor(self.angles)
         self.is_numpy = False
 

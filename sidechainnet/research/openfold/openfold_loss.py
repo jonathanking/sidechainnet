@@ -55,7 +55,7 @@ def openmm_loss(
     loss = OpenMMEnergyH()
 
     # Now, compute the energy of each protein
-    total_energy = torch.tensor(0.0)
+    total_energy = torch.tensor(0.0, device=model_output["final_atom_positions"].device)
     for protein in scn_proteins:
         if "X" in protein.seq:
             # Skip proteins with unknown residues, they cannot have their energy computed

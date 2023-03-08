@@ -1,3 +1,5 @@
+"""Minimize a SidechainNet dataset by splitting, minimizing, and combining in 3 phases."""
+import argparse
 import copy
 import datetime
 from glob import glob
@@ -9,6 +11,7 @@ import traceback
 from tqdm import tqdm
 from datetime import timedelta
 import time
+import random
 
 import sidechainnet as scn
 from sidechainnet.dataloaders.SCNDataset import SCNDataset
@@ -40,6 +43,7 @@ def do_pickle(protein):
 
 def process_index(index, unmin_path, min_path):
     """Minimize a single protein by its index in the sorted list of files."""
+    random.seed(0)
     start_time = time.time()
     parent, _ = os.path.split(min_path)
     os.makedirs(os.path.join(parent, "failed"), exist_ok=True)
@@ -73,8 +77,22 @@ def process_index(index, unmin_path, min_path):
 
 def process_protein_obj(protein, output_path=None):
     """Minimize a single protein object with LBFGS."""
+    start_time = time.time()
     m = SCNMinimizer()
-    m.minimize_scnprotein(protein, use_sgd=False, verbose=True, path=output_path)
+    original_protein = protein.copy()
+    m.minimize_scnprotein(protein,
+                          optimizer="sgd",
+                          starting_lr=1,
+                          max_iter=20,
+                          max_eval=30,
+                          epochs=10_000,
+                          lr_decay=True,
+                          patience=7,
+                          record_structure_every_n=None,
+                          path=output_path)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"{protein.id},RMSD_CA,{protein.rmsd_ca(original_protein)},{elapsed_time}")
 
 
 def get_filename_from_index_path(index, path):
@@ -118,10 +136,36 @@ def cleanup(min_path):
 
 
 if __name__ == "__main__":
-    _, step, datapath, unmin_path, min_path, index = sys.argv
-    if step == "setup":
-        setup(datapath, unmin_path)
-    elif step == "process_index":
-        process_index(int(index), unmin_path, min_path)
-    elif step == "cleanup":
-        cleanup(min_path)
+    # Use argparse to parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--step",
+                        type=str,
+                        help="setup, process_index, or cleanup",
+                        required=True)
+    parser.add_argument("--datapath",
+                        type=str,
+                        help="Path to raw SidechainNet data.",
+                        required=True)
+    parser.add_argument("--unmin_path",
+                        type=str,
+                        help="Path to save unminimized proteins.",
+                        required=True)
+    parser.add_argument("--min_path",
+                        type=str,
+                        help="Path to save minimized data.",
+                        required=True)
+    parser.add_argument("--index",
+                        type=int,
+                        help="Index of protein to minimize.",
+                        required=True)
+    args = parser.parse_args()
+
+    if args.step == "setup":
+        setup(args.datapath, args.unmin_path)
+    elif args.step == "process_index":
+        process_index(args.index, args.unmin_path, args.min_path)
+    elif args.step == "cleanup":
+        cleanup(args.min_path)
+    else:
+        print("Invalid step. Please use setup, process_index, or cleanup.")
+        exit(1)

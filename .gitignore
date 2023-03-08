@@ -141,3 +141,6 @@ sidechainnet/research/reconfigure_alignments/**/*.txt
 sidechainnet/research/reconfigure_alignments/**/*.pkl
 sidechainnet/research/evaluate_energy/**/*.csv
 seq_dict.pkl
+sidechainnet/research/analysis/minimization/**/*.png
+sidechainnet/research/analysis/minimization/**/*.pkl
+sidechainnet/research/analysis/minimization/**/*.pdb

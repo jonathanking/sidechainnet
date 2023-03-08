@@ -317,7 +317,7 @@ class StructureBuilder(object):
                 other_protein_copy.coords = other_protein_copy.hcoords
             # Add viz to model
             other_protein_copy.sb = None
-            view.addModel(other_protein_copy.to_pdbstr())
+            view.addModel(other_protein_copy.to_pdbstr(), 'pdb', {'keepH': True})
 
         # Set visualization style
         if not style:
@@ -325,26 +325,22 @@ class StructureBuilder(object):
         if other_protein is None:
             view.setStyle(style)
         elif other_protein is not None:
-            style1 = {
-                # 'cartoon': {
-                #     'color': '#599BFB'
-                # },
+            style0 = {
                 'stick': {
-                    'radius': .07,
+                    'radius': .13,
                     'color': '#599BFB'  # Blue
-                }
+                },
+                'cartoon': {'color': '#599BFB'}
             }
-            style2 = {
-                # 'cartoon': {
-                #     'color': '#FB5960'
-                # },
+            style1 = {
                 'stick': {
-                    'radius': .15,
+                    'radius': .065,
                     'color': '#FB5960'  # Red, other
-                }
+                },
+                'cartoon': {'color': '#FB5960'}
             }
-            view.setStyle({"model": 0}, style1)
-            view.setStyle({"model": 1}, style2)
+            view.setStyle({"model": 0}, style0)
+            view.setStyle({"model": 1}, style1)
 
         view.zoomTo()
         return view
