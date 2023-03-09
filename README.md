@@ -3,7 +3,7 @@ SidechainNet
 [//]: # (Badges)
 [![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
 
-**[Colab Walkthrough](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing), [arXiv](https://arxiv.org/abs/2010.08162)**
+**[Colab Walkthrough](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing), [Paper](https://doi.org/10.1002/prot.26169)**
 
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
@@ -279,7 +279,26 @@ Computational Biology Skills Seminar, U.C. Berkeley, May 13, 2021
 * [Notebook](https://colab.research.google.com/drive/1J5pUnPuANM6cPXaR2eVNLI6c5wfZgr3X#scrollTo=4tBXWlrt-IWD)
 * [Recording](https://youtu.be/1gZAYO7hl80)
 
+## Citation
+Please cite our paper if you find SidechainNet useful in your work.
+```
+@article{https://doi.org/10.1002/prot.26169,
+	author = {King, Jonathan Edward and Koes, David Ryan},
+	title = {SidechainNet: An all-atom protein structure dataset for machine learning},
+	journal = {Proteins: Structure, Function, and Bioinformatics},
+	volume = {89},
+	number = {11},
+	pages = {1489-1496},
+	keywords = {dataset, deep learning, machine learning, protein structure, proteins, software},
+	doi = {https://doi.org/10.1002/prot.26169},
+	url = {https://onlinelibrary.wiley.com/doi/abs/10.1002/prot.26169},
+	eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/prot.26169},
+	abstract = {Abstract Despite recent advancements in deep learning methods for protein structure prediction and representation, little focus has been directed at the simultaneous inclusion and prediction of protein backbone and sidechain structure information. We present SidechainNet, a new dataset that directly extends the ProteinNet dataset. SidechainNet includes angle and atomic coordinate information capable of describing all heavy atoms of each protein structure and can be extended by users to include new protein structures as they are released. In this article, we provide background information on the availability of protein structure data and the significance of ProteinNet. Thereafter, we argue for the potentially beneficial inclusion of sidechain information through SidechainNet, describe the process by which we organize SidechainNet, and provide a software package (https://github.com/jonathanking/sidechainnet) for data manipulation and training with machine learning models.},
+	year = {2021}
+}
+```
+
 
 ## Copyright
 
-Copyright (c) 2021, Jonathan King
+Copyright (c) 2023, Jonathan King
