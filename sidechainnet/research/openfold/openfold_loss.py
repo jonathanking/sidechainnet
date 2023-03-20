@@ -3,6 +3,7 @@
 import argparse
 import torch
 from typing import Dict, List
+import numpy as np
 
 from openfold.np.protein import Protein
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
@@ -189,6 +190,27 @@ def get_openfold_to_sidechainnet_mapping():
     
 
     return openfold_idx_to_scn_idx
+
+
+class OpenMMLR:
+    """Learning rate schedule that starts at 1e-4 and increases to 1 over 1000 steps"""
+    def __init__(self, start=1e-4, end=1, steps=1000):
+        self.lr = np.linspace(start, end, steps)
+        self.steps = steps
+        self.cur_step = 0
+    def step(self):
+        self.cur_step += 1
+    def get_lr(self, step=None):
+        if step is None:
+            step = self.cur_step
+        if self.cur_step >= self.steps:
+            return self.lr[-1]
+        else:
+            return self.lr[self.cur_step]
+    def get_lr_and_step(self):
+        val = self.get_lr()
+        self.step()
+        return val
 
 
 OPENFOLD_TO_SCN_MAP = get_openfold_to_sidechainnet_mapping()
