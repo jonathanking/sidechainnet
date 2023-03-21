@@ -198,8 +198,11 @@ class OpenMMLR:
         self.lr = np.linspace(start, end, steps)
         self.steps = steps
         self.cur_step = 0
-    def step(self):
-        self.cur_step += 1
+    def step(self, new_step=None):
+        if new_step is not None:
+            self.cur_step = new_step
+        else:
+            self.cur_step += 1
     def get_lr(self, step=None):
         if step is None:
             step = self.cur_step
