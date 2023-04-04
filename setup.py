@@ -20,7 +20,7 @@ setup(
     description=short_description[0],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version=versioneer.get_version(),
+    version=0.3,
     cmdclass=versioneer.get_cmdclass(),
     license='BSD-3-Clause',
 
@@ -45,7 +45,7 @@ setup(
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     url='https://github.com/jonathanking/sidechainnet',  # Website
     install_requires=[
-        'ProDy>=2.0', 'numpy', 'scipy', 'biopython', 'tqdm', 'py3Dmol',
+        'ProDy>=2.0', 'numpy', 'scipy', 'biopython<=1.79', 'tqdm', 'py3Dmol',
         'requests', 'setuptools', 'pandas', 'numba', 'wandb', 'pytorch_lightning'
     ],  # Required packages, pulls from pip if needed; do not use for Conda deployment
     tests_require=['pytest'],
