@@ -411,7 +411,7 @@ def filter_dictionary_by_missing_residues(raw_data):
 BOXURLS = {
     # CASP 12
     "sidechainnet_casp12_30.pkl":
-        "https://pitt.box.com/shared/static/hbatd2a750tx8e27yizwinc3hsceeeui.pkl",
+        "https://bits.csb.pitt.edu/~jok120/_dev/scn220502/sidechainnet_casp12_30.pkl",
     "sidechainnet_casp12_50.pkl":
         "https://pitt.box.com/shared/static/7cng5zdi2s4doruh1m512d281w2cmk0z.pkl",
     "sidechainnet_casp12_70.pkl":
@@ -421,7 +421,7 @@ BOXURLS = {
     "sidechainnet_casp12_95.pkl":
         "https://pitt.box.com/shared/static/wcz1kex8idnpy8zx7a59r3h6e216tlq1.pkl",
     "sidechainnet_casp12_100.pkl":
-        "https://pitt.box.com/shared/static/ey5xh6l4p8iwzrxtxwpxt7oeg70eayl4.pkl",
+        "https://bits.csb.pitt.edu/~jok120/_dev/scn220502/sidechainnet_casp12_100.pkl",
 
     # CASP 11
     "sidechainnet_casp11_30.pkl":
