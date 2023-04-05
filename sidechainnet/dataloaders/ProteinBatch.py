@@ -44,7 +44,7 @@ class ProteinBatch(object):
     
     @property
     def seqs_str(self):
-        reurn [p.seq for p in self]
+        return [p.seq for p in self]
 
     @property
     def seqs_onehot(self):
