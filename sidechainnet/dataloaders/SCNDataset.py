@@ -41,7 +41,7 @@ class SCNDataset(torch.utils.data.Dataset):
         self.splits = []
         for split_label in ['train', 'valid', 'test']:
             for existing_data_label in data.keys():
-                if split_label in existing_data_label:
+                if existing_data_label is not None and split_label in existing_data_label:
                     self.splits.append(existing_data_label)
 
         # If only a single split was provided, prepare the data for protein construction

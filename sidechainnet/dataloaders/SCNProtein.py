@@ -143,6 +143,49 @@ class SCNProtein(object):
             scndata['resolution'] = get_resolution_from_pdbid(pdbid)
         return cls(**scndata)
 
+    @classmethod
+    def from_cif(cls, filename, chid=None, pdbid="", include_resolution=False, return_sequences=False):
+        """Create a SCNProtein from a mmCIF file. Warning: does not support gaps.
+
+        Args:
+            filename (str): Path to existing PDB file.
+            pdbid (str): 4-letter string representing the PDB Identifier.
+            include_resolution (bool, default=False): If True, query the PDB for the protein
+                structure resolution based off of the given pdb_id.
+
+        Returns:
+            A SCNProtein object containing the coorinates, angles, and sequence parsed
+            from the PDB file.
+        """
+        # TODO: Raise an alarm if the user is working with files that have gaps
+        # First, use Prody to parse the PDB file
+        # header = None
+        chain, header = prody.parseMMCIF(filename, chain=chid, header=True)
+        # chain = prody.parseMMCIF(filename, chain=chid, header=False)
+        # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
+        (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
+         is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain,
+                                                                  replace_nonstd=True)
+        if not return_sequences and len(observed_sequence) < len(header[chid].sequence):
+            raise ValueError("The observed sequence is shorter than the sequence in the "
+                             "header. There are likely gaps in the sequence, and this is unsupported.")
+        scndata = {
+            "coordinates": coords_np.reshape(len(observed_sequence), -1, 3),
+            "angles": dihedrals_np,
+            "sequence": observed_sequence,
+            "unmodified_seq": unmodified_sequence,
+            "mask": "+" * len(observed_sequence),
+            "is_modified": is_nonstd,
+            "id": pdbid,
+        }
+        # If requested, look up the resolution of the given PDB ID
+        if include_resolution:
+            assert pdbid, "You must provide a PDB ID to look up the resolution."
+            scndata['resolution'] = get_resolution_from_pdbid(pdbid)
+        if header is not None and return_sequences:
+            return cls(**scndata), observed_sequence, header[chid].sequence
+        return cls(**scndata)
+
     @property
     def sequence(self):
         """Return the protein's sequence in 1-letter amino acid codes."""
@@ -366,9 +409,8 @@ class SCNProtein(object):
         self._convert_pdbfixer_positions_to_quantities()
         self.pdbfixer.findMissingResidues()
         self.pdbfixer.findMissingAtoms()
-        self.pdbfixer.addMissingAtoms(seed=SEED)
+        self.pdbfixer.addMissingAtoms()
         self.pdbfixer.addMissingHydrogens(pH=7.0,
-                                          seed=SEED,
                                           forcefield=ForceField(*self.openmm_forcefields))
         self._undo_pdbfixer_positions_to_quantities()
         self.positions = self.pdbfixer.positions
@@ -665,9 +707,8 @@ class SCNProtein(object):
         # create a tensor filled with nans of the correct shape
         self.hcoords = torch.full_like(self.hcoords, float("nan"))
         # fill in the positions
-        # self.hcoords[self.get_hydrogen_coord_mask(zeros_instead_of_nans=True)] = torch.from_numpy(openmm_positions)
-        self.hcoords
-        self.positions[self.hcoord_to_pos_map_values] = hcoords.reshape(
+        self.hcoords[self.get_hydrogen_coord_mask(zeros_instead_of_nans=True)] = torch.from_numpy(openmm_positions)
+        self.positions[self.hcoord_to_pos_map_values] = self.hcoords.reshape(
             -1, 3)[self.hcoord_to_pos_map_keys]
         self.coords = self.hcoords
 

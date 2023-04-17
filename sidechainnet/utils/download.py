@@ -233,7 +233,7 @@ def get_sidechain_data(pnids, limit, num_cores=multiprocessing.cpu_count()):
     return all_data, all_errors
 
 
-def process_id(pnid):
+def process_id(pnid, chain=None):
     """Create dictionary of sidechain data for a single ProteinNet ID.
 
     For a single ProteinNet ID i.e. ('1A9U_1_A'), fetches that PDB chain
@@ -247,7 +247,8 @@ def process_id(pnid):
     """
     message = None
     pnid_type = determine_pnid_type(pnid)
-    chain = get_chain_from_proteinnetid(pnid, pnid_type)
+    if chain is None:
+        chain = get_chain_from_proteinnetid(pnid, pnid_type)
     if not chain:
         return pnid, errors.ERRORS["NONE_STRUCTURE_ERRORS"]
     elif type(chain) == tuple and type(chain[1]) == int:

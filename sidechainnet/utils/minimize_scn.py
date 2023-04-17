@@ -115,6 +115,8 @@ def cleanup(min_path):
         with open(fn, "rb") as f:
             datadict = pickle.load(f)
         p = SCNProtein(**datadict)
+        if p.split is None:
+            p.split = "default"
         if p.split not in data:
             data[p.split] = copy.deepcopy(EMPTY_SPLIT_DICT)
         p.numpy()
