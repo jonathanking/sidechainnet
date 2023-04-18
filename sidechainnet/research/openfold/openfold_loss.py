@@ -57,6 +57,7 @@ def openmm_loss(
 
     # Now, compute the energy of each protein
     total_energy = torch.tensor(0.0, device=model_output["final_atom_positions"].device)
+    total_energy_raw = torch.tensor(0.0, device=model_output["final_atom_positions"].device)
     for protein in scn_proteins:
         if "X" in protein.seq:
             # Skip proteins with unknown residues, they cannot have their energy computed
@@ -65,6 +66,8 @@ def openmm_loss(
                                     protein.hcoords,
                                     force_scaling,
                                     force_clipping_val)
+        protein_energy_raw = protein_energy.clone()
+        total_energy_raw += protein_energy_raw
         if scale_by_length:
             protein_energy /= len(protein)
         if squash and protein_energy > 0:
@@ -75,7 +78,7 @@ def openmm_loss(
 
         total_energy += protein_energy
 
-    return total_energy, scn_proteins_no_hy, scn_proteins_gt
+    return total_energy, scn_proteins_no_hy, scn_proteins_gt, total_energy_raw
 
 
 def iterate_over_model_input_output(model_input, model_output, ground_truth=False):
