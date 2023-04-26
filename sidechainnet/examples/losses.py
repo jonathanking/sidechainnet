@@ -169,6 +169,11 @@ def lddt_all(true, pred, atom_mask=None, residue_shape=None, cutoff=5):
     nomenclatures, and by choosing the one giving the highest value. Technically, lDDT_all
     score should be computed for all."
 
+    Comment from the paper: "Local atomic measures such as lDDT-all can evaluate important
+    aspects of prediction quality which are indiscernible by the traditional global
+    superposition based scores. lDDT complements the global assessment by a local
+    perspective on side-chain modeling and inter-residue interactions."
+
     # TODO Should support alternative atom naming/positions.
 
     Args:
