@@ -108,7 +108,7 @@ class SCNProtein(object):
         return cls(**datadict)
 
     @classmethod
-    def from_pdb(cls, filename, pdbid="", include_resolution=False):
+    def from_pdb(cls, filename, chid=None, pdbid="", include_resolution=False):
         """Create a SCNProtein from a PDB file. Warning: does not support gaps.
 
         Args:
@@ -123,7 +123,7 @@ class SCNProtein(object):
         """
         # TODO: Raise an alarm if the user is working with files that have gaps
         # First, use Prody to parse the PDB file
-        chain = prody.parsePDB(filename)
+        chain = prody.parsePDB(filename, chain=chid)
         # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
         (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
          is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain,
@@ -166,7 +166,7 @@ class SCNProtein(object):
         (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
          is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain,
                                                                   replace_nonstd=True)
-        if not return_sequences and len(observed_sequence) < len(header[chid].sequence):
+        if not return_sequences and chid is not None and len(observed_sequence) < len(header[chid].sequence):
             raise ValueError("The observed sequence is shorter than the sequence in the "
                              "header. There are likely gaps in the sequence, and this is unsupported.")
         scndata = {
@@ -421,10 +421,13 @@ class SCNProtein(object):
     def get_energy(self,
                    add_missing=False,
                    add_hydrogens_via_openmm=False,
+                   add_hydrogens_via_scnprotein=False,
                    return_unitless_kjmol=False):
         """Return potential energy of the system given current atom positions."""
-        if not self.has_hydrogens and not (add_hydrogens_via_openmm or add_missing):
+        if not self.has_hydrogens and not (add_hydrogens_via_openmm or add_missing or add_hydrogens_via_scnprotein):
             raise ValueError("Cannot compute energy without hydrogens.")
+        if add_hydrogens_via_openmm and add_hydrogens_via_scnprotein:
+            raise ValueError("Cannot add hydrogens via both OpenMM and SCNProtein.")
         if add_missing:
             try:
                 self._add_missing_via_pdbfixer_and_init_openmm(
@@ -434,6 +437,8 @@ class SCNProtein(object):
                     # The system exploded when adding atoms. Try a different seed.
                     self._add_missing_via_pdbfixer_and_init_openmm(
                         seed=SEED + 1, add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+        if add_hydrogens_via_scnprotein:
+            self.add_hydrogens(add_to_heavy_atoms=True)
 
         if not self.openmm_initialized:
             self.initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
@@ -589,8 +594,8 @@ class SCNProtein(object):
         if add_hydrogens_via_openmm:
             random.seed(SEED)
             self.modeller.addHydrogens(forcefield=self.forcefield)
-            self.has_hydrogens = True
-        if not self.has_hydrogens:
+            self.positions = self.modeller.positions
+        elif not self.has_hydrogens:
             self.add_hydrogens(add_to_heavy_atoms=True)
         self.system = self.forcefield.createSystem(self.modeller.topology,
                                                    nonbondedMethod=openmm.app.NoCutoff,
@@ -613,7 +618,7 @@ class SCNProtein(object):
                                                 platform=self.platform,
                                                 platformProperties=properties)
         self.openmm_initialized = True
-        self.simulation.context.setPositions(self.positions)
+        self.simulation.context.setPositions(self.modeller.positions)
 
     def get_hydrogen_coord_mask(self, zeros_instead_of_nans=False):
         """Return a torch tensor with nans representing pad characters in self.hcoords."""
@@ -783,7 +788,10 @@ class SCNProtein(object):
         if hcoords is None:
             hcoords = self.hcoords
 
-        new_coords = torch.zeros(len(hcoords), NUM_COORDS_PER_RES, 3) * GLOBAL_PAD_CHAR
+        if not self.is_numpy:
+            new_coords = torch.zeros(len(hcoords), NUM_COORDS_PER_RES, 3) * GLOBAL_PAD_CHAR
+        else:
+            new_coords = np.zeros((len(hcoords), NUM_COORDS_PER_RES, 3)) * GLOBAL_PAD_CHAR
 
         mask = HEAVY_ATOM_MASK_TENSOR[self.int_seq]
         for i, (resmask, res) in enumerate(zip(mask, hcoords)):
@@ -967,6 +975,20 @@ class SCNProtein(object):
             self.unmodified_seq = " ".join(ums[:n_removed_right])
         # Reset structure builders
         self.sb = None
+    
+    def reset_openmm_data(self):
+        """Reset all OpenMM data."""
+        self.sb = None
+        self.openmm_initialized = False
+    
+    def reset_hydrogens_and_openmm(self):
+        """Reset all hydrogen data."""
+        if self.has_hydrogens:
+            self.hydrogenrep_to_heavyatomrep(inplace=True)
+        else:
+            assert self.coords.shape[1] == NUM_COORDS_PER_RES, 'coords must be heavy atom rep.'
+            self.hcoords = self.coords
+        self.reset_openmm_data()
 
 
 def atom_name_pprint(atom_names, values):
