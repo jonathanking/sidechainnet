@@ -197,10 +197,10 @@ def get_openfold_to_sidechainnet_mapping():
 
 class OpenMMLR:
     """Learning rate schedule that starts at 1e-4 and increases to 1 over 1000 steps"""
-    def __init__(self, start=1e-4, end=1, steps=1000):
+    def __init__(self, start=1e-4, end=1, steps=1000, cur_step=0):
         self.lr = np.linspace(start, end, steps)
         self.steps = steps
-        self.cur_step = 0
+        self.cur_step = cur_step
     def step(self, new_step=None):
         if new_step is not None:
             self.cur_step = new_step
