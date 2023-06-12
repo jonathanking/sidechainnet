@@ -66,13 +66,13 @@ def openmm_loss(
         protein_energy = loss.apply(protein,
                                     protein.hcoords,
                                     force_scaling,
-                                    force_clipping_val)git
+                                    force_clipping_val)
         protein_energy_raw = protein_energy.clone()
         total_energy_raw += protein_energy_raw
         if scale_by_length:
             protein_energy /= len(protein)
         if add_relu:
-            relu_component = protein_energy * 10**-12
+            relu_component = protein_energy * 10**-12  # if protein_energy > 0 else 0
         if squash and protein_energy > 0:
             protein_energy = protein_energy * (squash_factor/(squash_factor+protein_energy))
         elif modified_sigmoid:
