@@ -27,6 +27,7 @@ def openmm_loss(
         squash_factor=100.0,
         modified_sigmoid=False,
         modified_sigmoid_params=(1,1,1,1),
+        add_relu=False,
 ) -> torch.Tensor:
     """Return a loss value based on the OpenMM energies of the predicted structures.
     
@@ -65,16 +66,20 @@ def openmm_loss(
         protein_energy = loss.apply(protein,
                                     protein.hcoords,
                                     force_scaling,
-                                    force_clipping_val)
+                                    force_clipping_val)git
         protein_energy_raw = protein_energy.clone()
         total_energy_raw += protein_energy_raw
         if scale_by_length:
             protein_energy /= len(protein)
+        if add_relu:
+            relu_component = protein_energy * 10**-12
         if squash and protein_energy > 0:
             protein_energy = protein_energy * (squash_factor/(squash_factor+protein_energy))
         elif modified_sigmoid:
             a, b, c, d = modified_sigmoid_params
             protein_energy = (1/a + torch.exp(-(d*protein_energy+b)/c))**(-1) - (a-1)
+        if add_relu:
+            protein_energy += relu_component
 
         total_energy += protein_energy
 
