@@ -128,6 +128,12 @@ def angle_mae(true, pred):
     return torch.nanmean(absolute_error)
 
 
+def angle_abs_error(true, pred):
+    """Compute unflattened MeanAbsoluteError between angle(Rad) tensors with nan pads."""
+    absolute_error = torch.abs(angle_diff(true, pred))
+    return absolute_error
+
+
 def angle_diff(true, pred):
     """Compute signed distance between two angle tensors (does not change shape)."""
     error = true - pred
