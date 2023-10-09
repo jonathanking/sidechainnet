@@ -108,7 +108,7 @@ class SCNProtein(object):
         return cls(**datadict)
 
     @classmethod
-    def from_pdb(cls, filename, chid=None, pdbid="", include_resolution=False):
+    def from_pdb(cls, filename, chid=None, pdbid="", include_resolution=False, allow_nan=False):
         """Create a SCNProtein from a PDB file. Warning: does not support gaps.
 
         Args:
@@ -127,7 +127,7 @@ class SCNProtein(object):
         # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
         (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
          is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain,
-                                                                  replace_nonstd=True)
+                                                                  replace_nonstd=True, allow_nan=allow_nan)
         scndata = {
             "coordinates": coords_np.reshape(len(observed_sequence), -1, 3),
             "angles": dihedrals_np,

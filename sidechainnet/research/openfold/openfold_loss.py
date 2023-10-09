@@ -206,11 +206,13 @@ class OpenMMLR:
         self.lr = np.linspace(start, end, steps)
         self.steps = steps
         self.cur_step = cur_step
+    
     def step(self, new_step=None):
         if new_step is not None:
             self.cur_step = new_step
         else:
             self.cur_step += 1
+
     def get_lr(self, step=None):
         if step is None:
             step = self.cur_step
@@ -218,6 +220,7 @@ class OpenMMLR:
             return self.lr[-1]
         else:
             return self.lr[self.cur_step]
+
     def get_lr_and_step(self):
         val = self.get_lr()
         self.step()

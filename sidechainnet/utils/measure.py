@@ -71,7 +71,7 @@ def determine_sidechain_atomnames(_res, include_h=False):
         raise NonStandardAminoAcidError
 
 
-def compute_sidechain_dihedrals(residue, prev_residue):
+def compute_sidechain_dihedrals(residue, prev_residue, allow_nan=False):
     """Compute all angles to predict for a given residue.
 
     If the residue is the first in the protein chain, a fictitious C atom is
@@ -93,7 +93,7 @@ def compute_sidechain_dihedrals(residue, prev_residue):
         if prev_residue:
             cb_dihedral = compute_single_dihedral(
                 (prev_residue.select("name C"),
-                 *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])))
+                 *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])), allow_nan=allow_nan)
         else:
             atoms = [residue.select(f"name {an}") for an in ["N", "N", "CA", "CB"]]
             # Make a ficticious atom, X, that is extended from N.
@@ -105,7 +105,7 @@ def compute_sidechain_dihedrals(residue, prev_residue):
                 ca=atoms[2].getCoords(),
                 c=residue.select("name C").getCoords())
             atoms[0].setCoords(fict_coords)
-            cb_dihedral = compute_single_dihedral(atoms)
+            cb_dihedral = compute_single_dihedral(atoms, allow_nan=allow_nan)
 
     except AttributeError:
         cb_dihedral = GLOBAL_PAD_CHAR
@@ -120,7 +120,7 @@ def compute_sidechain_dihedrals(residue, prev_residue):
             break
         atom_names = t_name.split("-")
         res_dihedrals.append(
-            compute_single_dihedral([residue.select("name " + an) for an in atom_names]))
+            compute_single_dihedral([residue.select("name " + an) for an in atom_names],  allow_nan=allow_nan))
 
     return res_dihedrals + (NUM_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) -
                             len(res_dihedrals)) * [GLOBAL_PAD_CHAR]
@@ -210,7 +210,7 @@ def replace_nonstdaas(residues):
     return residues, resnames, np.asarray(is_nonstd)
 
 
-def get_seq_coords_and_angles(chain, replace_nonstd=True):
+def get_seq_coords_and_angles(chain, replace_nonstd=True, allow_nan=False):
     """Extract protein sequence, coordinates, and angles from a ProDy chain.
 
     Args:
@@ -249,7 +249,7 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
 
         # Measure sidechain angles
         all_res_angles = bb_angles + bond_angles + compute_sidechain_dihedrals(
-            res, prev_res)
+            res, prev_res, allow_nan=allow_nan)
 
         # Measure coordinates
         rescoords = measure_res_coordinates(res)
@@ -418,7 +418,7 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
     """
     try:
         phi = pr.calcPhi(residue, radian=True)
-    except ValueError:
+    except (ValueError, ArithmeticError):
         phi = GLOBAL_PAD_CHAR
     try:
         if last_res:
@@ -426,7 +426,7 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
                 [residue.select("name " + an) for an in "N CA C O".split()])
         else:
             psi = pr.calcPsi(residue, radian=True)
-    except (ValueError, IndexError):
+    except (ValueError, IndexError, ArithmeticError):
         # For the last residue, we can measure a "psi" angle that is actually
         # the placement of the terminal oxygen. Currently, this is not utilized
         # in the building of structures, but it is included in case the need
@@ -444,21 +444,21 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
             psi = GLOBAL_PAD_CHAR
     try:
         omega = pr.calcOmega(residue, radian=True)
-    except ValueError:
+    except (ValueError, ArithmeticError):
         omega = GLOBAL_PAD_CHAR
     return [phi, psi, omega]
 
 
-def compute_single_dihedral(atoms):
+def compute_single_dihedral(atoms, allow_nan=False):
     """Given 4 Atoms, calculate the dihedral angle between them in radians."""
     if None in atoms:
         return GLOBAL_PAD_CHAR
     else:
         atoms = [a.getCoords()[0] for a in atoms]
-        return get_dihedral(atoms[0], atoms[1], atoms[2], atoms[3], radian=True)
+        return get_dihedral(atoms[0], atoms[1], atoms[2], atoms[3], radian=True, allow_nan=allow_nan)
 
 
-def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
+def get_dihedral(coords1, coords2, coords3, coords4, radian=False, allow_nan=False):
     """Returns the dihedral angle between four coordinates in degrees.
 
     Modified from prody.measure.measure to use a numerically safe normalization
@@ -483,9 +483,11 @@ def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
         arccos_input = 1
     elif arccos_input_raw < -1 and np.abs(arccos_input_raw) - 1 < eps:
         arccos_input = -1
-    else:
+    elif not allow_nan:
         raise ArithmeticError(
-            "Input to arccos is outside of acceptable [-1, 1] domain +/- 1e-6.")
+            "Input to arccos is outside of acceptable [-1, 1] domain +/- 1e-6.", arccos_input_raw)
+    else:
+        return GLOBAL_PAD_CHAR
     rad = np.arccos(arccos_input)
     if not porm == 0:
         rad = rad * porm
