@@ -9,7 +9,7 @@ from openfold.np.protein import Protein
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 from sidechainnet.structure.build_info import ATOM_MAP_HEAVY, NUM_COORDS_PER_RES
 from sidechainnet.utils.openmm_loss import OpenMMEnergyH, OpenMMEnergy
-from openfold.utils.feats import atom37_to_atom14
+from openfold.utils.feats import batched_gather
 
 import openfold
 
@@ -23,8 +23,6 @@ def openmm_loss(
         force_scaling=None,
         force_clipping_val=None,
         scale_by_length=False,
-        squash=False,
-        squash_factor=100.0,
         modified_sigmoid=False,
         modified_sigmoid_params=(1,1,1,1),
         add_relu=False,
@@ -73,9 +71,7 @@ def openmm_loss(
             protein_energy /= len(protein)
         if add_relu:
             relu_component = protein_energy * 10**-12  # if protein_energy > 0 else 0
-        if squash and protein_energy > 0:
-            protein_energy = protein_energy * (squash_factor/(squash_factor+protein_energy))
-        elif modified_sigmoid:
+        if modified_sigmoid:
             a, b, c, d = modified_sigmoid_params
             protein_energy = (1/a + torch.exp(-(d*protein_energy+b)/c))**(-1) - (a-1)
         if add_relu:
@@ -123,7 +119,11 @@ def iterate_over_model_input_output(model_input, model_output, ground_truth=Fals
         coords14 = coords14[:seq_length]
         coords15 = convert_openfold_atom14_to_scn_atom15(coords14, seq)
 
-        protein = SCNProtein(coordinates=coords15, sequence=seq, mask=seq_mask, id=model_input['name'][i])
+        try:
+            ident = model_input['name'][i]
+        except KeyError:
+            ident = "prot"
+        protein = SCNProtein(coordinates=coords15, sequence=seq, mask=seq_mask, id=ident)
 
         if "X" in protein.seq:
             # Skip proteins with unknown residues, they cannot have their energy computed
@@ -225,6 +225,19 @@ class OpenMMLR:
         val = self.get_lr()
         self.step()
         return val
+
+
+def atom37_to_atom14(atom37, batch, no_batch_dims=0):
+    atom14_data = batched_gather(
+        atom37,
+        batch["residx_atom14_to_atom37"],
+        dim=-2,
+        no_batch_dims=no_batch_dims,
+    )
+
+    atom14_data = atom14_data * batch["atom14_atom_exists"][..., None]
+
+    return atom14_data
 
 
 OPENFOLD_TO_SCN_MAP = get_openfold_to_sidechainnet_mapping()
