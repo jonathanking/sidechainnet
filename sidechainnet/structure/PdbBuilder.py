@@ -2,8 +2,8 @@
 import itertools
 
 import numpy as np
-from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, SC_BUILD_INFO
-from sidechainnet.structure.HydrogenBuilder import ATOM_MAP_24, NUM_COORDS_PER_RES_W_HYDROGENS
+from sidechainnet.structure.build_info import ATOM_MAP_H, ATOM_MAP_HEAVY
+from sidechainnet.structure.HydrogenBuilder import NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 
@@ -21,8 +21,8 @@ class PdbBuilder(object):
     def __init__(self,
                  seq,
                  coords,
-                 atoms_per_res=NUM_COORDS_PER_RES,
-                 terminal_atoms=None):
+                 terminal_atoms=None,
+                 has_hydrogens=None):
         """Initialize a PdbBuilder.
 
         Args:
@@ -35,21 +35,16 @@ class PdbBuilder(object):
             terminal_atoms: Python dictionary mapping "H2", "H3", and "OXT" atom names to
                 their positions in the structure.
         """
-        if len(seq) != coords.shape[0] / atoms_per_res:
+        if len(seq) != coords.shape[0]:
             raise ValueError(
                 "The sequence length must match the coordinate length and contain 1 "
-                "letter AA codes." + str(coords.shape[0] / atoms_per_res) + " " +
+                "letter AA codes." + str(coords.shape[0]) + " " +
                 str(len(seq)))
-        if coords.shape[0] % atoms_per_res != 0:
-            raise AssertionError(f"Coords is not divisible by {atoms_per_res}. "
-                                 f"{coords.shape}")
-        if atoms_per_res not in (NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS):
-            raise ValueError(
-                f"Values for atoms_per_res other than {NUM_COORDS_PER_RES}"
-                f"/{NUM_COORDS_PER_RES_W_HYDROGENS} are currently not supported.")
 
-        self.atoms_per_res = atoms_per_res
-        self.has_hydrogens = self.atoms_per_res == NUM_COORDS_PER_RES_W_HYDROGENS
+        if has_hydrogens is not None:
+            self.has_hydrogens = has_hydrogens
+        else:
+            self.has_hydrogens = coords.shape[1] == NUM_COORDS_PER_RES_W_HYDROGENS
         self.coords = coords
         self.seq = seq
         self.mapping = self._make_mapping_from_seq()
@@ -76,7 +71,7 @@ class PdbBuilder(object):
 
     def _coord_generator(self):
         """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
-        return coord_generator(self.coords, self.atoms_per_res)
+        return coord_generator(self.coords)
 
     def _get_line_for_atom(self, res_name, atom_name, atom_coords, missing=False):
         """Return the 'ATOM...' line in PDB format for the specified atom.
@@ -107,8 +102,7 @@ class PdbBuilder(object):
         """
         residue_lines = []
         for atom_name, atom_coord in zip(atom_names, coords):
-            if (atom_name == "PAD" or np.isnan(atom_coord).sum() > 0 or
-                    np.all(atom_coord == 0):
+            if (atom_name == "PAD" or np.isnan(atom_coord).sum() > 0):
                 continue
             residue_lines.append(self._get_line_for_atom(res_name, atom_name, atom_coord))
             self.atom_nbr += 1
@@ -158,10 +152,15 @@ class PdbBuilder(object):
     def _make_mapping_from_seq(self):
         """Given a protein sequence, this returns a mapping that assumes coords are
         generated in groups of atoms_per_res (the output is L x atoms_per_res x 3.)"""
-        atom_names = ATOM_MAP_14 if not self.has_hydrogens else ATOM_MAP_24
+        atom_names = ATOM_MAP_HEAVY if not self.has_hydrogens else ATOM_MAP_H
         mapping = []
-        for residue in self.seq:
-            mapping.append((residue, atom_names[residue]))
+        for i, residue in enumerate(self.seq):
+            an = atom_names[residue]
+            # The first residue, if N-terminal, actually calls its N-H hydrogen H1, not H
+            if i == 0 and self.has_hydrogens:
+                assert an[5] == "H"
+                an = an[0:5] + ["H1"] + an[6:]
+            mapping.append((residue, an))
         return mapping
 
     def get_pdb_string(self, title=None):
@@ -206,6 +205,8 @@ class PdbBuilder(object):
             self.save_pdb(path.replace(".gltf", ".pdb"), title)
         pymol.cmd.load(path.replace(".gltf", ".pdb"), title)
         pymol.cmd.color("oxygen", title)
+        pymol.cmd.select("sidechain")
+        pymol.cmd.show("lines")
         pymol.cmd.save(path, quiet=True)
         pymol.cmd.delete("all")
 
@@ -217,10 +218,3 @@ def split_every(n, iterable):
     while piece:
         yield piece
         piece = list(itertools.islice(i, n))
-
-
-ATOM_MAP_14 = {}
-for one_letter in ONE_TO_THREE_LETTER_MAP.keys():
-    ATOM_MAP_14[one_letter] = ["N", "CA", "C", "O"] + list(
-        SC_BUILD_INFO[ONE_TO_THREE_LETTER_MAP[one_letter]]["atom-names"])
-    ATOM_MAP_14[one_letter].extend(["PAD"] * (14 - len(ATOM_MAP_14[one_letter])))

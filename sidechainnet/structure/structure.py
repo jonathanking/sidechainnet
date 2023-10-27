@@ -3,10 +3,10 @@
 import numpy as np
 import prody as pr
 import torch
+from numba import njit
 from sidechainnet.structure import StructureBuilder
 from sidechainnet.structure.build_info import NUM_ANGLES
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
-from sidechainnet.utils.sequence import VOCAB
+from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
 
 
 def angles_to_coords(angles, seq, remove_batch_padding=False):
@@ -95,8 +95,6 @@ def standard_nerf(a, b, c, l, theta, chi):
         torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
         placement using points a, b, c, and several parameters.
     """
-    if not (-np.pi <= theta <= np.pi):
-        raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
 
     # calculate unit vectors AB and BC
     W_hat = torch.nn.functional.normalize(b - a, dim=0)
@@ -124,6 +122,7 @@ def standard_nerf(a, b, c, l, theta, chi):
     return res.squeeze()
 
 
+# @torch.jit.script
 def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
     """Return coordinates for point d given previous points & parameters. Optimized NeRF.
 
@@ -150,24 +149,67 @@ def sn_nerf(a, b, c, l_cd, theta, chi, l_bc):
         torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
         placement using points a, b, c, and several parameters.
     """
-    if not (-np.pi <= theta <= np.pi):
-        raise ValueError(f"theta must be in radians and in [-pi, pi]. theta = {theta}")
+    return torch.mm(
+        torch.stack(
+            [(c - b) / l_bc,
+             torch.cross(
+                 torch.nn.functional.normalize(torch.cross(b - a, (c - b) / l_bc), dim=0),
+                 (c - b) / l_bc),
+             torch.nn.functional.normalize(torch.cross(b - a, (c - b) / l_bc), dim=0)],
+            dim=1),
+        l_cd * torch.stack([
+            -torch.cos(theta),
+            torch.sin(theta) * torch.cos(chi),
+            torch.sin(theta) * torch.sin(chi)
+        ]).to(torch.float32).unsqueeze(1)).squeeze() + c
+
+
+# @njit
+def sn_nerf_numpy(a, b, c, l_cd, theta, chi, l_bc):
+    """Return coordinates for point d given previous points & parameters. Optimized NeRF.
+
+    This function has been optimized from the original nerf to be about 20% faster. It
+    contains fewer normalization steps and total calculations than the original
+    formulation. See https://doi.org/10.1002/jcc.20237 for details.
+
+    Args:
+        a (torch.float32 tensor): (3 x 1) tensor describing point a.
+        b (torch.float32 tensor): (3 x 1) tensor describing point b.
+        c (torch.float32 tensor): (3 x 1) tensor describing point c.
+        l_cd (torch.float32 tensor): (1) tensor describing the length between points
+            c & d.
+        theta (torch.float32 tensor): (1) tensor describing angle between points b, c,
+            and d.
+        chi (torch.float32 tensor): (1) tensor describing dihedral angle between points
+            a, b, c, and d.
+        l_bc (torch.float32 tensor): (1) tensor describing length between points b and c.
+
+    Raises:
+        ValueError: Raises ValueError when value of theta is not in [-pi, pi].
+
+    Returns:
+        torch.float32 tensor: (3 x 1) tensor describing coordinates of point c after
+        placement using points a, b, c, and several parameters.
+    """
     AB = b - a
     BC = c - b
     bc = BC / l_bc
-    n = torch.nn.functional.normalize(torch.cross(AB, bc), dim=0)
-    n_x_bc = torch.cross(n, bc)
+    AB_x_bc = np.cross(AB, bc)
+    n = AB_x_bc / np.linalg.norm(AB_x_bc)
+    n_x_bc = np.cross(n, bc)
 
-    M = torch.stack([bc, n_x_bc, n], dim=1)
+    M = np.stack((bc, n_x_bc, n), axis=1)
 
-    D2 = torch.stack([
-        -l_cd * torch.cos(theta), l_cd * torch.sin(theta) * torch.cos(chi),
-        l_cd * torch.sin(theta) * torch.sin(chi)
-    ]).to(torch.float32).unsqueeze(1)
+    sin_theta = np.sin(theta)
 
-    D = torch.mm(M, D2).squeeze()
+    D = np.dot(
+        M,
+        l_cd * np.expand_dims(
+            np.asarray(
+                (-np.cos(theta), sin_theta * np.cos(chi), sin_theta * np.sin(chi))),
+            1)).reshape((3,)) + c
 
-    return D + c
+    return D
 
 
 def determine_missing_positions(ang_or_coord_matrix):
@@ -180,7 +222,7 @@ def deg2rad(angle):
     return angle * np.pi / 180.
 
 
-def inverse_trig_transform(t):
+def inverse_trig_transform(t, n_angles=NUM_ANGLES, cos_first=True):
     """Compute the atan2 of the last 2 dimensions of a given tensor.
 
     Given a (BATCH x L X NUM_PREDICTED_ANGLES ) tensor, returns (BATCH X
@@ -194,9 +236,13 @@ def inverse_trig_transform(t):
         torch.tensor: Tensor of angles with the last two dimensions reduced
         via atan2.
     """
-    t = t.view(t.shape[0], -1, NUM_ANGLES, 2)
-    t_cos = t[:, :, :, 0]
-    t_sin = t[:, :, :, 1]
+    t = t.view(t.shape[0], -1, n_angles, 2)
+    if cos_first:
+        t_cos = t[:, :, :, 0]
+        t_sin = t[:, :, :, 1]
+    else:
+        t_cos = t[:, :, :, 1]
+        t_sin = t[:, :, :, 0]
     t = torch.atan2(t_sin, t_cos)
     return t
 
@@ -213,7 +259,7 @@ def trig_transform(t):
     Returns:
         torch.tensor: Angle tensor with shape (batch x L x num_angle x 2).
     """
-    new_t = torch.zeros(*t.shape, 2)
+    new_t = torch.zeros(*t.shape, 2, device=t.device)
     if len(new_t.shape) == 4:
         new_t[:, :, :, 0] = torch.cos(t)
         new_t[:, :, :, 1] = torch.sin(t)
@@ -249,16 +295,16 @@ def debug_example():
     sb.build()
 
 
-def coord_generator(coords, atoms_per_res=14, remove_padding=False):
-    """Return a generator to iteratively yield self.atoms_per_res atoms at a time."""
-    coord_idx = 0
-    while coord_idx < coords.shape[0]:
-        _slice = coords[coord_idx:coord_idx + atoms_per_res]
-        if remove_padding:
-            non_pad_locs = (_slice != GLOBAL_PAD_CHAR).any(axis=1)
-            _slice = _slice[non_pad_locs]
-        yield _slice
-        coord_idx += atoms_per_res
+def coord_generator(coords, remove_padding=False, seq=""):
+    """Return a generator to iteratively yield one residue at a time."""
+    assert not remove_padding, "Cannot remove padding from coord generator."
+    if remove_padding and not seq:
+        raise ValueError("A sequence (1-letter code) must be provided to remove padding.")
+    i = 0
+    while i < coords.shape[0]:
+        yield coords[i]
+        i += 1
+
 
 
 if __name__ == '__main__':

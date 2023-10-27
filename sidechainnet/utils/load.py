@@ -1,15 +1,17 @@
 """Implements SidechainNet loading functionality."""
 
-import pickle
 import os
-from sidechainnet.dataloaders.SCNDataset import SCNDataset
+import pickle
 
+import prody as pr
 import requests
-import tqdm
-
 import sidechainnet as scn
+import tqdm
 from sidechainnet.create import format_sidechainnet_path
 from sidechainnet.dataloaders.collate import prepare_dataloaders
+from sidechainnet.dataloaders.SCNDataset import SCNDataset
+from sidechainnet.dataloaders.SCNProtein import SCNProtein
+from sidechainnet.utils.download import get_resolution_from_pdbid
 
 
 def _get_local_sidechainnet_path(casp_version, thinning, scn_dir):
@@ -89,7 +91,7 @@ def _load_dict(local_path):
 
 
 def load(casp_version=12,
-         thinning=30,
+         casp_thinning=30,
          scn_dir="./sidechainnet_data",
          force_download=False,
          with_pytorch=None,
@@ -104,9 +106,13 @@ def load(casp_version=12,
          filter_by_resolution=False,
          complete_structures_only=False,
          local_scn_path=None,
-         scn_dataset=False):
+         scn_dataset=True,
+         shuffle=True,
+         trim_edges=False,
+         sort_by_length="ascending",
+         **kwargs):
     #: Okay
-    """Load and return the specified SidechainNet dataset as a dictionary or DataLoaders.
+    """Load and return the specified SidechainNet dataset in the specified manner.
 
     This function flexibly allows the user to load SidechainNet in a format that is most
     convenient to them. The user can specify which version and "thinning" of the dataset
@@ -117,13 +123,15 @@ def load(casp_version=12,
     batch_size, seq_as_one_hot, dynamic_batching, num_workers,
     optimize_for_cpu_parallelism, and train_eval_downsample.)
 
+    By default, the data is returned as a SCNDataset object, to facilitate inspection.
+
     Args:
         casp_version (int, optional): CASP version to load (7-12). Defaults to 12.
-        thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A thinning
-            represents the minimum sequence similarity each protein sequence must have to
-            all other sequences in the same thinning. The 100 thinning contains all of the
-            protein entries in SidechainNet, while the 30 thinning has a much smaller
-            amount. Defaults to 30.
+        casp_thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A
+            thinning represents the minimum sequence similarity each protein sequence must
+            have to all other sequences in the same thinning. The 100 thinning contains
+            all of the protein entries in SidechainNet, while the 30 thinning has a much
+            smaller amount. Defaults to 30.
         scn_dir (str, optional): Path where SidechainNet data will be stored locally.
             Defaults to "./sidechainnet_data".
         force_download (bool, optional): If true, download SidechainNet data from the web
@@ -172,29 +180,43 @@ def load(casp_version=12,
             training set at the start of training, and use that downsampled dataset during
             the whole of model training. Defaults to .2.
         filter_by_resolution (float, bool, optional): If True, only use structures with a
-            reported resolution < 3 Angstroms. Structures wit no reported resolutions will
-            also be excluded. If filter_by_resolution is a float, then only structures
-            having a resolution value LESS than or equal this threshold will be included.
-            For example, a value of 2.5 will exclude all structures with resolution
-            greater than 2.5 Angstrom. Only the training set is filtered.
+            reported resolution < 3 Angstroms. Structures with no reported resolutions
+            will also be excluded. If filter_by_resolution is a float, then only
+            structures having a resolution value LESS than or equal this threshold will be
+            included. For example, a value of 2.5 will exclude all structures with
+            resolution greater than 2.5 Angstrom. Only the training set is filtered.
         complete_structures_only (bool, optional): If True, yield only structures from the
             training set that have no missing residues. Filter not applied to other data
             splits. Default False.
         local_scn_path (str, optional): The path for a locally saved SidechainNet file.
             This is especially useful for loading custom SidechainNet datasets.
         scn_dataset (bool, optional): If True, return a sidechainnet.SCNDataset object
-            for conveniently accessing properties of the data.
+            for conveniently accessing properties of the data. Default True.
             (See sidechainnet.SCNDataset) for more information.
+        shuffle (bool, optional): Default True. If True, yields random batches from the
+            dataloader instead of in-order (length ascending). Does not apply when a
+            dataloader is not requested.
+        trim_edges (bool, optional): If True, trim missing residues from the beginning
+            and end of the protein sequence. Default False.
+        sort_by_length (str, optional): If 'ascending', SCNDataset sorts its proteins in
+            ascending order of length. If 'descending', yields proteins in descending
+            order of length. Default 'ascending'.
 
     Returns:
         A Python dictionary that maps data splits ('train', 'test', 'train-eval',
         'valid-X') to either more dictionaries containing protein data ('seq', 'ang',
         'crd', etc.) or to PyTorch DataLoaders that can be used for training. See below.
+        
+        Option 0 (SCNDataset, default):
+            By default, scn.load returns a SCNDataset object. This object has the
+            following properties:
+                - indexing by integer or ProteinNet IDs yields SCNProtein objects.
+                - is iterable.
 
         Option 1 (Python dictionary):
-            By default, the function returns a dictionary that is organized by training/
-            validation/testing splits. For example, the following code loads CASP 12 with
-            the 30% thinning option:
+            If scn_dataset=False, the function returns a dictionary that is organized by
+            training/validation/testing splits. For example, the following code loads CASP
+            12 with the 30% thinning option:
 
                 >>> import sidechainnet as scn
                 >>> data = scn.load(12, 30)
@@ -254,28 +276,31 @@ def load(casp_version=12,
     if local_scn_path:
         local_path = local_scn_path
     else:
-        local_path = _get_local_sidechainnet_path(casp_version, thinning, scn_dir)
+        local_path = _get_local_sidechainnet_path(casp_version, casp_thinning, scn_dir)
         if not local_path:
-            print(f"SidechainNet{(casp_version, thinning)} was not found in {scn_dir}.")
+            print(f"SidechainNet{(casp_version, casp_thinning)} was not found in "
+                  "{scn_dir}.")
     if not local_path or force_download:
         # Download SidechainNet if it does not exist locally, or if requested
-        local_path = _download_sidechainnet(casp_version, thinning, scn_dir)
+        local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
 
-    scn_dict = _load_dict(local_path)
-
-    # Patch for removing 1GJJ_1_A, see Issue #38
-    scn_dict = scn.utils.manual_adjustment._repair_1GJJ_1_A(scn_dict)
+    try:
+        scn_dict = _load_dict(local_path)
+    except pickle.UnpicklingError:
+        print("Redownloading due to Pickle file error.")
+        local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
+        scn_dict = _load_dict(local_path)
 
     scn_dict = filter_dictionary_by_resolution(scn_dict, threshold=filter_by_resolution)
-    if complete_structures_only:
-        scn_dict = filter_dictionary_by_missing_residues(scn_dict)
 
     # By default, the load function returns a dictionary
     if not with_pytorch and not scn_dataset:
         return scn_dict
     elif not with_pytorch and scn_dataset:
-        return SCNDataset(scn_dict)
-
+        return SCNDataset(scn_dict,
+                          complete_structures_only=complete_structures_only,
+                          trim_edges=trim_edges,
+                          sort_by_length=sort_by_length)
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
             scn_dict,
@@ -286,7 +311,9 @@ def load(casp_version=12,
             seq_as_onehot=seq_as_onehot,
             dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
-            train_eval_downsample=train_eval_downsample)
+            train_eval_downsample=train_eval_downsample,
+            shuffle=shuffle,
+            complete_structures_only=complete_structures_only)
 
     return
 
@@ -395,6 +422,66 @@ def filter_dictionary_by_missing_residues(raw_data):
               " training set entries were excluded based on missing residues.")
     raw_data["train"] = new_data
     return raw_data
+
+
+def load_pdb(filename, pdbid="", include_resolution=False, scnprotein=True):
+    """Return a SCNProtein containing SidechainNet-relevant data for a given PDB file.
+
+    Args:
+        filename (str): Path to existing PDB file.
+        pdbid (str): 4-letter string representing the PDB Identifier.
+        include_resolution (bool, default=False): If True, query the PDB for the protein
+            structure resolution based off of the given pdb_id.
+
+    Returns:
+        scndata (SCNProtein): A SCNProtein object containing information parsed from the
+            specified PDB file. If scnprotein is set to false, the data is returned as a
+            dictionary holding the parsed data attributes of the protein
+            structure. Below is a description of the keys:
+
+                The key 'seq' is a 1-letter amino acid sequence.
+                The key 'coords' is a (L x NUM_COORDS_PER_RES) x 3 numpy array.
+                The key 'angs' is a L x NUM_ANGLES numpy array.
+                The key 'is_nonstd' is a L x 1 numpy array with binary values. 1
+                    represents that the amino acid at that position was a non-standard
+                    amino acid that has been modified by SidechainNet into its standard
+                    form.
+                The key 'unmodified_seq' refers to the original amino acid sequence
+                    of the protein structure. Some non-standard amino acids are converted
+                    into their standard form by SidechainNet before measurement. In this
+                    case, the unmodified_seq variable will contain the original
+                    (3-letter code) seq.
+                The key 'resolution' is the resolution of the structure as listed on the
+                    PDB.
+    """
+    # First, use Prody to parse the PDB file
+    chain = pr.parsePDB(filename)
+    # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
+    (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
+     is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain, replace_nonstd=True)
+    scndata = {
+        "coords": coords_np,
+        "angs": dihedrals_np,
+        "seq": observed_sequence,
+        "unmodified_seq": unmodified_sequence,
+        "is_nonstd": is_nonstd
+    }
+    # If requested, look up the resolution of the given PDB ID
+    if include_resolution:
+        assert pdbid, "You must provide a PDB ID to look up the resolution."
+        scndata['resolution'] = get_resolution_from_pdbid(pdbid)
+
+    if scnprotein:
+        p = SCNProtein(coordinates=scndata['coords'].reshape(len(observed_sequence), -1,
+                                                             3),
+                       angles=scndata['angs'],
+                       sequence=scndata['seq'],
+                       unmodified_seq=scndata["unmodified_seq"],
+                       is_modified=scndata["is_nonstd"],
+                       mask='+' * len(observed_sequence),
+                       id=pdbid)
+        return p
+    return scndata
 
 
 _base_url = "http://bits.csb.pitt.edu/~jok120/sidechainnet_data/"

@@ -1,8 +1,11 @@
 # Pytorch saved files and associated ProteinNet files
 *.pt
-*.pkl
 *_ids.txt
 *.pdb
+sidechain*pkl
+training*pkl
+validation.pkl
+data/*/*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -129,3 +132,15 @@ resources/dev/*
 *_*.out
 *wandb*
 *.chkpt
+sidechainnet/utils/minimize_old.py
+sidechainnet/utils/openmmpdb.py
+sidechainnet/research/analysis/plots
+*.prof_stats*
+test_minimize_alpha.png
+sidechainnet/research/reconfigure_alignments/**/*.txt
+sidechainnet/research/reconfigure_alignments/**/*.pkl
+sidechainnet/research/evaluate_energy/**/*.csv
+seq_dict.pkl
+sidechainnet/research/analysis/minimization/**/*.png
+sidechainnet/research/analysis/minimization/**/*.pkl
+sidechainnet/research/analysis/minimization/**/*.pdb

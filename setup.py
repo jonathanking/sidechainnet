@@ -36,8 +36,9 @@ setup(
     package_data={
         "astral_data": ["resources/astral_data.txt"],
         "full_protein_dssp": ["resources/full_protein_dssp_annotations.json"],
-        "single_domain_dssp": ["resources/single_domain_dssp_annotations.json"]
-        },
+        "single_domain_dssp": ["resources/single_domain_dssp_annotations.json"],
+        "amber_build_params": ["resources/build_params.pkl"]
+    },
 
     # Allows `setup.py test` to work correctly with pytest
     setup_requires=[] + pytest_runner,
@@ -46,7 +47,7 @@ setup(
     url='https://github.com/jonathanking/sidechainnet',  # Website
     install_requires=[
         'ProDy>=2.0', 'numpy', 'scipy', 'torch>=1.7', 'biopython', 'tqdm', 'py3Dmol',
-        'requests', 'setuptools', 'pandas'
+        'requests', 'setuptools', 'pandas', 'numba'
     ],  # Required packages, pulls from pip if needed; do not use for Conda deployment
     tests_require=['pytest'],
     # platforms=['Linux',

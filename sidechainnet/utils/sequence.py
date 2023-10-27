@@ -3,7 +3,7 @@
 import numpy as np
 
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, NUM_ANGLES
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 
 
 def trim_mask_and_true_seqs(mask_seq, true_seq):
@@ -280,4 +280,4 @@ for one_letter_code in list(AA_MAP.keys()):
     AA_MAP[ONE_TO_THREE_LETTER_MAP[one_letter_code]] = AA_MAP[one_letter_code]
 
 # TODO: create VOCAB object only when needed.
-VOCAB = ProteinVocabulary()
+VOCAB = ProteinVocabulary()  # Padding idx = 20
