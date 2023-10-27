@@ -125,6 +125,36 @@ class SCNDataset(torch.utils.data.Dataset):
             print(f"{n_filtered_entries} ({n_filtered_entries/starting_length:.1%})"
                   " data set entries were excluded due to missing residues.")
 
+    @classmethod
+    def from_scnproteins(cls, proteins):
+        """Create a SCNDataset from a list of SCNProtein objects."""
+        data = {}
+        for p in proteins:
+            if p.split not in data:
+                data[p.split] = {
+                    'crd': [],
+                    'ang': [],
+                    'seq': [],
+                    'ums': [],
+                    'msk': [],
+                    'evo': [],
+                    'sec': [],
+                    'res': [],
+                    'mod': [],
+                    'ids': []
+                }
+            data[p.split]['crd'].append(p.coords)
+            data[p.split]['ang'].append(p.angles)
+            data[p.split]['seq'].append(p.seq)
+            data[p.split]['ums'].append(p.unmodified_seq)
+            data[p.split]['msk'].append(p.mask)
+            data[p.split]['evo'].append(p.evolutionary)
+            data[p.split]['sec'].append(p.secondary_structure)
+            data[p.split]['res'].append(p.resolution)
+            data[p.split]['mod'].append(p.is_modified)
+            data[p.split]['ids'].append(p.id)
+        return cls(data)
+
     def get_protein_list_by_split_name(self, split_name):
         """Return list of SCNProtein objects belonging to str split_name."""
         return [p for p in self if p.split == split_name]
