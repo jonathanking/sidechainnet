@@ -194,9 +194,13 @@ def get_tuple(pndata, scdata, pnid):
 
 
 def format_sidechainnet_path(casp_version, training_split):
-    """Returns a string representing a .pkl file for a CASP version and training set."""
+    """Return a string representing a .pkl file for a CASP version and training set."""
     if casp_version == "debug":
         return "sidechainnet_debug.pkl"
+    elif casp_version == 12 and training_split == "scnmin":
+        return "sidechainnet_scnmin_ommloss_paper.pkl"
+    elif casp_version == 12 and training_split == "scnunmin":
+        return "sidechainnet_scnunmin_ommloss_paper.pkl"
     return f"sidechainnet_casp{casp_version}_{training_split}.pkl"
 
 
