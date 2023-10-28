@@ -126,12 +126,15 @@ def load(casp_version=12,
     By default, the data is returned as a SCNDataset object, to facilitate inspection.
 
     Args:
-        casp_version (int, optional): CASP version to load (7-12). Defaults to 12.
-        casp_thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A
-            thinning represents the minimum sequence similarity each protein sequence must
-            have to all other sequences in the same thinning. The 100 thinning contains
-            all of the protein entries in SidechainNet, while the 30 thinning has a much
-            smaller amount. Defaults to 30.
+        casp_version (int, optional): CASP version to load (7-12). Defaults to 12. Users
+            may also specify 'debug' to load a small, debug dataset.
+        thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A thinning
+            represents the minimum sequence similarity each protein sequence must have to
+            all other sequences in the same thinning. The 100 thinning contains all of the
+            protein entries in SidechainNet, while the 30 thinning has a much smaller
+            amount. Defaults to 30. For CASP 12, users may specify the thinning as either
+            'scnmin' or 'scnunmin', which refer to the datasets used in the OpenMM-Loss
+            paper, https://doi.org/10.1101/2023.10.03.560775.
         scn_dir (str, optional): Path where SidechainNet data will be stored locally.
             Defaults to "./sidechainnet_data".
         force_download (bool, optional): If true, download SidechainNet data from the web
@@ -534,6 +537,10 @@ SCN_URLS = {
     "sidechainnet_casp7_95.pkl":  _base_url + "sidechainnet_casp7_95.pkl",
     "sidechainnet_casp7_100.pkl": _base_url + "sidechainnet_casp7_100.pkl",
 
-    # Other
+    # Debug
     "sidechainnet_debug.pkl":     _base_url + "sidechainnet_debug.pkl",
+
+    # Datasets associated with the OpenMM-Loss paper, https://doi.org/10.1101/2023.10.03.560775
+    "sidechainnet_scnmin_ommloss_paper.pkl": _base_url + "sidechainnet_scnmin_ommloss_paper.pkl",
+    "sidechainnet_scnunmin_ommloss_paper.pkl": _base_url + "sidechainnet_scnunmin_ommloss_paper.pkl",
 }
