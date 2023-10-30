@@ -39,7 +39,6 @@ NUM_BB_OTHER_ANGLES = 3
 NUM_SC_ANGLES = NUM_ANGLES - (NUM_BB_OTHER_ANGLES + NUM_BB_TORSION_ANGLES)
 SC_ANGLES_START_POS = NUM_BB_OTHER_ANGLES + NUM_BB_TORSION_ANGLES
 
-NUM_COORDS_PER_RES = 14
 PRODY_CA_DIST = 4.1
 GLOBAL_PAD_CHAR = np.nan
 ANGLE_NAME_TO_IDX_MAP = {
@@ -869,7 +868,7 @@ for a, aaa in AA1to3.items():
 HEAVY_ATOM_MASK_TENSOR = create_heavyatom_mask_tensor()
 
 
-# Legacy API, please use ATOM_MAP_HEAVY and ATOM_MAP_H when possible
+# Legacy API, please use ATOM_MAP_HEAVY and ATOM_MAP_H defined above
 SC_BUILD_INFO = {
     'ALA': {
         'angles-names': ['N-CA-CB'],

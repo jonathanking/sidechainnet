@@ -107,7 +107,7 @@ class SCNProtein(object):
             datadict = pickle.load(f)
         return cls(**datadict)
     @classmethod
-     def from_pdb(
+    def from_pdb(
         cls,
         filename,
         chid=None,
@@ -359,7 +359,20 @@ class SCNProtein(object):
                 f"split='{self.split}')")
 
     def fastbuild(self, add_hydrogens=False, build_params=None, inplace=False):
-        """Build protein coordinates from angles."""
+        """Build protein coords from angles using a highly parallel NeRF-like method.
+        
+        Args:
+            add_hydrogens (bool, default=False): If True, add hydrogens to the protein
+                structure.
+            build_params (dict, default=None): Dictionary of build parameters. If None,
+                defaults to the values in 
+                sidechainnet.structure.build_info.SC_HBUILD_INFO.
+            inplace (bool, default=False): If True, modify the protein's coordinates
+                in-place.
+        
+        Returns:
+            A torch tensor of the built coordinates. Protein is moved to torch data reps.
+        """
         if self.is_numpy:
             self.torch()
         coords, params = fastbuild.make_coords(self.seq,
@@ -382,16 +395,18 @@ class SCNProtein(object):
         """Build protein coordinates iff no StructureBuilder already exists."""
         raise ValueError("Use fastbuild instead.")
 
-    def add_hydrogens(self, add_to_heavy_atoms=False):
+    def add_hydrogens(self, add_to_heavy_atoms=True):
         """Add hydrogens to the internal protein structure representation."""
         if not add_to_heavy_atoms:
             raise ValueError(
                 "Adding hydrogens without add_to_heavy_atoms==True is not "
                 "supported.\nDo you want to use fastbuild to build all atoms from angles "
                 "instead?")
+        self.sb = None  # Reset the structure builder
         starting_is_numpy = self.is_numpy
         self.torch()
-        self.cuda()
+        if torch.cuda.is_available():
+            self.cuda()
         self.hb = sidechainnet.structure.HydrogenBuilder.HydrogenBuilder(
             self.seq, self.coords.double(), device=self.device)
         self.hcoords = self.hb.build_hydrogens()
