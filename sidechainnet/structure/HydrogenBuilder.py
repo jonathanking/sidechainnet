@@ -1,14 +1,17 @@
-"""Methods for adding hydrogen atoms to amino acid residues."""
+"""Vector methods for adding hydrogen atoms to a heavy atom protein structure."""
 import math
 
 import numpy as np
-from numba import njit
 import torch
-from sidechainnet.structure.build_info import ATOM_MAP_H, BB_BUILD_INFO, NUM_COORDS_PER_RES, NUM_COORDS_PER_RES_W_HYDROGENS
+from sidechainnet.structure.build_info import ATOM_MAP_H, BB_BUILD_INFO, NUM_COORDS_PER_RES_W_HYDROGENS
 from sidechainnet.structure.structure import coord_generator
 from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP
 from sidechainnet.structure.fastbuild import AA2NUM, SC_ALL_ATOM_BUILD_PARAMS
+
+# Optional numba support, uncomment @njit headers below
+# from numba import njit
+
 
 # ARG has 24 atoms including Hs (see amino12.lib)  + 2 terminal H + 1 terminal OXT
 # 3 of these are backbone heavy atom (N, CA, C), 1 is bb Oxygen, 1 is N-H
@@ -31,7 +34,7 @@ AMINE_LEN = torch.tensor(1.01)
 OXT_LEN = torch.tensor(BB_BUILD_INFO['BONDLENS']['c-oh'])
 RAD120TORCH = torch.tensor(2 * np.pi / 3)
 THIOL_ROT = torch.tensor(1.23045715359)
-# TODO-JK update with minimized values
+
 
 # yapf: disable
 HYDROGEN_NAMES = {

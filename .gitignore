@@ -110,7 +110,7 @@ ENV/
 # mypy
 .mypy_cache/
 
-# custom project ignore
+# Other custom project ignores for research code/data
 errors/
 *.cif
 .idea/

@@ -119,8 +119,7 @@ def get_p():
 
 @pytest.fixture
 def plarge():
-    d = scn.load('demo',
-                 local_scn_path='/home/jok120/sidechainnet_data/sidechainnet_debug.pkl',
+    d = scn.load('debug',
                  scn_dataset=True,
                  complete_structures_only=True)
     plarge = d[-10]
@@ -181,7 +180,7 @@ def test_fasbuildh_01(p: SCNProtein):
     """Build a simple protein from angles, including hydrogens."""
     fast_coords = p.fastbuild(add_hydrogens=True)
     p.coords = p.hcoords = fast_coords
-    p.to_pdb("/home/jok120/Downloads/predh36.pdb")
+    p.to_pdb("predh36.pdb")
 
 
 def test_fasbuildh_02(p: SCNProtein):
@@ -223,7 +222,7 @@ def test_measure_x0_with_fictitious_atom():
     print(data)
 
 def test_alphabet():
-    d = scn.load_pdb("/home/jok120/Downloads/alphabet.pdb", pdbid='ALFA')
+    d = get_alphabet_protein()
     d.torch()
     # coords = d.fastbuild(add_hydrogens=False)
     hcoords = d.fastbuild(add_hydrogens=True)
@@ -231,7 +230,7 @@ def test_alphabet():
     d.hcoords = hcoords
     d.has_hydrogens = True
     d.sb = None
-    d.to_pdb("/home/jok120/Downloads/alfa31.pdb", title='ALFA')
+    d.to_pdb("alfa31.pdb", title='ALFA')
     print(hcoords)
 
 
@@ -241,7 +240,7 @@ def test_alphabet_build():
     # p.fastbuild(inplace=True)
     # p.to_pdb("./alphabet_build02.pdb")
     p.fastbuild(add_hydrogens=True, inplace=True)
-    p.to_pdb("/home/jok120/Downloads/build_alfa04.pdb")
+    p.to_pdb("build_alfa04.pdb")
 
 
 def test_heavy_atom_build_info():

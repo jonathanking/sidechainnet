@@ -280,6 +280,11 @@ class StructureBuilder(object):
         Args:
             style (str, optional): Style string to be passed to py3Dmol for
                 visualization. Defaults to None.
+            other_protein (SCNProtein, optional): Another SCNProtein object to be
+                visualized alongside this one. Defaults to None. Other protein will be
+                colored red and the first protein will be colored blue. The other protein
+                must be the same length as this one and thus alignable.
+            **kwargs: Additional arguments to be passed to py3Dmol.view.
 
         Returns:
             py3Dmol.view object: A view object that is interactive in iPython notebook
@@ -541,7 +546,7 @@ def _get_residue_build_iter(res, build_dictionary, device):
     """Return an iterator over (bond-lens, angles, torsions, atom names) for a residue.
 
     This function makes it easy to iterate over the huge amount of data contained in
-    the dictionary sidechainnet.structure.build_info.SC_BUILD_INFO. This dictionary
+    the dictionary sidechainnet.structure.build_info.SC_HBUILD_INFO. This dictionary
     contains all of the various standard bond and angle values that are used during atomic
     reconstruction of a residue from its angles.
 
@@ -551,7 +556,7 @@ def _get_residue_build_iter(res, build_dictionary, device):
         build_dictionary (dict): A dictionary mapping 3-letter amino acid codes to
             dictionaries of information relevant to the construction of this amino acid
             from angles (i.e. angle names, atom types, bond lengths, bond types, torsion
-            types, etc.). See sidechainnet.structure.build_info.SC_BUILD_INFO.
+            types, etc.). See sidechainnet.structure.build_info.SC_HBUILD_INFO.
 
     Returns:
         iterator: An iterator that yields 4-tuples of (bond-value, angle-value,

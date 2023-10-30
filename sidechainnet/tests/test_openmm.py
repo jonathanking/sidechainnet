@@ -21,7 +21,6 @@ torch.set_printoptions(sci_mode=False, precision=3)
 # Turn off scientific notation for numpy
 np.set_printoptions(suppress=True)
 
-SCN_DIR = '/home/jok120/scn221001/'
 TOLERANCE = 1e-3
 
 
@@ -71,12 +70,6 @@ def af2pred_protein(af2pred_str):
     return SCNProtein_from_str(af2pred_str, pdbid="EXMP")
 
 
-@fixture
-def af2pred_protein2():
-    return scn.SCNProtein.from_pdb("/home/jok120/sidechainnet/sidechainnet/tests/"
-                                   "test_openmm/1A92_1_A_model_1_ptm_unrelaxed.pdb")
-
-
 def test_get_energy_from_pdbfile_fails_nohy(af2pred_protein):
     with pytest.raises(ValueError):
         af2pred_protein.get_energy()
@@ -88,11 +81,6 @@ def test_get_energy_from_pdbfile_addh_via_fastbuild(af2pred_str, tmp_path):
     p = scn.SCNProtein.from_pdb(tmp_path / "af2pred.pdb")
     p.fastbuild(add_hydrogens=True, inplace=True)
     p.get_energy()
-
-
-def test_get_energy_from_af2pred2(af2pred_protein2):
-    af2pred_protein2.fastbuild(add_hydrogens=True, inplace=True)
-    af2pred_protein2.get_energy()
 
 
 def test_get_energy_from_alphabet_addh_via_fastbuild():
@@ -243,7 +231,6 @@ def test_hydrogen_partners():
 
 def test_OpenMMEnergyH():
     d = scn.load("debug",
-                 scn_dir=SCN_DIR,
                  scn_dataset=True,
                  complete_structures_only=True,
                  filter_by_resolution=True)
@@ -274,101 +261,3 @@ def test_OpenMMEnergyH():
         losses.append(lossnp)
         fn = torch.norm(to_optim.grad)
         opt.step()
-
-
-### Deprecated ###
-
-# def test_pytorch_layer():
-#     # Fails because add_hydrogens is not yet implemented
-#     d = scn.load("debug", scn_dir=SCN_DIR, scn_dataset=True)
-#     p = d["40#2BDS_1_A"]
-#     p.add_hydrogens()  # Must be done at every step of optimization
-#     p.initialize_openmm()  # Need only be done once, but does need to see hydrogens
-#     energy = p.get_energy()
-#     print(energy)
-#     assert energy == p.get_energy()
-#     p.add_hydrogens()
-#     assert energy == p.get_energy()
-
-# def test_pytorch_layer2():
-#     # Setup
-#     d = scn.load("debug", scn_dir=SCN_DIR, scn_dataset=True)
-#     p = d[0]
-#     p.cuda()
-#     p.angles = torch.tensor(p.angles, requires_grad=True)
-#     p.fast_build(from_angles=True)
-#     p.coords = torch.tensor(p.coords, requires_grad=True)
-#     loss_layer = mm.OpenMMEnergy()
-#     opt = optim.SGD([p.coords], lr=1e-3)
-
-#     for i in range(10):
-#         energy = loss_layer.apply(p)
-#         print(energy)
-#         energy.requires_grad = True
-#         energy.backward()
-#         opt.step()
-
-# def test_add_hydrogens_to_struct_with_existing_h():
-#     d = scn.load("debug",
-#                  scn_dir=SCN_DIR,
-#                  scn_dataset=True)
-#     p = d["40#2BDS_1_A"]
-#     p.add_hydrogens()  # Must be done at every step of optimization
-#     p.initialize_openmm()  # Need only be done once, but does need to see hydrogens
-#     energy = p.get_energy()
-#     p.add_hydrogens()
-#     assert energy == p.get_energy()
-
-# def test_minimize_scndataset():
-#     d = scn.load("debug",
-#                  scn_dir=SCN_DIR,
-#                  scn_dataset=True,
-#                  complete_structures_only=True)
-#     p = d[0]
-#     p.add_hydrogens()
-#     p.minimize()
-
-#
-
-# def test_gradcheck2():
-#     # Load data
-#     d = scn.load("debug",
-#                  scn_dir=SCN_DIR,
-#                  scn_dataset=True)
-#     p = d[0]
-
-#     # Truncate to 2 AAs
-#     p.seq = p.seq[:2]
-#     p.hcoords = p.hcoords[:14 * 2]
-#     p.angles = torch.tensor(p.angles[:12 * 2], requires_grad=True)
-#     p.coords = torch.tensor(p.coords[:14 * 2], requires_grad=True)
-
-#     dfdx, forces = _gradcheck(p, p.coords)
-
-# def test_gradcheck_hsum():
-#     # Load data
-#     d = scn.load("debug", scn_dir=SCN_DIR, scn_dataset=True)
-#     p = d["1HD1_1_A"]
-
-#     # Truncate to 2 AAs
-#     p.seq = p.seq[:2]
-#     p.hcoords = p.hcoords[:14 * 2]
-#     p.angles = torch.tensor(p.angles[:12 * 2], requires_grad=True)
-#     p.coords = torch.tensor(p.coords[:14 * 2], requires_grad=True)
-
-#     energy_loss = OpenMMEnergy()
-#     opt = torch.optim.LBFGS([p.coords], lr=1e-7)
-
-#     losses = []
-
-#     for i in tqdm(range(50)):
-
-#         def closure():
-#             opt.zero_grad()
-#             loss = energy_loss.apply(p, p.coords)
-#             loss.backward()
-#             print(loss)
-#             losses.append(float(loss.detach().numpy()))
-#             return loss
-
-#         opt.step(closure)

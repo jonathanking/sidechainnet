@@ -3,9 +3,9 @@
 import sidechainnet as scn
 from sidechainnet.create import create
 from sidechainnet.utils.download import process_id
-from sidechainnet.utils.minimize_scn import do_pickle, process_index
+from sidechainnet.research.minimize_scn import do_pickle, process_index
 from sidechainnet.examples import get_alphabet_protein
-from sidechainnet.utils.minimizer import SCNMinimizer
+from sidechainnet.research.minimizer import SCNMinimizer
 
 
 def test_minimize_10p1JB0_12_X():

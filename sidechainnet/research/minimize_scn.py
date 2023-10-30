@@ -16,7 +16,7 @@ import random
 import sidechainnet as scn
 from sidechainnet.dataloaders.SCNDataset import SCNDataset
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
-from sidechainnet.utils.minimizer import SCNMinimizer
+from sidechainnet.research.minimizer import SCNMinimizer
 from sidechainnet.utils.organize import EMPTY_SPLIT_DICT
 
 UNMIN_PATH = ""

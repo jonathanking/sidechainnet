@@ -21,7 +21,7 @@ from sidechainnet.utils.parse import get_chain_from_astral_id, parse_astral_summ
 from sidechainnet.utils.manual_adjustment import correct_1GJJ_A_1
 
 # TODO Make max seq len argument
-MAX_SEQ_LEN = 750  # An arbitrarily large upper-bound on sequence lengths
+MAX_SEQ_LEN = 10_000  # An arbitrarily large upper-bound on sequence lengths
 
 VALID_SPLITS_INTS = [10, 20, 30, 40, 50, 70, 90]
 VALID_SPLITS = [f'valid-{s}' for s in VALID_SPLITS_INTS]

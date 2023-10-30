@@ -9,8 +9,61 @@ import torch
 from torch.autograd.functional import jacobian as get_jacobian
 
 
-class OpenMMEnergy(torch.autograd.Function):
+class OpenMMEnergyH(torch.autograd.Function):
     """A force-field based loss function."""
+
+    @staticmethod
+    def forward(ctx, protein, hcoords, force_scaling=None, force_clipping_val=None):
+        """Compute protein potential energy and save atomic forces for the backwards pass.
+
+        Args:
+            ctx (torch.autograd.Function): The autograd context.
+            protein (sidechainnet.SCNProtein): A sidechainnet protein.
+            hcoords (torch.Tensor): The current all-atom coordinates, including hydrogens.
+            force_scaling (float): A factor by which to scale the forces.
+            force_clipping_val (float): A value by which to clip the forces.
+        
+        Returns:
+            torch.Tensor: The potential energy of the protein.
+        """
+        # Set reasonable defaults
+        if force_scaling is None:
+            force_scaling = 1
+        if force_clipping_val is None:
+            force_clipping_val = 1e6
+
+        # Update protein's hcoords, scaled behind the scenes to match OpenMM's units
+        protein.update_hydrogens_for_openmm(hcoords)
+
+        # Compute potential energy and forces
+        energy = torch.tensor(protein.get_energy(return_unitless_kjmol=True),
+                              requires_grad=True,
+                              dtype=torch.float64,
+                              device=protein.device)
+        forces = protein.get_forces()
+
+        # Some forces may have inf/-inf, so we clip large values to avoid nan gradients
+        forces[forces > force_clipping_val] = force_clipping_val
+        forces[forces < -force_clipping_val] = -force_clipping_val
+
+        # Save context
+        ctx.forces = forces
+        ctx.grad_scale = force_scaling
+        ctx.device = protein.device
+        ctx.coord_shape = hcoords.shape
+
+        return energy
+
+    @staticmethod
+    def backward(ctx, grad_output=None):
+        """Return the negative force acting on each atom."""
+        return None, torch.tensor(
+            -ctx.forces.reshape(*ctx.coord_shape),
+            device='cuda') * grad_output * ctx.grad_scale, None, None
+
+
+class OpenMMEnergy(torch.autograd.Function):
+    """Not utilized in our research. A skeleton for OpenMM loss without hydrogens."""
 
     @staticmethod
     def forward(ctx, protein, coords, output_rep="all", jacobian=None):
@@ -49,47 +102,6 @@ class OpenMMEnergy(torch.autograd.Function):
 
         return None, de_dx * grad_output, None, None, None
 
-
-class OpenMMEnergyH(torch.autograd.Function):
-    """A force-field based loss function."""
-
-    @staticmethod
-    def forward(ctx, protein, hcoords, force_scaling=None, force_clipping_val=None):
-        """Compute potential energy of the protein system and save atomic forces."""
-        # Set reasonable defaults
-        if force_scaling is None:
-            force_scaling = 1
-        if force_clipping_val is None:
-            force_clipping_val = 1e6
-
-        # Update protein's hcoords, scaled behind the scenes to match OpenMM's units
-        protein.update_hydrogens_for_openmm(hcoords)
-
-        # Compute potential energy and forces
-        energy = torch.tensor(protein.get_energy(return_unitless_kjmol=True),
-                              requires_grad=True,
-                              dtype=torch.float64,
-                              device=protein.device)
-        forces = protein.get_forces()
-
-        # Some forces may have inf/-inf, so we clip large values to avoid nan gradients
-        forces[forces > force_clipping_val] = force_clipping_val
-        forces[forces < -force_clipping_val] = -force_clipping_val
-
-        # Save context
-        ctx.forces = forces
-        ctx.grad_scale = force_scaling
-        ctx.device = protein.device
-        ctx.coord_shape = hcoords.shape
-
-        return energy
-
-    @staticmethod
-    def backward(ctx, grad_output=None):
-        """Return the negative force acting on each atom."""
-        return None, torch.tensor(
-            -ctx.forces.reshape(*ctx.coord_shape),
-            device='cuda') * grad_output * ctx.grad_scale, None, None
 
 
 def _get_alias(protein):

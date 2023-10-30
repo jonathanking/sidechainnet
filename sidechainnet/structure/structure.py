@@ -3,10 +3,12 @@
 import numpy as np
 import prody as pr
 import torch
-from numba import njit
 from sidechainnet.structure import StructureBuilder
 from sidechainnet.structure.build_info import NUM_ANGLES
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
+
+# Optional numba support, uncomment @njit decorators
+# from numba import njit
 
 
 def angles_to_coords(angles, seq, remove_batch_padding=False):
@@ -284,15 +286,6 @@ def compare_pdb_files(file1, file2):
     transformation = pr.calcTransformation(s1, s2)
     s1_aligned = transformation.apply(s1)
     return pr.calcRMSD(s1_aligned, s2)
-
-
-def debug_example():
-    """A simple example of structure building for debugging."""
-    d = torch.load("/home/jok120/protein-transformer/data/proteinnet/casp12_200206_30.pt")
-    seq = d["train"]["seq"][70]
-    ang = d["train"]["ang"][70]
-    sb = StructureBuilder.StructureBuilder(seq, ang)
-    sb.build()
 
 
 def coord_generator(coords, remove_padding=False, seq=""):

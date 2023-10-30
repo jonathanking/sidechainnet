@@ -427,66 +427,6 @@ def filter_dictionary_by_missing_residues(raw_data):
     return raw_data
 
 
-def load_pdb(filename, pdbid="", include_resolution=False, scnprotein=True):
-    """Return a SCNProtein containing SidechainNet-relevant data for a given PDB file.
-
-    Args:
-        filename (str): Path to existing PDB file.
-        pdbid (str): 4-letter string representing the PDB Identifier.
-        include_resolution (bool, default=False): If True, query the PDB for the protein
-            structure resolution based off of the given pdb_id.
-
-    Returns:
-        scndata (SCNProtein): A SCNProtein object containing information parsed from the
-            specified PDB file. If scnprotein is set to false, the data is returned as a
-            dictionary holding the parsed data attributes of the protein
-            structure. Below is a description of the keys:
-
-                The key 'seq' is a 1-letter amino acid sequence.
-                The key 'coords' is a (L x NUM_COORDS_PER_RES) x 3 numpy array.
-                The key 'angs' is a L x NUM_ANGLES numpy array.
-                The key 'is_nonstd' is a L x 1 numpy array with binary values. 1
-                    represents that the amino acid at that position was a non-standard
-                    amino acid that has been modified by SidechainNet into its standard
-                    form.
-                The key 'unmodified_seq' refers to the original amino acid sequence
-                    of the protein structure. Some non-standard amino acids are converted
-                    into their standard form by SidechainNet before measurement. In this
-                    case, the unmodified_seq variable will contain the original
-                    (3-letter code) seq.
-                The key 'resolution' is the resolution of the structure as listed on the
-                    PDB.
-    """
-    # First, use Prody to parse the PDB file
-    chain = pr.parsePDB(filename)
-    # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
-    (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
-     is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain, replace_nonstd=True)
-    scndata = {
-        "coords": coords_np,
-        "angs": dihedrals_np,
-        "seq": observed_sequence,
-        "unmodified_seq": unmodified_sequence,
-        "is_nonstd": is_nonstd
-    }
-    # If requested, look up the resolution of the given PDB ID
-    if include_resolution:
-        assert pdbid, "You must provide a PDB ID to look up the resolution."
-        scndata['resolution'] = get_resolution_from_pdbid(pdbid)
-
-    if scnprotein:
-        p = SCNProtein(coordinates=scndata['coords'].reshape(len(observed_sequence), -1,
-                                                             3),
-                       angles=scndata['angs'],
-                       sequence=scndata['seq'],
-                       unmodified_seq=scndata["unmodified_seq"],
-                       is_modified=scndata["is_nonstd"],
-                       mask='+' * len(observed_sequence),
-                       id=pdbid)
-        return p
-    return scndata
-
-
 _base_url = "http://bits.csb.pitt.edu/~jok120/sidechainnet_data/"
 SCN_URLS = {
     # CASP 12

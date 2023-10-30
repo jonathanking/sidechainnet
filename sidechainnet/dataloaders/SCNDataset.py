@@ -6,7 +6,7 @@ To utilize SCNDataset, pass scn_dataset=True to scn.load().
     >>> d
     SCNDataset(n=461)
 
-SCNDatasets containt SCNProtein objects. See SCNProtein.py for more information.
+SCNDatasets contain SCNProtein objects. See SCNProtein.py for more information.
 SCNProteins may be iterated over or selected from the SCNDataset.
 
     >>> d["1HD1_1_A"]

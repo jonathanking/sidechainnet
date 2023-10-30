@@ -3,9 +3,6 @@ import torch
 
 from sidechainnet.utils.sequence import VOCAB
 
-# TODO: PyTorch Lightning do not forgets:
-# TODO: -clip gradients using the Trainer (clipval1)
-# TODO: -use wandb as the registered logger
 
 LOCAL_DIR = ""
 
@@ -80,51 +77,3 @@ class SidechainTransformer(torch.nn.Module):
         x = self.ff2(x)
         x = self.output_activation(x)
         return x
-
-
-# class _SCNDataModuleFull(pl.LightningDataModule):
-
-#     def __init__(self, scn_data_dict, batch_size=32, num_workers=1, dynamic_batching=False, optimize_for_cpu_parallelism=False):
-#         super().__init__()
-#         self.scn_data_dict = scn_data_dict
-#         self.batch_size = batch_size
-#         self.num_workers = num_workers
-#         self.dynamic_batching = dynamic_batching
-#         self.dynamic_batch_size = self.batch_size *  self.scn_data_dict['settings']['lengths'].mean()
-#         self.optimize_for_cpu_parallelism = optimize_for_cpu_parallelism
-#         # TODO: Fix shuffling
-
-#         if self.dynamic_batching:
-#             self.dynamic_batch_size = self.batch_size * self.scn_data_dict['settings'][
-#                 'lengths'].mean()
-#         else:
-#             self.dynamic_batch_size = None
-
-#     def _get_collate_fn(self):
-#         def collate(protein_objects):
-#             return ProteinBatch(protein_objects)
-
-#     def train_dataloader(self):
-#         train_dataset = SCNDataset(self.scn_data_dict['train'], split_name='train')
-#         sampler = SimilarLengthBatchSampler(
-#                 train_dataset,
-#                 self.batch_size,
-#                 dynamic_batch=self.dynamic_batch_size,
-#                 optimize_batch_for_cpus=self.optimize_for_cpu_parallelism,
-#                 shuffle=False)
-#         train_dl = torch.utils.data.DataLoader(
-#             train_dataset,
-#             num_workers=self.num_workers,
-#             collate_fn=self._get_collate_fn(),
-#             batch_sampler=sampler)
-#         return train_dl
-
-#     def val_dataloader(self):
-#         vkeys = []
-#         for key in self.scn_dataset.keys():
-#             if "valid" in key:
-#                 vkeys.append(key)
-#         return [self.scn_dataset[split_name] for split_name in vkeys]
-
-#     def test_dataloader(self):
-#         return self.scn_dataset['test']

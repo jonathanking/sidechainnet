@@ -49,7 +49,6 @@ def openmm_loss(
 
     # Add hydrogens to each protein
     for protein in scn_proteins:
-        #TODO-JK: What method should we use to add hydrogens?
         protein.add_hydrogens(add_to_heavy_atoms=True)
 
     loss = OpenMMEnergyH()
@@ -243,40 +242,3 @@ def atom37_to_atom14(atom37, batch, no_batch_dims=0):
 OPENFOLD_TO_SCN_MAP = get_openfold_to_sidechainnet_mapping()
 
 
-# def _create_ith_scn_protein_from_openfold_output(
-#         i: int,
-#         model_input: Dict,  # this represents the batch
-#         model_output: Dict,  # this represents the model's predictions
-# ) -> SCNProtein:
-#     """Take a batch of predictions and convert the ith prediction into a SCNProtein.
-
-#     Args:
-#         i (int): index of the protein in the batch.
-#         input (Dict): model input.
-#         output (Dict): model output.
-
-#     Returns:
-#         SCNProtein: parsed SidechainNet protein.
-#     """
-#     pass
-
-
-# def _create_scn_proteins_from_openfold_output(model_input: Dict,
-#                                               model_output: Dict) -> List[SCNProtein]:
-#     """Take a batch of predictions and convert them into a list of SidechainNet proteins.
-
-#     Args:
-#         input (Dict): model input.
-#         output (Dict): model output.
-
-#     Returns:
-#         List[SCNProtein]: List of parsed SidechainNet proteins.
-#     """
-#     # TODO-JK : this likely won't work, since I can't iterate over the batch input/output
-#     print(model_input.keys())
-#     print(model_output.keys())
-#     proteins = [
-#         _create_ith_scn_protein_from_openfold_output(i, _in, _out)
-#         for i, (_in, _out) in enumerate(zip(model_input, model_output))
-#     ]
-#     return proteins

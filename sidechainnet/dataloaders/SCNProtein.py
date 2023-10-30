@@ -106,28 +106,44 @@ class SCNProtein(object):
         with open(pkl_file, "rb") as f:
             datadict = pickle.load(f)
         return cls(**datadict)
-
     @classmethod
-    def from_pdb(cls, filename, chid=None, pdbid="", include_resolution=False, allow_nan=False):
+     def from_pdb(
+        cls,
+        filename,
+        chid=None,
+        pdbid="",
+        include_resolution=False,
+        allow_nan=False,
+        suppress_warnings=False):
         """Create a SCNProtein from a PDB file. Warning: does not support gaps.
 
         Args:
             filename (str): Path to existing PDB file.
+            chid (str, default=None): Chain ID to use when parsing the PDB file.
             pdbid (str): 4-letter string representing the PDB Identifier.
             include_resolution (bool, default=False): If True, query the PDB for the protein
                 structure resolution based off of the given pdb_id.
+            allow_nan (bool, default=False): If True, allow NaN values in the output (may
+                help with unrealistic structures, e.g., bad predictions).
+            suppress_warnings (bool, default=False): If True, suppress warnings.
 
         Returns:
             A SCNProtein object containing the coorinates, angles, and sequence parsed
             from the PDB file.
         """
         # TODO: Raise an alarm if the user is working with files that have gaps
+        # Raise a warning in any case, letting the user know that gaps are not supported
+        if not suppress_warnings:
+            warnings.warn("Gaps are not supported. If you are working with a PDB file "
+                          "that contains gaps, you will need to fix them prior to using "
+                          "this function.")
         # First, use Prody to parse the PDB file
         chain = prody.parsePDB(filename, chain=chid)
         # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
         (dihedrals_np, coords_np, observed_sequence, unmodified_sequence,
          is_nonstd) = scn.utils.measure.get_seq_coords_and_angles(chain,
-                                                                  replace_nonstd=True, allow_nan=allow_nan)
+                                                                  replace_nonstd=True,
+                                                                  allow_nan=allow_nan)
         scndata = {
             "coordinates": coords_np.reshape(len(observed_sequence), -1, 3),
             "angles": dihedrals_np,
@@ -521,7 +537,7 @@ class SCNProtein(object):
         # A mapping is used to define the relationship between hcoords and positions
         self.positions[self.hcoord_to_pos_map_values] = hcoords.reshape(
             -1, 3)[self.hcoord_to_pos_map_keys]
-        return self.positions  # TODO numba JIT compile
+        return self.positions
 
     ##########################################
     #         OPENMM SETUP FUNCTIONS         #
