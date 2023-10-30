@@ -236,7 +236,7 @@ def test_alphabet():
 
 
 def test_alphabet_build():
-    p = alphabet_protein()
+    p = get_alphabet_protein()
     # p.to_pdb("./alphabet_build01.pdb")
     # p.fastbuild(inplace=True)
     # p.to_pdb("./alphabet_build02.pdb")

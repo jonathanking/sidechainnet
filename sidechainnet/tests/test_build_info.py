@@ -10,7 +10,7 @@ def test_same_number_of_bonds_angles_dihedrals():
     for AA, AA_dict in SC_HBUILD_INFO.items():
         l = len(AA_dict["torsion-names"])
         for k in [
-                "angles-vals", "bonds-vals",
-                "torsion-vals",  "torsion-types"
+                "angle-vals", "bond-vals",
+                "torsion-vals",  "torsion-names"
         ]:
             assert len(AA_dict[k]) == l

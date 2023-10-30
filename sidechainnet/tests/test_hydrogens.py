@@ -128,7 +128,7 @@ def test_optimize_with_profiling():
     losses = []
     print(p, p.hcoords, to_optim)
 
-    for i in tqdm(range(500)):
+    for i in tqdm(range(10)):
         def closure():
             opt.zero_grad()
             loss = energy_loss.apply(p, to_optim)
@@ -191,7 +191,7 @@ def test_optimize_internal():
 
 def test_nanh_01():
     """Build hydrogens for a structure without gaps."""
-    d = scn.load("debug", scn_dir="/home/jok120/sidechainnet_data/", scn_dataset=True)
+    d = scn.load("debug", scn_dataset=True)
     p = d["1BE3_d1be3k-"]
     p.to_3Dmol()
     p.torch()

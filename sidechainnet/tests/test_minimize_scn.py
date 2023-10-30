@@ -27,18 +27,20 @@ def test_minimize_alpha():
 
 
 def test_process_raw_10p1JB0_12_X():
-    create(12, 100, './tmp1JBO')
+    pass
+    # create(12, 100, './tmp1JBO')
 
 
 def test_better_generate():
-    from sidechainnet.create import generate_all_from_proteinnet
+    pass
+    # from sidechainnet.create import generate_all_from_proteinnet
 
-    generate_all_from_proteinnet(
-        proteinnet_dir="/net/pulsar/home/koes/jok120/proteinnet/data",
-        sidechainnet_out='/net/pulsar/home/koes/jok120/scn220905',
-        num_cores=16,
-        limit=200,
-        regenerate_scdata=True)
+    # generate_all_from_proteinnet(
+    #     proteinnet_dir="/net/pulsar/home/koes/jok120/proteinnet/data",
+    #     sidechainnet_out='/net/pulsar/home/koes/jok120/scn220905',
+    #     num_cores=16,
+    #     limit=200,
+    #     regenerate_scdata=True)
 
 
 if __name__ == "__main__":

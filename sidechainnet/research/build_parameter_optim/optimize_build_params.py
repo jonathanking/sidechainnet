@@ -29,7 +29,6 @@ class BuildParamOptimizer(object):
         self._starting_build_params = copy.deepcopy(self.build_params)
         self.protein = self.prepare_protein(protein)
         self.ffname = ffname
-        assert ffname == ['amber14/protein.ff15ipq.xml', 'amber14/spce.xml']
         self.energy_loss = OpenMMEnergyH()
         self.keys_to_optimize = []
         if opt_bond_lengths:

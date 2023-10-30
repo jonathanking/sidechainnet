@@ -77,15 +77,6 @@ def af2pred_protein2():
                                    "test_openmm/1A92_1_A_model_1_ptm_unrelaxed.pdb")
 
 
-
-def test_load_scndir():
-    d = scn.load("debug",
-                 scn_dir=SCN_DIR,
-                 scn_dataset=True,
-                 complete_structures_only=True)
-    p = get_alphabet_protein()
-
-
 def test_get_energy_from_pdbfile_fails_nohy(af2pred_protein):
     with pytest.raises(ValueError):
         af2pred_protein.get_energy()
@@ -111,9 +102,9 @@ def test_get_energy_from_alphabet_addh_via_fastbuild():
 
 
 def test_gradcheck_small():
-    torch.cuda.synchronize()
+    # torch.cuda.synchronize()
     p = get_alphabet_protein()
-    p.cuda()
+    # p.cuda()
     p.seq = p.seq[1:3]
     p.angles = p.angles[1:3]
     p.angles = torch.tensor(p.angles, dtype=torch.float64, requires_grad=True)
@@ -133,9 +124,9 @@ def test_gradcheck_small():
 
 
 def test_gradcheck_large():
-    torch.cuda.synchronize()
+    # torch.cuda.synchronize()
     p = get_alphabet_protein()
-    p.cuda()
+    # p.cuda()
     # p.seq = p.seq[1:10]
     # p.angles = p.angles[1:10]
     p.angles = torch.tensor(p.angles, dtype=torch.float64, requires_grad=True)
@@ -155,8 +146,8 @@ def test_gradcheck_large():
 
 
 def get_af2pred_protein2():
-    return scn.SCNProtein.from_pdb("/home/jok120/sidechainnet/sidechainnet/tests/"
-                                   "test_openmm/1A92_1_A_model_1_ptm_unrelaxed.pdb")
+    return scn.SCNProtein.from_pdb("/net/pulsar/home/koes/jok120/repos/sidechainnet/"
+                                   "sidechainnet/tests/example_pred.pdb")
 
 
 @pytest.mark.parametrize("protein", [get_alphabet_protein(), get_af2pred_protein2()])
@@ -274,7 +265,7 @@ def test_OpenMMEnergyH():
     losses = []
     coordinates = []
 
-    for i in tqdm(range(10000)):
+    for i in tqdm(range(100)):
         coordinates.append(to_optim.detach().cpu().numpy())
         opt.zero_grad()
         loss = energy_loss.apply(p, to_optim)

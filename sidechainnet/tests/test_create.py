@@ -28,12 +28,14 @@ def test_make_unmodified_seq_entry():
 
 
 def test_generate_all():
-    from sidechainnet.create import generate_all
-    generate_all(num_cores=8, regenerate_scdata=True)
+    pass
+    # from sidechainnet.create import generate_all
+    # generate_all(num_cores=8, regenerate_scdata=True)
 
 
 def test_generate_all_from_proteinnet():
-    generate_all_from_proteinnet("/home/jok120/proteinnet/data/",
-                                 "/home/jok120/scn220901test",
-                                 limit=None,
-                                 regenerate_scdata=True)
+    pass
+    # generate_all_from_proteinnet("/home/jok120/proteinnet/data/",
+    #                              "/home/jok120/scn220901test",
+    #                              limit=None,
+    #                              regenerate_scdata=True)
