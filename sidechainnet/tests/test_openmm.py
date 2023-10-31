@@ -192,37 +192,11 @@ def test_similar_energy4(protein):
     assert torch.abs(eloss - e) < TOLERANCE
 
 
-def test_gradcheck2():
-    protein = get_alphabet_protein()
-    protein.fastbuild(add_hydrogens=True, inplace=True)
-    hcoords = torch.tensor(protein.hcoords, dtype=torch.float64, requires_grad=True)
-    eps = 1e-2
-    energy_loss = mm.OpenMMEnergyH()
-    energy = energy_loss.apply
-    c1, c2 = torch.tensor(hcoords.clone().detach()), torch.tensor(
-        hcoords.clone().detach())
-    c1[0, 0] += eps
-    c2[0, 0] -= eps
-    f1 = energy(protein, c1)
-    f2 = energy(protein, c2)
-    dfdx = (f1 - f2) / 2 * eps
-
-    analytical_energy = mm.OpenMMEnergyH()
-    analytical_energy = analytical_energy.apply(protein, hcoords)
-    analytical_energy.backward()
-    forces = hcoords.grad
-    force = forces[0, 0]
-
-    difference = np.float64(torch.abs(dfdx - force)) / max(np.float64(torch.abs(dfdx)),
-                                                           np.float64(torch.abs(force)))
-    return difference
-
-
 def test_hydrogen_partners():
     from sidechainnet.structure.HydrogenBuilder import (HYDROGEN_NAMES, HYDROGEN_PARTNERS)
 
     for resname in HYDROGEN_NAMES.keys():
-        assert len(HYDROGEN_NAMES[resname]) == len(HYDROGEN_PARTNERS[resname])
+        assert len(HYDROGEN_NAMES[resname]) == len(HYDROGEN_PARTNERS[resname]), resname
         for atomname in HYDROGEN_PARTNERS[resname]:
             assert not atomname.startswith("H")
 

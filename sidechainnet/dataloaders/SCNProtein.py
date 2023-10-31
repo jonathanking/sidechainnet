@@ -507,9 +507,17 @@ class SCNProtein(object):
         raise ValueError("This method is deprecated. Use fastbuild instead.")
 
     # TODO consider refactoring to remove unused argument
-    def add_hydrogens(self, add_to_heavy_atoms=True):
-        """Add hydrogens to the internal protein structure representation."""
-        if not add_to_heavy_atoms or (not self.has_hydrogens and not self.coords):
+    def add_hydrogens(self, add_to_heavy_atoms=True, force_requires_grad=False):
+        """Add hydrogens to the internal protein structure representation.
+
+        Args:
+            add_to_heavy_atoms (bool, default=True): If True, add hydrogens to the
+                protein structure. Otherwise, do nothing.
+            force_requires_grad (bool, default=False): If True, force the coordinates
+                to require gradients. Otherwise, hcoords will have gradients depending
+                on whether or not the heavy atom coordinates do.
+        """
+        if not add_to_heavy_atoms or (not self.has_hydrogens and self.coords is None):
             raise ValueError(
                 "Adding hydrogens without add_to_heavy_atoms==True is not "
                 "supported.\nDo you want to use fastbuild to build all atoms from angles "
@@ -517,6 +525,8 @@ class SCNProtein(object):
         self.sb = None  # Reset the structure builder
         starting_is_numpy = self.is_numpy
         self.torch()
+        if force_requires_grad:
+            self.coords.requires_grad = True
         self.hb = sidechainnet.structure.HydrogenBuilder.HydrogenBuilder(
             self.seq, self.coords.double(), device=self.device)
         self.hcoords = self.hb.build_hydrogens()
