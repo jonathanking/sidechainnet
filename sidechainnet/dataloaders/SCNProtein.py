@@ -405,8 +405,6 @@ class SCNProtein(object):
         self.sb = None  # Reset the structure builder
         starting_is_numpy = self.is_numpy
         self.torch()
-        if torch.cuda.is_available():
-            self.cuda()
         self.hb = sidechainnet.structure.HydrogenBuilder.HydrogenBuilder(
             self.seq, self.coords.double(), device=self.device)
         self.hcoords = self.hb.build_hydrogens()
