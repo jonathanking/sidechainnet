@@ -66,7 +66,7 @@ computing energy.
 * scn.load returns SCNDataset object by default instead of a Python dictionary representation
 - default pad character is NaN, not 0
 - SCNProtein.build_coords_from_angles is no longer supported, use SCNProtein.fastbuild to build coordinates from angles instead.
-- NUM_COORDS_PER_RES is now 15, not 14
+- NUM_COORDS_PER_RES is now 15, not 14. This is primarily to support terminal residue atoms (OXT, H2, and H3)
 
 
 ## To Dos

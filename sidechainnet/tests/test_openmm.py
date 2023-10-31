@@ -196,7 +196,7 @@ def test_gradcheck2():
     protein = get_alphabet_protein()
     protein.fastbuild(add_hydrogens=True, inplace=True)
     hcoords = torch.tensor(protein.hcoords, dtype=torch.float64, requires_grad=True)
-    eps = 1e-5
+    eps = 1e-2
     energy_loss = mm.OpenMMEnergyH()
     energy = energy_loss.apply
     c1, c2 = torch.tensor(hcoords.clone().detach()), torch.tensor(

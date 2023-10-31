@@ -742,7 +742,8 @@ class SCNProtein(object):
         # create a tensor filled with nans of the correct shape
         self.hcoords = torch.full_like(self.hcoords, float("nan"))
         # fill in the positions
-        self.hcoords[self.get_hydrogen_coord_mask(zeros_instead_of_nans=True)] = torch.from_numpy(openmm_positions)
+        self.hcoords[torch.all(self.get_hydrogen_coord_mask(zeros_instead_of_nans=True),
+            dim=-1)] = torch.from_numpy(openmm_positions)
         self.positions[self.hcoord_to_pos_map_values] = self.hcoords.reshape(
             -1, 3)[self.hcoord_to_pos_map_keys]
         self.coords = self.hcoords

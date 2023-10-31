@@ -85,6 +85,16 @@ def test_fasbuildh_02(p: SCNProtein):
     p.minimize()
 
 
+def test_fasbuildh_03(p: SCNProtein):
+    """Build a simple protein from angles, including hydrogens. Compute E."""
+    # p.fastbuild(add_hydrogens=True, inplace=True)
+    d = scn.load(casp_version=12, casp_thinning='scnmin')
+    p = d[1]
+    p.torch()
+    p.add_hydrogens()
+    p.minimize()
+
+
 def test_fastbuild_openmmhloss(p: SCNProtein):
     p.fastbuild(add_hydrogens=True, inplace=True)
     p.cpu()
