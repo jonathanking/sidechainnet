@@ -19,7 +19,8 @@ def test_add_hydrogen_numpy():
     d = scn.load("debug",
                  scn_dataset=True)
     p = d['40#2BDS_1_A']  # Starts with 2 Alanines
-    p.coords = p.coords[:28, :]
+    # Use numpy to add a new dimension at the beginning
+    p.coords = np.expand_dims(p.coords, axis=0)
     p.seq = p.seq[:2]
     p.add_hydrogens()
 
@@ -28,8 +29,10 @@ def test_add_hydrogen_torch():
     d = scn.load("debug",
                  scn_dataset=True)
     p = d['40#2BDS_1_A']  # Starts with 2 Alanines
-    p.coords = torch.tensor(p.coords[:28, :])
+    # Use numpy to add a new dimension at the beginning
+    p.coords = np.expand_dims(p.coords, axis=0)
     p.seq = p.seq[:2]
+    p.torch()
     p.add_hydrogens()
 
 

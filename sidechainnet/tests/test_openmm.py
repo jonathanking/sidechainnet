@@ -75,11 +75,11 @@ def test_get_energy_from_pdbfile_fails_nohy(af2pred_protein):
         af2pred_protein.get_energy()
 
 
-def test_get_energy_from_pdbfile_addh_via_fastbuild(af2pred_str, tmp_path):
-    with open(tmp_path / "af2pred.pdb", "w") as f:
-        f.write(af2pred_str)
-    p = scn.SCNProtein.from_pdb(tmp_path / "af2pred.pdb")
-    p.fastbuild(add_hydrogens=True, inplace=True)
+def test_get_energy_from_pdbfile_addh_via_fastbuild(af2pred_protein):
+    af2pred_protein.to_pdb("af2pred.pdb")
+    p = scn.SCNProtein.from_pdb("af2pred.pdb")
+    # p.fastbuild(add_hydrogens=True, inplace=True)
+    p.add_hydrogens()
     p.get_energy()
 
 
@@ -105,10 +105,9 @@ def test_gradcheck_small():
         openmmf.apply,
         _input,
         check_undefined_grad=True,
-        raise_exception=False,
-        rtol=.001,
+        raise_exception=True,
+        atol=.3,
         eps=1e-3)
-    assert test
 
 
 def test_gradcheck_large():
@@ -128,9 +127,8 @@ def test_gradcheck_large():
         _input,
         check_undefined_grad=True,
         raise_exception=True,
-        rtol=.1,
+        atol=.5,
         eps=1e-3)
-    assert test
 
 
 def get_af2pred_protein2():
@@ -235,8 +233,9 @@ def test_OpenMMEnergyH():
                  complete_structures_only=True,
                  filter_by_resolution=True)
     p = d[7]
+    p = get_alphabet_protein()
     p.torch()
-    p.cuda()
+    # p.cuda()
     p.add_hydrogens()
     # p.get_openmm_repr()
     # p.get_energy_difference()

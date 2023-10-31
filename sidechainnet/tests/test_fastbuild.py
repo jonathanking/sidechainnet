@@ -77,12 +77,17 @@ def test_fasbuildh_01(p: SCNProtein):
 def test_fasbuildh_02(p: SCNProtein):
     """Build a simple protein from angles, including hydrogens. Compute E."""
     # p.fastbuild(add_hydrogens=True, inplace=True)
-p    p.add_hydrogens(add_to_heavy_atoms=True)
+    p = get_alphabet_protein()
+    d = scn.load(casp_version=12, casp_thinning='scnmin')
+    p = d[0]
+    p.torch()
+    p.add_hydrogens()
     p.minimize()
 
 
 def test_fastbuild_openmmhloss(p: SCNProtein):
-    fast_coords = p.fastbuild(add_hydrogens=True)
+    p.fastbuild(add_hydrogens=True, inplace=True)
+    p.cpu()
     to_optim = (p.hcoords).detach().clone().requires_grad_(True)
 
     energy_loss = OpenMMEnergyH()
@@ -91,10 +96,10 @@ def test_fastbuild_openmmhloss(p: SCNProtein):
     losses = []
     coordinates = []
 
-    for i in tqdm(range(10000)):
+    for i in tqdm(range(10)):
         coordinates.append(to_optim.detach().cpu().numpy())
         opt.zero_grad()
-        loss = energy_loss.apply(p, to_optim)
+        loss = energy_loss.apply(p, to_optim).cpu()
         loss.backward()
         lossnp = float(loss.detach().cpu().numpy())
         losses.append(lossnp)

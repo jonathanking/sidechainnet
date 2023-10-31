@@ -410,6 +410,7 @@ class SCNProtein(object):
         self.hb = sidechainnet.structure.HydrogenBuilder.HydrogenBuilder(
             self.seq, self.coords.double(), device=self.device)
         self.hcoords = self.hb.build_hydrogens()
+        self.coords = self.hcoords
         self.has_hydrogens = True
         if starting_is_numpy:
             self.numpy()

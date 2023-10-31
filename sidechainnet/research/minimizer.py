@@ -136,7 +136,6 @@ class SCNMinimizer(object):
         # TODO support missing atoms
         min_results = {}
         p.torch()
-        p.cuda()
         to_optim = (p.angles).detach().clone().requires_grad_(True)
         opt = self._get_optimizer(to_optim)
         energy_loss = OpenMMEnergyH()

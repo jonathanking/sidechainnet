@@ -6,6 +6,7 @@ def test_other_protein():
 
     p = get_alphabet_protein()
     p2 = get_alphabet_protein()
+    p2.add_hydrogens()
 
     bpo = BuildParamOptimizer(p)
     bpo.optimize(opt='SGD')

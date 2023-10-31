@@ -283,7 +283,7 @@ class StructureBuilder(object):
             other_protein (SCNProtein, optional): Another SCNProtein object to be
                 visualized alongside this one. Defaults to None. Other protein will be
                 colored red and the first protein will be colored blue. The other protein
-                must be the same length as this one and thus alignable.
+                must have the same number of atoms as this one and thus alignable.
             **kwargs: Additional arguments to be passed to py3Dmol.view.
 
         Returns:
@@ -301,13 +301,14 @@ class StructureBuilder(object):
             other_protein.numpy()
             other_protein_copy = other_protein.copy()
             # Remove rows with nans
-            other_protein_copy_coords = other_protein_copy.coords.reshape(-1, 3)
-            other_protein_copy_coords_nonans = other_protein_copy_coords[
-                ~np.isnan(other_protein_copy_coords).any(axis=-1)]
             if torch.is_tensor(self.coords):
                 self.coords = self.coords.detach().cpu().numpy()
             coords_copy = copy.deepcopy(self.coords).reshape(-1, 3)
             coords_copy_nonans = coords_copy[~np.isnan(coords_copy).any(axis=-1)]
+            other_protein_copy_coords = other_protein_copy.coords.reshape(-1, 3)
+            other_protein_copy_coords_nonans = other_protein_copy_coords[
+                ~np.isnan(coords_copy).any(axis=-1)]
+            
             # Perform alignment between non-nan coords
             t = pr.calcTransformation(other_protein_copy_coords_nonans,
                                       coords_copy_nonans)

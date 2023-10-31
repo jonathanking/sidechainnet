@@ -59,7 +59,7 @@ class OpenMMEnergyH(torch.autograd.Function):
         """Return the negative force acting on each atom."""
         return None, torch.tensor(
             -ctx.forces.reshape(*ctx.coord_shape),
-            device='cuda') * grad_output * ctx.grad_scale, None, None
+            device=ctx.device) * grad_output * ctx.grad_scale, None, None
 
 
 class OpenMMEnergy(torch.autograd.Function):
