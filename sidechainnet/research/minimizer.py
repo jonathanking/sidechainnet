@@ -32,7 +32,7 @@ class SCNMinimizer(object):
         """Preprocess a protein object for minimization."""
         # Add missing atoms
         p.add_hydrogens()
-        p.make_pdbfixer()
+        p._make_pdbfixer()
         p.pdbfixer.addMissingAtoms()
         p.pdbfixer.findMissingAtoms()
 

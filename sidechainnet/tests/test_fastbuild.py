@@ -82,7 +82,7 @@ def test_fasbuildh_02(p: SCNProtein):
     p = d[0]
     p.torch()
     p.add_hydrogens()
-    p.minimize()
+    p._minimize()
 
 
 def test_fasbuildh_03(p: SCNProtein):
@@ -92,7 +92,7 @@ def test_fasbuildh_03(p: SCNProtein):
     p = d[1]
     p.torch()
     p.add_hydrogens()
-    p.minimize()
+    p._minimize()
 
 
 def test_fastbuild_openmmhloss(p: SCNProtein):

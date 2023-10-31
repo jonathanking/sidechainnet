@@ -33,7 +33,7 @@ class OpenMMEnergyH(torch.autograd.Function):
             force_clipping_val = 1e6
 
         # Update protein's hcoords, scaled behind the scenes to match OpenMM's units
-        protein.update_hydrogens_for_openmm(hcoords)
+        protein._update_hydrogens_for_openmm(hcoords)
 
         # Compute potential energy and forces
         energy = torch.tensor(protein.get_energy(return_unitless_kjmol=True),

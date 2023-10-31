@@ -143,7 +143,7 @@ def test_similar_energy1(protein):
     protein.fastbuild(add_hydrogens=True, inplace=True)
 
     # First test if the energy is similar when using the same openmm representation
-    protein.initialize_openmm()
+    protein._initialize_openmm()
     eloss_fn = OpenMMEnergyH()
     eloss = eloss_fn.apply(protein, protein.hcoords)
 
@@ -157,7 +157,7 @@ def test_similar_energy2(protein):
     protein.fastbuild(add_hydrogens=True, inplace=True)
 
     # Test that the above works when computed in reverse
-    protein.initialize_openmm()
+    protein._initialize_openmm()
     e = protein.get_energy(return_unitless_kjmol=True)
 
     eloss_fn = OpenMMEnergyH()
@@ -182,12 +182,12 @@ def test_similar_energy4(protein):
     protein.fastbuild(add_hydrogens=True, inplace=True)
 
     # Now test if the energy is similar when resetting the openmm representation
-    protein.initialize_openmm()
+    protein._initialize_openmm()
     eloss_fn = OpenMMEnergyH()
     eloss = eloss_fn.apply(protein, protein.hcoords)
 
     protein.openmm_initialized = False
-    protein.initialize_openmm()
+    protein._initialize_openmm()
     e = protein.get_energy(return_unitless_kjmol=True)
     assert torch.abs(eloss - e) < TOLERANCE
 
@@ -237,7 +237,7 @@ def test_OpenMMEnergyH():
     p.torch()
     # p.cuda()
     p.add_hydrogens()
-    # p.get_openmm_repr()
+    # p._get_openmm_repr()
     # p.get_energy_difference()
     # p.get_rmsd_difference()
     # p._make_start_and_end_pdbs()

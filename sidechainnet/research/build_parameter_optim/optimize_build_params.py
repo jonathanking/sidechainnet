@@ -66,7 +66,7 @@ class BuildParamOptimizer(object):
         protein.fastbuild(add_hydrogens=True,
                           build_params=self.build_params,
                           inplace=True)
-        protein.initialize_openmm(nonbonded_interactions=False)
+        protein._initialize_openmm(nonbonded_interactions=False)
         return protein
 
     def create_param_list_from_build_params(self, build_params):

@@ -14,9 +14,14 @@ Available SCNProtein attributes include:
     * split
 
 Other features:
+    * read/write to PDBs and pkl files
     * add non-terminal hydrogens to a protein's coordinates with SCNProtein.add_hydrogens
-    * visualize proteins with SCNProtein.to_3Dmol()
+    * visualize proteins with SCNProtein.to_3Dmol() or write to PNGs or GLTFs
     * write PDB files for proteins with SCNProtein.to_PDB()
+    * compare rmsd between two of the same protein with different conformations
+    * convert torsion angle rep to coordinates with SCNProtein.fastbuild()
+    * get OpenMM potential energy, forces, or OpenMMLoss values with 
+        SCNProtein.get_energy(), SCNProtein.get_forces(), or SCNProtein.get_openmm_loss()
 """
 import pickle
 import random
@@ -56,7 +61,26 @@ SEED = 1234
 class SCNProtein(object):
     """Represent one protein in SidechainNet. Created programmatically by SCNDataset."""
     def __init__(self, **kwargs) -> None:
-        """Create a SCNProtein from keyword arguments."""
+        f"""Create a SCNProtein from keyword arguments.
+
+        Args:
+            coordinates (np.ndarray): (L x N x 3) array of atomic coordinates.
+            angles (np.ndarray): (L x 14) array of dihedral angles.
+            sequence (str): Length-L string of 1-letter amino acid codes.
+            unmodified_seq (str): Length-L string of 1-letter amino acid codes.
+            mask (str): Length-L string of "+" and "-" characters indicating which
+                residues have coordinates.
+            evolutionary (np.ndarray): (L x 21) array of PSSM values.
+            secondary_structure (str): Length-L string of DSSP secondary structure
+                codes.
+            resolution (float): Resolution of the protein's structure.
+            is_modified (bool): Whether the protein contains non-standard amino acids.
+            id (str): 4-letter PDB identifier.
+            split (str): "train", "val", or "test".
+            add_sos_eos (bool): Whether to add SOS and EOS tokens to the sequence.
+            openmm_forcefields (list): List of OpenMM forcefields (default:
+                {OPENMM_FORCEFIELDS})
+        """
         super().__init__()
         self.coords = kwargs['coordinates'] if 'coordinates' in kwargs else None
         self.angles = kwargs['angles'] if 'angles' in kwargs else None
@@ -102,19 +126,28 @@ class SCNProtein(object):
 
     @classmethod
     def from_pkl(cls, pkl_file):
-        """Create a SCNProtein from a pickle file (inverse of SCNProtein.to_pkl)."""
+        """Create a SCNProtein from a pickle file (inverse of SCNProtein.to_pkl).
+        
+        Args:
+            pkl_file (str): Path to pickle file. Must have been created by
+                SCNProtein.to_pkl.
+        
+        Returns:
+            A SCNProtein object.
+        """
         with open(pkl_file, "rb") as f:
             datadict = pickle.load(f)
         return cls(**datadict)
+
     @classmethod
     def from_pdb(
-        cls,
-        filename,
-        chid=None,
-        pdbid="",
-        include_resolution=False,
-        allow_nan=False,
-        suppress_warnings=False):
+            cls,
+            filename,
+            chid=None,
+            pdbid="",
+            include_resolution=False,
+            allow_nan=False,
+            suppress_warnings=False):
         """Create a SCNProtein from a PDB file. Warning: does not support gaps.
 
         Args:
@@ -160,22 +193,27 @@ class SCNProtein(object):
         return cls(**scndata)
 
     @classmethod
-    def from_cif(cls, filename, chid=None, pdbid="", include_resolution=False, return_sequences=False):
+    def from_cif(cls, filename, chid=None, pdbid="", include_resolution=False, return_sequences=False, suppress_warnings=False):
         """Create a SCNProtein from a mmCIF file. Warning: does not support gaps.
 
         Args:
             filename (str): Path to existing PDB file.
             pdbid (str): 4-letter string representing the PDB Identifier.
-            include_resolution (bool, default=False): If True, query the PDB for the protein
-                structure resolution based off of the given pdb_id.
+            include_resolution (bool, default=False): If True, query the PDB for the
+                protein structure resolution based off of the given pdb_id.
+            return_sequences (bool, default=False): If True, return the observed and
+                unmodified sequences in addition to the SCNProtein object.
+            suppress_warnings (bool, default=False): If True, suppress warnings.
 
         Returns:
             A SCNProtein object containing the coorinates, angles, and sequence parsed
-            from the PDB file.
+            from the cif file.
         """
         # TODO: Raise an alarm if the user is working with files that have gaps
-        # First, use Prody to parse the PDB file
-        # header = None
+        if not suppress_warnings:
+            warnings.warn("Gaps are not supported. If you are working with a CIF file "
+                          "that contains gaps, you will need to fix them prior to using "
+                          "this function.")
         chain, header = prody.parseMMCIF(filename, chain=chid, header=True)
         # chain = prody.parseMMCIF(filename, chain=chid, header=False)
         # Next, use SidechainNet to make the relevant measurements given the Prody chain obj
@@ -212,7 +250,16 @@ class SCNProtein(object):
         return len(self.seq)
 
     def to_3Dmol(self, from_angles=False, style=None, other_protein=None):
-        """Return an interactive visualization of the protein with py3DMol."""
+        """Return an interactive visualization of the protein with py3DMol.
+
+        Args:
+            from_angles (bool, default=False): If True, build the protein from angles
+                instead of coordinates.
+            style (str, default=None): If None, use the default style. Otherwise, use
+                the style specified by the string. Passed to py3Dmol.view.
+            other_protein (SCNProtein, default=None): If not None, visualize this protein
+                alongside the current protein. Must have the same number of atoms.
+        """
         if self.sb is None:
             if from_angles:
                 self.sb = sidechainnet.StructureBuilder(self.seq,
@@ -229,7 +276,15 @@ class SCNProtein(object):
         return self.sb.to_3Dmol(style=style, other_protein=other_protein)
 
     def to_pdb(self, path, title=None, from_angles=False):
-        """Save structure to path as a PDB file."""
+        """Save structure to path as a PDB file.
+        
+        Args:
+            path (str): Path to save the PDB file.
+            title (str, default=None): Title of the PDB file. If None, use the protein's
+                ID.
+            from_angles (bool, default=False): If True, build the protein from angles
+                instead of coordinates.
+        """
         if not title:
             title = self.id
         if self.sb is None:
@@ -248,7 +303,16 @@ class SCNProtein(object):
         return self.sb.to_pdb(path, title)
 
     def to_pdbstr(self, title=None, from_angles=False, hcoords=None):
-        """Save structure to path as a PDB file."""
+        """Generate the PDB file as a string for this protein.
+        
+        Args:
+            title (str, default=None): Title of the PDB file. If None, use the protein's
+                ID.
+            from_angles (bool, default=False): If True, build the protein from angles
+                instead of coordinates.
+            hcoords (np.ndarray, default=None): If not None, use these coordinates to
+                generate the PDB file. Otherwise, use the protein's coordinates.
+        """
         if not title:
             title = self.id
         if hcoords is not None:
@@ -271,7 +335,14 @@ class SCNProtein(object):
         return self.sb.to_pdbstr(title)
 
     def to_gltf(self, path, title="test", from_angles=False):
-        """Save structure to path as a gltf (3D-object) file."""
+        """Save structure to path as a gltf (3D-object) file.
+        
+        Args:
+            path (str): Path to save the gltf file.
+            title (str, default='test'): Title of the gltf file.
+            from_angles (bool, default=False): If True, build the protein from angles
+                instead of coordinates.
+        """
         if self.sb is None:
             if from_angles:
                 self.sb = sidechainnet.StructureBuilder(self.seq,
@@ -288,7 +359,13 @@ class SCNProtein(object):
         return self.sb.to_gltf(path, title)
 
     def to_png(self, path, from_angles=False):
-        """Save structure to path as a PNG (image) file."""
+        """Save structure to path as a PNG (image) file.
+        
+        Args:
+            path (str): Path to save the PNG file.
+            from_angles (bool, default=False): If True, build the protein from angles
+                instead of coordinates.
+        """
         if self.sb is None:
             if from_angles:
                 self.sb = sidechainnet.StructureBuilder(self.seq,
@@ -305,7 +382,16 @@ class SCNProtein(object):
         return self.sb.to_png(path)
 
     def rmsd(self, other_scnprotein):
-        """Compute all-atom RMSD between two sequence-identical SCNProteins."""
+        """Compute all-atom RMSD between two sequence-identical SCNProteins.
+        
+        Args:
+            other_scnprotein (SCNProtein): The other protein to compare to. Should
+                essentially be the same protein with a different conformation since an
+                alignment is necessary.
+            
+        Returns:
+            The RMSD between the two proteins.
+        """
         assert self.seq == other_scnprotein.seq, "Proteins must have identical sequences."
         unrolled_coords_a = self.coords.reshape(-1, 3)
         unrolled_coords_b = other_scnprotein.coords.reshape(-1, 3)
@@ -319,16 +405,25 @@ class SCNProtein(object):
         b = unrolled_coords_b[real_valued_rows_a & real_valued_rows_b]
         t = prody.calcTransformation(a, b)
         return prody.calcRMSD(t.apply(a), b)
-    
+
     def get_ca_coords(self):
         """Return a numpy array of the C-alpha coordinates."""
         if torch.is_tensor(self.coords):
             return self.coords[:, 1, :].cpu().detach().numpy()
         else:
             return self.coords[:, 1, :]
-    
+
     def rmsd_ca(self, other_scnprotein):
-        """Compute C-alpha RMSD between two sequence-identical SCNProteins."""
+        """Compute C-alpha RMSD between two sequence-identical SCNProteins.
+        
+        Args:
+            other_scnprotein (SCNProtein): The other protein to compare to. Should
+                essentially be the same protein with a different conformation since an
+                alignment is necessary.
+                
+        Returns:
+            The C-alpha RMSD between the two proteins.
+        """
         ca1 = self.get_ca_coords()
         ca2 = other_scnprotein.get_ca_coords()
         real_valued_rows_a = (~np.isnan(ca1)).all(axis=-1)
@@ -358,8 +453,15 @@ class SCNProtein(object):
         return (f"SCNProtein({self.id}, len={len(self)}, missing={self.num_missing}, "
                 f"split='{self.split}')")
 
+    # TODO: Consider refactoring for renaming the fastbuild fn
     def fastbuild(self, add_hydrogens=False, build_params=None, inplace=False):
-        """Build protein coords from angles using a highly parallel NeRF-like method.
+        """Build protein coords from angles using a highly parallel NeRF implementation.
+
+        Note: Our implementation was developed independently of MP-NeRF. It uses a
+        residue-level parallelism approach with local and global frames of reference. It
+        supports all-atom (protein backbone + sidechain) and hydrogen generation. Compared
+        to sequential NeRF for torsion angle to cartesian coordinate generation, it is
+        much faster.
         
         Args:
             add_hydrogens (bool, default=False): If True, add hydrogens to the protein
@@ -393,11 +495,12 @@ class SCNProtein(object):
 
     def build_coords_from_angles(self, angles=None, add_hydrogens=False):
         """Build protein coordinates iff no StructureBuilder already exists."""
-        raise ValueError("Use fastbuild instead.")
+        raise ValueError("This method is deprecated. Use fastbuild instead.")
 
+    # TODO consider refactoring to remove unused argument
     def add_hydrogens(self, add_to_heavy_atoms=True):
         """Add hydrogens to the internal protein structure representation."""
-        if not add_to_heavy_atoms:
+        if not add_to_heavy_atoms or (not self.has_hydrogens and not self.coords):
             raise ValueError(
                 "Adding hydrogens without add_to_heavy_atoms==True is not "
                 "supported.\nDo you want to use fastbuild to build all atoms from angles "
@@ -414,7 +517,7 @@ class SCNProtein(object):
             self.numpy()
 
     def get_unpadded_coords(self):
-        """Get coordinates without padding and without ATOMS_PER_RES dimension."""
+        """Get coordinates without padding and without NUM_COORDS_PER_RES dimension."""
         unrolled_coords = self.coords.reshape(-1, 3)
         real_valued_rows = (~torch.isnan(unrolled_coords)).any(dim=-1)
         return unrolled_coords[real_valued_rows]
@@ -434,8 +537,9 @@ class SCNProtein(object):
     def _add_missing_via_pdbfixer_and_init_openmm(self,
                                                   seed=SEED,
                                                   add_hydrogens_via_openmm=False):
-        self.get_openmm_repr()
-        self.make_pdbfixer()
+        """Utilize pdbfixer to add missing atoms, then initialize OpenMM."""
+        self._get_openmm_repr()
+        self._make_pdbfixer()
         self._convert_pdbfixer_positions_to_quantities()
         self.pdbfixer.findMissingResidues()
         self.pdbfixer.findMissingAtoms()
@@ -445,7 +549,7 @@ class SCNProtein(object):
         self._undo_pdbfixer_positions_to_quantities()
         self.positions = self.pdbfixer.positions
         self.topology = self.pdbfixer.topology
-        self.initialize_openmm(skip_get_openmm_repr=True,
+        self._initialize_openmm(skip_get_openmm_repr=True,
                                add_hydrogens_via_openmm=add_hydrogens_via_openmm)
 
     def get_energy(self,
@@ -453,7 +557,21 @@ class SCNProtein(object):
                    add_hydrogens_via_openmm=False,
                    add_hydrogens_via_scnprotein=False,
                    return_unitless_kjmol=False):
-        """Return potential energy of the system given current atom positions."""
+        """Return potential energy of the system via OpenMM given current atom positions.
+        
+        Args:
+            add_missing (bool, default=False): If True, add missing atoms to the protein
+                structure using PDBFixer.
+            add_hydrogens_via_openmm (bool, default=False): If True, add hydrogens to the
+                protein structure using OpenMM.
+            add_hydrogens_via_scnprotein (bool, default=False): If True, add hydrogens to
+                the protein structure using SCNProtein.add_hydrogens().
+            return_unitless_kjmol (bool, default=False): If True, return the energy in
+                kJ/mol without units.
+        
+        Returns:
+            The potential energy of the protein structure as an OpenMM quantity or float.
+            """
         if not self.has_hydrogens and not (add_hydrogens_via_openmm or add_missing or add_hydrogens_via_scnprotein):
             raise ValueError("Cannot compute energy without hydrogens.")
         if add_hydrogens_via_openmm and add_hydrogens_via_scnprotein:
@@ -471,7 +589,7 @@ class SCNProtein(object):
             self.add_hydrogens(add_to_heavy_atoms=True)
 
         if not self.openmm_initialized:
-            self.initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+            self._initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
 
         self.simulation.context.setPositions(self.positions)
         self.starting_state = self.simulation.context.getState(getEnergy=True,
@@ -482,16 +600,32 @@ class SCNProtein(object):
         else:
             return self.starting_energy
 
-    def get_energy_loss(self, nonbonded_interactions=True):
-        """Return potential energy loss of the system given current atom positions."""
+    def get_openmm_loss(self, nonbonded_interactions=True):
+        """Return OpenMMLoss (i.e., energy) of the system given current positions.
+
+        Args:
+            nonbonded_interactions (bool, default=True): If True, compute nonbonded
+                interactions. If False, only compute bonded interactions.
+        
+        Returns:
+            The value of the OpenMMLoss function for this protein as a float tensor
+        """
         if not self.openmm_initialized or not nonbonded_interactions:
-            self.initialize_openmm(nonbonded_interactions=nonbonded_interactions)
+            self._initialize_openmm(nonbonded_interactions=nonbonded_interactions)
         eloss_fn = OpenMMEnergyH()
         eloss = eloss_fn.apply(self, self.hcoords)
         return eloss
 
     def get_forces(self, pprint=False):
-        """Return tensor of forces as requested."""
+        """Return tensor of atomic forces as computed by OpenMM.
+        
+        Args:
+            pprint (bool, default=False): If True, print the forces in a human-readable
+                format.
+                
+        Returns:
+            A tensor of atomic forces as computed by OpenMM.
+        """
         # Initialize tensor and energy
         if self.forces is None:
             self.forces = np.zeros((len(self.seq) * NUM_COORDS_PER_RES_W_HYDROGENS, 3))
@@ -507,38 +641,33 @@ class SCNProtein(object):
             self.hcoord_to_pos_map_values]
 
         if pprint:
-            atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
-            # return
+            self._atom_name_pprint(self.get_atom_names(heavy_only=False), self.forces)
 
         return self.forces
 
-    def update_hydrogens(self, hcoords):
-        """Take a set of hydrogen coordinates and use it to update this protein."""
+    def _update_hydrogens(self, hcoords):
+        """Take a set of hydrogen coordinates and use it to update hydrogens inplace.
+        
+        Args:
+            hcoords (np.ndarray): A numpy array of hydrogen coordinates.
+        """
+        # We mask out the hcoords so that we can perform coordinate optimation and
+        # maintain padding, etc.
         mask = self.get_hydrogen_coord_mask()
         self.hcoords = hcoords * mask
         self.has_hydrogens = True
-        self.update_positions()
+        self._update_positions()
 
-    def update_hydrogens_for_openmm(self, hcoords):
+    def _update_hydrogens_for_openmm(self, hcoords):
         """Use a set of hydrogen coords to update OpenMM data for this protein."""
         if not self.openmm_initialized:
-            self.initialize_openmm()
-        #     self.update_positions()
+            self._initialize_openmm()
 
         mask = self.get_hydrogen_coord_mask()
         self._hcoords_for_openmm = torch.nan_to_num(hcoords * mask, nan=0.0)
-        self.update_positions(self._hcoords_for_openmm)  # Use our openmm only hcoords
+        self._update_positions(self._hcoords_for_openmm)  # Use our openmm only hcoords
 
-        # Below is experimental code that only passes hcoords from GPU to CPU once
-        # If this code is in use, then the coordinates do not update. If the above line
-        # of code is in use, the the coordinates will update, but must be passed from GPU
-        # to CPU each time.
-
-        # if not hasattr(self, "_hcoords_for_openmm_cpu"):
-        #     self._hcoords_for_openmm_cpu = self._hcoords_for_openmm.cpu().detach().numpy()
-        # self.update_positions(self._hcoords_for_openmm_cpu)
-
-    def update_positions(self, hcoords=None):
+    def _update_positions(self, hcoords=None):
         """Update the positions variable with hydrogen coordinate values."""
         if hcoords is None:
             hcoords = self.hcoords
@@ -557,7 +686,7 @@ class SCNProtein(object):
     #         OPENMM SETUP FUNCTIONS         #
     ##########################################
 
-    def get_openmm_repr(self, skip_missing_residues=True):
+    def _get_openmm_repr(self, skip_missing_residues=True):
         """Return tuple of OpenMM topology and positions for analysis with OpenMM."""
         self.hcoord_to_pos_map_keys = []
         self.hcoord_to_pos_map_values = []
@@ -612,13 +741,13 @@ class SCNProtein(object):
         self.positions = np.array(self.positions)
         return self.topology, self.positions
 
-    def initialize_openmm(self,
-                          nonbonded_interactions=True,
-                          skip_get_openmm_repr=False,
-                          add_hydrogens_via_openmm=False):
+    def _initialize_openmm(self,
+                           nonbonded_interactions=True,
+                           skip_get_openmm_repr=False,
+                           add_hydrogens_via_openmm=False):
         """Create top., pos., modeller, forcefield, system, integrator, & simulation."""
         if not skip_get_openmm_repr:
-            self.get_openmm_repr()
+            self._get_openmm_repr()
         self.modeller = Modeller(self.topology, self.positions)
         self.forcefield = ForceField(*self.openmm_forcefields)
         if add_hydrogens_via_openmm:
@@ -651,7 +780,15 @@ class SCNProtein(object):
         self.simulation.context.setPositions(self.modeller.positions)
 
     def get_hydrogen_coord_mask(self, zeros_instead_of_nans=False):
-        """Return a torch tensor with nans representing pad characters in self.hcoords."""
+        """Return a torch tensor with nans identifying the pad characters in self.hcoords.
+
+        Args:
+            zeros_instead_of_nans (bool, default=False): If True, return a tensor with
+                zeros instead of nans.
+        
+        Returns:
+            A torch tensor with nans representing pad characters in self.hcoords.
+        """
         if self._hcoord_mask is not None:
             return self._hcoord_mask
         else:
@@ -679,7 +816,7 @@ class SCNProtein(object):
     #         OTHER OPENMM FUNCTIONS         #
     ##########################################
 
-    def make_pdbfixer(self):
+    def _make_pdbfixer(self):
         """Construct and return an OpenMM PDBFixer object for this protein."""
         from pdbfixer import PDBFixer
         self.pdbfixer = PDBFixer(topology=self.topology,
@@ -687,7 +824,7 @@ class SCNProtein(object):
                                  sequence=self.openmm_seq)
         return self.pdbfixer
 
-    def run_pdbfixer(self):
+    def _run_pdbfixer(self):
         """Add missing atoms to protein's PDBFixer representation."""
         self.pdbfixer.findMissingResidues()
         self.pdbfixer.findMissingAtoms()
@@ -696,14 +833,33 @@ class SCNProtein(object):
         self.pdbfixer.addMissingAtoms()
         self.pdbfixer.addMissingHydrogens(7.0)
 
-    def minimize(self, nonbonded_interactions=True, add_hydrogens_via_openmm=False):
-        """Perform an energy minimization using the PDBFixer representation. Return ∆E."""
+    def _minimize(self, nonbonded_interactions=True, add_hydrogens_via_openmm=False, update_hcoords=False):
+        """Experimental. Perform energy minimization using PDBFixer rep and return ∆E.
+
+        Warning: this function is experimental. Updating SCNProtein coordinates with the
+        minimized coordinates is not yet fully supported, but may attempted with
+        update_hcoords=True.
+
+        After minimization, self.starting_positions, self.ending_positions,
+        self.starting_energy, and self.ending_energy will have been populated by OpenMM.
+        
+        Args:
+            nonbonded_interactions (bool, default=True): If True, compute nonbonded
+                interactions. If False, only compute bonded interactions.
+            add_hydrogens_via_openmm (bool, default=False): If True, add hydrogens to the
+                protein structure using OpenMM.
+            update_hcoords (bool, default=False): If True, update self.hcoords with the
+                minimized coordinates.
+        
+        Returns:
+            The difference in energy between the starting and ending states.
+        """
         assert self.has_hydrogens, "You must add hydrogens before minimizing. (self.fastbuild, self.add_hydrogens)"
         cutoff_method = openmm.app.NoCutoff if nonbonded_interactions else openmm.app.CutoffNonPeriodic
         cutoff_dist = 1 * nanometer if nonbonded_interactions else 1e-5 * nanometer
         constraints = HBonds if nonbonded_interactions else None
         if not hasattr(self, "topology") or self.topology is None:
-            self.initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
+            self._initialize_openmm(add_hydrogens_via_openmm=add_hydrogens_via_openmm)
         if not self.has_hydrogens:
             self.add_hydrogens(add_to_heavy_atoms=True)
         self.modeller = Modeller(self.topology, self.positions)
@@ -733,10 +889,11 @@ class SCNProtein(object):
                                                       getForces=True)
         self.ending_energy = self.state.getPotentialEnergy()
         self.ending_positions = np.asarray(self.state.getPositions(asNumpy=True))
-        self.update_hcoords_from_openmm_positions(self.ending_positions)
+        if update_hcoords:
+            self._update_hcoords_from_openmm_positions(self.ending_positions)
         return self.ending_energy - self.starting_energy
     
-    def update_hcoords_from_openmm_positions(self, openmm_positions):
+    def _update_hcoords_from_openmm_positions(self, openmm_positions):
         """Update self.hcoords from OpenMM positions."""
         self.has_hydrogens = True
         # create a tensor filled with nans of the correct shape
@@ -750,14 +907,15 @@ class SCNProtein(object):
 
 
     def write_ending_positions_to_pdbfile(self, filename):
+        """Write self.ending_positions to a PDB file after minimization."""
         with open(filename, 'w') as f:
             PDBFile.writeFile(self.simulation.topology, self.ending_positions * 10, f)
 
     def get_energy_difference(self):
         """Create PDBFixer object, minimize, and report ∆E."""
         self.add_hydrogens()
-        self.topology, self.positions = self.get_openmm_repr()
-        return self.minimize()
+        self.topology, self.positions = self._get_openmm_repr()
+        return self._minimize()
 
     def get_rmsd_difference(self):
         """Report difference in start/end coordinates after energy minimization."""
@@ -771,7 +929,18 @@ class SCNProtein(object):
     ###################################
 
     def get_atom_names(self, zip_coords=False, pprint=False, heavy_only=False):
-        """Return or print atom name list for each residue including terminal atoms."""
+        """Return or print atom name list for each residue including terminal atoms.
+        
+        Args:
+            zip_coords (bool, default=False): If True, return a list of tuples of the
+                form (atom_name, coordinates).
+            pprint (bool, default=False): If True, print the atom names in a human-
+                readable format.
+            heavy_only (bool, default=False): If True, return only heavy atom names.
+                
+        Returns:
+            A list of lists of atom names for each residue in the protein.
+        """
         all_atom_name_list = []
         for i in range(len(self.seq)):
             if not self.has_hydrogens or heavy_only:
@@ -807,15 +976,18 @@ class SCNProtein(object):
             return None
         return all_atom_name_list
 
-    def insert_terminal_atoms_into_name_list(self, atom_names, terminal_atom_names):
-        """Insert a list of atoms into an existing list, keeping lengths the same."""
-        pad_idx = atom_names.index("PAD")
-        new_list = list(atom_names)
-        new_list[pad_idx:pad_idx + len(terminal_atom_names)] = terminal_atom_names
-        return new_list
-
     def hydrogenrep_to_heavyatomrep(self, hcoords=None, inplace=False):
-        """Remove hydrogens from a tensor of coordinates in heavy atom representation."""
+        """Remove hydrogens from a tensor of coordinates in heavy atom representation.
+        
+        Args:
+            hcoords (torch.tensor, default=None): A tensor of coordinates in hydrogen
+                representation. If None, use self.hcoords.
+            inplace (bool, default=False): If True, modify the protein's coordinates
+                in-place.
+        
+        Returns:
+            A tensor of the atomic coordinates after removing hydrogens.
+        """
         if hcoords is None:
             hcoords = self.hcoords
 
@@ -890,13 +1062,15 @@ class SCNProtein(object):
             self.angles = torch.tensor(self.angles)
         self.is_numpy = False
 
-    def fillna(self, value=0.0, warn=True):
+    def fillna(self, value=0.0, suppress_warnings=True):
         """Replace nans in coordinate and angle matrices with the specified value.
 
         Args:
             value (float, optional): Replace nans with this value. Defaults to 0.0.
+            suppress_warnings (bool, optional): If True, suppress warnings. Defaults to
+                True.
         """
-        if warn:
+        if suppress_warnings:
             warnings.warn(
                 "Doing this will remove all nans from the object and may cause missing"
                 " residue information to be lost. To proceed, call with warn=False.")
@@ -1007,26 +1181,26 @@ class SCNProtein(object):
         # Reset structure builders
         self.sb = None
     
-    def reset_openmm_data(self):
+    def _reset_openmm_data(self):
         """Reset all OpenMM data."""
         self.sb = None
         self.openmm_initialized = False
     
-    def reset_hydrogens_and_openmm(self):
+    def _reset_hydrogens_and_openmm(self):
         """Reset all hydrogen data."""
         if self.has_hydrogens:
             self.hydrogenrep_to_heavyatomrep(inplace=True)
         else:
             assert self.coords.shape[1] == NUM_COORDS_PER_RES, 'coords must be heavy atom rep.'
             self.hcoords = self.coords
-        self.reset_openmm_data()
-
-
-def atom_name_pprint(atom_names, values):
-    """Nicely print atom names and values."""
-    flat_list = [item for sublist in atom_names for item in sublist]
-    for i, (an, vals) in enumerate(zip(flat_list, values)):
-        print(f"{i: <2}", f"{an: <4}", vals)
+        self._reset_openmm_data()
+    
+    @staticmethod
+    def _atom_name_pprint(atom_names, values):
+        """Nicely print atom names and values."""
+        flat_list = [item for sublist in atom_names for item in sublist]
+        for i, (an, vals) in enumerate(zip(flat_list, values)):
+            print(f"{i: <2}", f"{an: <4}", vals)
 
 
 def get_element_from_atomname(atom_name):
