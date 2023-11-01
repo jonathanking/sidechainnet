@@ -15,7 +15,8 @@ this opportunity to make accessible the useful changes to SidechainNet that have
 
 ### SCNDataset class
 SCNDatasets are now the default return type when using `scn.load`. SCNDatasets make it easy to interface with data and are a subclass of torch Dataset. SCNDatasets contain SCNProteins.
-- Index by SidechainNet ID or index: `scn_dataset['1A2K_1_A']` or `scn_dataset[0]`
+- index by SidechainNet ID or numerical index: `scn_dataset['1A2K_1_A']` or `scn_dataset[0]`
+- iterate over proteins in a dataset: `for protein in scn_dataset: ...`
 - can be created from a list of SCNProteins (`SCNDataset.from_scnproteins()`)
 - can be filtered via `SCNDataset.filter()`
 - can be pickled (`SCNDataset.pickle()`), or converted to FASTA/FASTAs
@@ -23,7 +24,7 @@ SCNDatasets are now the default return type when using `scn.load`. SCNDatasets m
 
 ### SCNProtein class
 The default data representation for a single protein is now a SCNProtein object. A SCNProtein has many convenience functions and attributes. It also allows for the measurement of energy, or various simulation/minimization experiments. Some new features include:
-- scn.load_pdb: create a SCNProtein from a pdb file (does not support gaps)
+- `scn.load_pdb()`: create a SCNProtein from a pdb file (*does not support gaps*)
 - can be pickled (`SCNProtein.pickle()`)
 - visually compare two structures for the same protein with `SCNProtein.to_3Dmol(other_protein=another_scnprotein)`
 - add hydrogens with `SCNProtein.add_hydrogens()` or quickly convert angles to coordinates with `SCNProtein.fastbuild()`
@@ -44,7 +45,7 @@ ProteinBatch objects have class properties that you can access to get a batched 
     - is_modified
     - ids
     - resolutions
-  - other helper fns
+  - other helper fns to change or inspect underlying data format
     - cuda()
     - cpu()
     - torch()
@@ -79,11 +80,10 @@ computing energy.
     * please see [paper](https://doi.org/10.1101/2023.10.03.560775) for more thorough descriptions
 
 
-## Other new features
-- changed global pad char loc
-- allow specification of num cores for scn.create functions
-- improved SimilarLengthBatchSampler, collate.py,
+## Other new (research oriented) features 
 - added an alphabet protein example (contains all amino acids) in `scn.examples.get_alphabet_protein()`
+- allow specification of number of cores for scn.create functions to create SidechainNet data
+- improved SimilarLengthBatchSampler, collate.py,
 - `examples.lightning.AnlgePredictionHelper` class, which takes a ProteinBatch as well as true and expected angle tensors and allows the user to evaluate a model trained to predict protein torsional angles
 - LitSCNDataModule, a pytorch lightning datamodule for loading and batching sidechainnet data
 - LitSidechainTransformer - a pytorch lightning module for training a transformer to predict protein torsional angles
@@ -92,14 +92,15 @@ computing energy.
 - a plethora of new structure metrics in examples/losses.py (lddt, gdt, etc.)
 - NoamOpt implementation in examples/optim.py
 - Sidechain only torsional predictive models (no backbone) in `examples/sidechain_only_models.py`
-
-
-### HydrogenBuilder
-- Uses vector operations to add hydrogens to heavy atom SCNProtein
-
-
-### Research Code
 - `sidechainnet/research/build_parameter_optim/optimize_build_params.py`
   - code to optimize build parameters for sidechainnet. build parameters
   are the hard-coded values used to model proteins (bond lengths etc.). This code allows us to minimize these hard coded values with respect to a certain force field.
+- HydrogenBuilder
+  - Uses vector operations to add hydrogens to heavy atom SCNProtein
+- Code for minimizing SCNDatasets and SCNProteins with OpenMM in `research/minimize*.py`
+
+## Things we're aware of but haven't implemented
+- Providing access to later CASP competitions (current implementation is reliant on ProteinNet which does not support past CASP12)
+- Energetically minimizing proteins containing gaps
+- Parsing PDB files with gaps into SCNProtein objects
 
