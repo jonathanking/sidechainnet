@@ -102,7 +102,7 @@ class PdbBuilder(object):
         """
         residue_lines = []
         for atom_name, atom_coord in zip(atom_names, coords):
-            if (atom_name == "PAD"):
+            if (atom_name == "PAD" or np.isnan(atom_coord).any()):
                 continue
             residue_lines.append(self._get_line_for_atom(res_name, atom_name, atom_coord))
             self.atom_nbr += 1
