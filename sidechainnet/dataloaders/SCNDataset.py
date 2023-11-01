@@ -198,16 +198,22 @@ class SCNDataset(torch.utils.data.Dataset):
 
     def delete_ids(self, to_delete):
         """Remove proteins whose IDs are in list to_delete."""
+        deleted = []
         for pnid in to_delete:
             try:
                 p = self.ids_to_SCNProtein[pnid]
                 self.split_to_ids[p.split].remove(pnid)
                 del self.ids_to_SCNProtein[pnid]
+                deleted.append(pnid)
             except KeyError:
                 continue  # If the protein is not in the dataset, do nothing
+        if not deleted:
+            return
+        index_protein_pairs = self.idx_to_SCNProtein.items()
         self.idx_to_SCNProtein = {}
-        for i, protein in enumerate(self.ids_to_SCNProtein.values()):
-            self.idx_to_SCNProtein[i] = protein
+        sorted_idx_protein_pairs = sorted(index_protein_pairs, key=lambda x: x[0])
+        for new_index, (original_idx, protein) in enumerate(sorted_idx_protein_pairs):
+            self.idx_to_SCNProtein[new_index] = protein
 
     def filter(self, func, verbose=True):
         """Filter the SCNDataset, keeping all entries where func(protein) is True.

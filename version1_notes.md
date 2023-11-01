@@ -76,7 +76,8 @@ computing energy.
     * ~30k protein structures without gaps
     * includes new validation and testing sets from CAMEO
     * access via `scn.load(casp_version=12, casp_thinning='scnmin')` or `scn.load(casp_version=12, casp_thinning='scnunmin')`
-    * note: proteins with more than 750 residues have been trimmed to a maximum 750 residues
+    * note: to facilitate training and minimization, proteins with more than 750 residues have been 
+    trimmed to a maximum 750 residues, and missing residues at the termini have been trimmed
     * please see [paper](https://doi.org/10.1101/2023.10.03.560775) for more thorough descriptions
 
 
