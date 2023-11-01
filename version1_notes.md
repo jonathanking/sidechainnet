@@ -37,10 +37,10 @@ SCNDatasets are returned by default when using `scn.load`. SCNDatasets make it e
 - can be pickled (SCNDataset.pickle()), or converted to FASTA/FASTAs
 
 ### ProteinBatch
-When iterating over a SCNDataset for pytorch, we now yield iterable ProteinBatch objects instead of tuples
-  - access ProteinBatch class properties to get a batched tensor of that data
-  - e.g., pb = ProteinBatch([scnprotein1, scnprotein2]); pb.seqs; pb.masks;
-  - available attributes
+When iterating over a SCNDataset for pytorch, we now yield iterable ProteinBatch objects instead of tuples.
+ProteinBatch objects are a convenient way to access data for training, and interface with SCNProteins under the hood. 
+ProteinBatch objects have class properties that you can access to get a batched tensor of that data.
+  - available class properties
     - angles
     - seqs (aka seqs_onehot)
     - seqs_int
@@ -70,35 +70,21 @@ computing energy.
 * scn.load returns SCNDataset object by default instead of a Python dictionary representation
 - default pad character is NaN, not 0
 - SCNProtein.build_coords_from_angles is no longer supported, use SCNProtein.fastbuild to build coordinates from angles instead.
-- NUM_COORDS_PER_RES is now 15, not 14. This is primarily to support terminal residue atoms (OXT, H2, and H3)
+- new atom mapping definitions
+  - NUM_COORDS_PER_RES is now 15, not 14. This is primarily to support terminal residue atoms (OXT, H2, and H3)
+  - ATOM_MAP_14 replaced with ATOM_MAP_HEAVY and its counterpart containing hydrogens, ATOM_MAP_H
 - scn.load(dynamic_batching) defaults to False.
 - When iterating over dataloaders, we now yield ProteinBatch objects instead of tuples
   - batch.int_seqs -> batch.seqs_int
 
 
 ## To Dos
-- [] remove research code from gitignore
 - [] discuss batched structure builder
-- [] either regenerate data or update code to support both new and old formats of scndata
-- [] what was original iteration format, tuples?
 
 
-
-
-## Other Notes
-
-
-### New feature accessibility
+## Other new features
 - changed global pad char loc
 - allow specification of num cores for scn.create functions
-- new fn "scn.create.generate_all_from_proteinnet" to generate all scn data from proteinnet files for curation and upload
-
-    
-SCNDatasets
-- can be made from list of SCNProteins (SCNDataset.from_scnproteins())
-- can filter a SCNDataset via SCNDataset.filter()
-- pickle entire dataset, SCNDataset.pickle(), or convert to FASTA/FASTAs
-
 - improved SimilarLengthBatchSampler, collate.py,
 - added an alphabet protein example (contains all amino acids) in scn.examples, get_alphabet_protein()
 - examples.lightning.AnlgePredictionHelper class, which takes a ProteinBatch as well as true and expected angle tensors and allows the user to evaluate a model trained to predict protein torsional angles
@@ -109,15 +95,14 @@ SCNDatasets
 - a plethora of new structure metrics in examples/losses.py (lddt, gdt, etc.)
 - NoamOpt implementation in examples/optim.py
 - Sidechain only torsional predictive models (no backbone) in examples/sidechain_only_models.py
-- ATOM_MAP_14 replaced with ATOM_MAP_HEAVY
 
 
-HydrogenBuilder
+### HydrogenBuilder
 - Uses vector operations to add hydrogens to heavy atom SCNProtein
 
 
-Research Code
+### Research Code
 - sidechainnet/research/build_parameter_optim/optimize_build_params.py
   - code to optimize build parameters for sidechainnet. build parameters
-  are the hard-coded values used to model proteins (bond lengths etc.). This code allows us to minimized these hard coded values with respect to a certain force field.
+  are the hard-coded values used to model proteins (bond lengths etc.). This code allows us to minimize these hard coded values with respect to a certain force field.
 
