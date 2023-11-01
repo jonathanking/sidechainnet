@@ -2,18 +2,22 @@
 SidechainNet v1.0 introduces new features (e.g., OpenMM interaction, hydrogen support) and several breaking changes. 
 
 This release coincides with the publication of our recent [research paper](https://doi.org/10.1101/2023.10.03.560775) where
-we utilized molecular dynamics forcefields as gradients for training OpenFold (AlphaFold2). This work was developed
-as part of Jonathan King's PhD thesis work. We are taking this opportunity to make public the
-useful changes to SidechainNet that have been developed as part of our research. Jonathan has graduated from the Koes Lab
-and will no longer be actively developing SidechainNet. However, we are interested in its continued development and
-welcome any interested parties to contact us at dkoes@pitt.edu, or by opening an issue here.
+we utilized molecular dynamics forcefields as gradients for training OpenFold (AlphaFold2). For more information on
+using the methods from that paper, see its [repository](https://github.com/jonathanking/openfold). 
+
+SidechainNet and the OpenMM-Loss method were developed as part of Jonathan King's PhD thesis work. We are taking 
+this opportunity to make public the useful changes to SidechainNet that have been developed as part of our research.
+Jonathan has graduated from the Koes Lab and will no longer be actively developing SidechainNet. However, we are
+interested in its continued development and welcome any interested parties to contact us at dkoes@pitt.edu, or
+by opening an issue here.
 
 ## New Data
 * 'scnmin' and 'scnunmin', minimized and unminimized data subsets from our [paper](https://doi.org/10.1101/2023.10.03.560775)
     * taken from the SidechainNet Casp12/100% thinning dataset and energetically minimized with OpenMM
-    * ~30k protein structures
+    * ~30k protein structures without gaps
     * includes new validation and testing sets from CAMEO
     * access via `scn.load(casp_version=12, casp_thinning='scnmin')` or `scn.load(casp_version=12, casp_thinning='scnunmin')`
+    * note: proteins with more than 750 residues have been trimmed to a maximum 750 residues
     * please see [paper](https://doi.org/10.1101/2023.10.03.560775) for more thorough descriptions
     
 
@@ -26,7 +30,7 @@ welcome any interested parties to contact us at dkoes@pitt.edu, or by opening an
   - visually compare two structures for the same protein with SCNProtein.to_3Dmol(other_protein=another_scnprotein)
 
 ### SCNDataset class improvements
-SCNDatasets make it easy to interface with data while also being a torch Dataset.
+SCNDatasets are returned by default when using `scn.load`. SCNDatasets make it easy to interface with data and are a subclass of torch Dataset.
 - Index by SidechainNet ID or index: `scn_dataset['1A2K_1_A']` or `scn_dataset[0]`
 - can be made from list of SCNProteins (SCNDataset.from_scnproteins())
 - can be filtered via SCNDataset.filter()

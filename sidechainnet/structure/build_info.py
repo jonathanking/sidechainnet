@@ -1,9 +1,9 @@
-"""Hard-coded values to use when building and analyzing sidechain structures.
+"""Values to use when building and analyzing sidechain structures.
 
 Bond lengths and angles are programmatically parsed from AMBER forcefields.
 'p' and 'i' for 'torsion-vals' stand for predicted and inferred, respectively.
 
-SIDECHAIN DATA FORMAT
+DATA FORMAT (SUMMARY)
 
     Angle vectors (NUM_ANGLES) are:
         [phi, psi, omega, n-ca-c, ca-c-n, c-n-ca, x0, x1, x2, x3, x4, x5]
@@ -16,13 +16,208 @@ SIDECHAIN DATA FORMAT
             - x5 is used to place NH1 or NH2 of Arginine.
             - if a given angle is not present, it is recorded with a GLOBAL_PAD_CHAR.
 
-    Coordinate vectors (NUM_COORDS_PER_RES x 3) for resname RES are:
+    Coordinate vectors (L x NUM_COORDS_PER_RES x 3) for resname RES are:
         [N, CA, C, O, *SC_HBUILD_INFO[RES]['atom_names'], <PAD> * (N_PAD)]
         [ backbone  |          sidechain atoms         |     padding*   ]
         where each vector is padded with GLOBAL_PAD_CHAR to maximum length.
 
         for example, the atoms for an ASN residue are:
             [N, CA, C, O, CB, CG, OD1, ND2, PAD, PAD, PAD, PAD, PAD, PAD]
+
+DATA FORMAT (as described in detail from the ATOM_MAP_* and SC_HBUILD_INFO dicts)
+
+As of November 11, 2023, ATOM_MAP_HEAVY (heavy atoms only) is generated as:
+
+{
+    'A': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'R': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD', 'NE', 'CZ', 'NH1', 'NH2', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'N': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'OD1', 'ND2', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'D': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'OD1', 'OD2', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'C': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'SG', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'Q': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD', 'OE1', 'NE2', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'E': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'G': [
+        'N', 'CA', 'C', 'O', 'OXT', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ],
+    'H': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'ND1', 'CE1', 'NE2', 'CD2', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'I': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG1', 'CD1', 'CG2', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'L': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD1', 'CD2', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'K': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD', 'CE', 'NZ', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'M': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'SD', 'CE', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'F': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD1', 'CE1', 'CZ', 'CE2', 'CD2', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'P': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'S': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'OG', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'T': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'OG1', 'CG2', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'W': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD1', 'NE1', 'CE2', 'CZ2', 'CH2', 'CZ3',
+        'CE3', 'CD2'
+    ],
+    'Y': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG', 'CD1', 'CE1', 'CZ', 'OH', 'CE2', 'CD2',
+        'PAD', 'PAD'
+    ],
+    'V': [
+        'N', 'CA', 'C', 'O', 'OXT', 'CB', 'CG1', 'CG2', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ]
+}
+
+As of November 1, 2023, ATOM_MAP_H (atom naming convention with hydrogens) is generated as:
+
+ {
+    'A': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'HA', 'HB1', 'HB2', 'HB3',
+        'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ],
+    'R': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD', 'NE', 'CZ', 'NH1',
+        'NH2', 'HA', 'HB2', 'HB3', 'HG2', 'HG3', 'HD2', 'HD3', 'HE', 'HH11', 'HH12',
+        'HH21', 'HH22'
+    ],
+    'N': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'OD1', 'ND2', 'HA',
+        'HB2', 'HB3', 'HD21', 'HD22', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ],
+    'D': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'OD1', 'OD2', 'HA',
+        'HB2', 'HB3', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ],
+    'C': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'SG', 'HA', 'HB2', 'HB3', 'HG',
+        'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'Q': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD', 'OE1', 'NE2', 'HA',
+        'HB2', 'HB3', 'HG2', 'HG3', 'HE21', 'HE22', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'E': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'HA',
+        'HB2', 'HB3', 'HG2', 'HG3', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'G': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'HA2', 'HA3', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ],
+    'H': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'ND1', 'CE1', 'NE2',
+        'CD2', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HD2', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'I': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG1', 'CD1', 'CG2', 'HA',
+        'HB', 'HG12', 'HG13', 'HD11', 'HD12', 'HD13', 'HG21', 'HG22', 'HG23', 'PAD',
+        'PAD', 'PAD', 'PAD', 'PAD'
+    ],
+    'L': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD1', 'CD2', 'HA',
+        'HB2', 'HB3', 'HG', 'HD11', 'HD12', 'HD13', 'HD21', 'HD22', 'HD23', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ],
+    'K': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD', 'CE', 'NZ', 'HA',
+        'HB2', 'HB3', 'HG2', 'HG3', 'HD2', 'HD3', 'HE2', 'HE3', 'HZ1', 'HZ2', 'HZ3',
+        'PAD', 'PAD'
+    ],
+    'M': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'SD', 'CE', 'HA', 'HB2',
+        'HB3', 'HG2', 'HG3', 'HE1', 'HE2', 'HE3', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'F': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD1', 'CE1', 'CZ',
+        'CE2', 'CD2', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HZ', 'HE2', 'HD2', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'P': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD', 'HA', 'HB2', 'HB3',
+        'HG2', 'HG3', 'HD2', 'HD3', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'S': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'OG', 'HA', 'HB2', 'HB3', 'HG',
+        'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD'
+    ],
+    'T': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'OG1', 'CG2', 'HA', 'HB',
+        'HG1', 'HG21', 'HG22', 'HG23', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ],
+    'W': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD1', 'NE1', 'CE2',
+        'CZ2', 'CH2', 'CZ3', 'CE3', 'CD2', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HZ2', 'HH2',
+        'HZ3', 'HE3'
+    ],
+    'Y': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG', 'CD1', 'CE1', 'CZ', 'OH',
+        'CE2', 'CD2', 'HA', 'HB2', 'HB3', 'HD1', 'HE1', 'HH', 'HE2', 'HD2', 'PAD', 'PAD',
+        'PAD'
+    ],
+    'V': [
+        'N', 'CA', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'CB', 'CG1', 'CG2', 'HA', 'HB',
+        'HG11', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23', 'PAD', 'PAD', 'PAD', 'PAD', 'PAD',
+        'PAD', 'PAD', 'PAD'
+    ]
+}
+
+See _RAW_BUILD_INFO or SC_HBUILD_INFO for more information on the expected ordering
+of specific torsion angles for each amino acid.
 """
 import copy
 import re
@@ -866,6 +1061,8 @@ for a, aaa in AA1to3.items():
     ATOM_MAP_H[a].extend(["PAD"] * (NUM_COORDS_PER_RES_W_HYDROGENS - len(ATOM_MAP_H[a])))
 
 HEAVY_ATOM_MASK_TENSOR = create_heavyatom_mask_tensor()
+
+
 
 
 # Legacy API, please use ATOM_MAP_HEAVY and ATOM_MAP_H defined above

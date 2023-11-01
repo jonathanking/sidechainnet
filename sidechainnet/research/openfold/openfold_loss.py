@@ -1,4 +1,9 @@
-"""This module contains the necessary loss functions to train OpenFold with OpenMMLoss."""
+"""This module contains the necessary loss functions to train OpenFold with OpenMMLoss.
+
+If you wish to use OpenMMLoss with other models, this is the file you'll want to modify.
+
+See the note below for more information.
+"""
 
 import argparse
 import torch
@@ -43,8 +48,8 @@ def openmm_loss(
 
     # Convert the model output into a list of SidechainNet proteins
     # scn_proteins = _create_scn_proteins_from_openfold_output(model_input, model_output)
-    scn_proteins = [p for p in iterate_over_model_input_output(model_input, model_output) if p is not None]
-    scn_proteins_gt = [p for p in iterate_over_model_input_output(model_input, model_output, ground_truth=True) if p is not None]
+    scn_proteins = [p for p in generate_scnproteins_from_model_reps(model_input, model_output) if p is not None]
+    scn_proteins_gt = [p for p in generate_scnproteins_from_model_reps(model_input, model_output, ground_truth=True) if p is not None]
     scn_proteins_no_hy = [p.copy() for p in scn_proteins]
 
     # Add hydrogens to each protein
@@ -81,13 +86,29 @@ def openmm_loss(
     return total_energy, scn_proteins_no_hy, scn_proteins_gt, total_energy_raw
 
 
-def iterate_over_model_input_output(model_input, model_output, ground_truth=False):
-    """Iterate over the model input and output, yielding the input and output for each protein in the batch.
-    
+# IF YOU ARE INTERESTED IN APPLYING OPENMM-LOSS TO MODELS OTHER THAN OPENFOLD, YOU'LL
+# NEED TO REIMPLEMENT THE FUNCTION BELOW (& POTENTIALLY THE ONE ABOVE IF YOU DON'T HAVE
+# MODEL INPUT/OUTPUT DICTIONARIES). THIS ASSUMES THAT MODEL_INPUT AND MODEL_OUTPUT ARE
+# DICTIONARIES CONTAINING YOUR MODEL'S INPUT AND OUTPUT DATA, RESPECTIVELY.
+#
+# ESSENTIALLY, YOU MUST CREATE A SCNPROTEIN GENERATOR FROM YOUR MODEL'S INPUT AND OUTPUT.
+# SEE BELOW FOR AN EXAMPLE OF HOW TO DO THIS. A BIT OF TRICKY CONVERSION MAY BE REQUIRED
+# TO GET THE SHAPES JUST RIGHT, SINCE SCNPROTEIN REQUIRES COORDINATES IN THE SHAPE
+# (L x 15 x 3), with 15 being sidechainnet.build_info.NUM_COORDS_PER_RES, AND ATOM
+# NAMES/POSITIONS AS DEFINED IN sidechainnet.build_info.ATOM_MAP_HEAVY. NOTE THAT
+# IT'S ALSO POSSIBLE TO USE SCNPROTEIN.fastbuild TO CONVERT AN INTERNAL COORDINATE (ANGLE)
+# PROTEIN REPRESENTATION INTO A CARTESIAN COORDINATE REPRESENTATION, IF YOU HAVE A MODEL
+# THAT PREDICTS INTERNAL COORDINATES.
+
+def generate_scnproteins_from_model_reps(model_input, model_output, ground_truth=False):
+    """Iterate over OpenFold input/output, generating SCNProteins for each in/out pair.
+
     Args:
-        model_input (Dict): The model input.
-        model_output (Dict): The model output.
-    
+        model_input (Dict): The model input. Keys describe various model inputs 
+            (sequence, etc.).
+        model_output (Dict): The model output. Keys describe various model outputs or
+            predictions (coordinates, angles, etc.)
+
     Yields:
         protein (SCNProtein): SidechainNet protein created from model input/output.
     """
@@ -97,7 +118,7 @@ def iterate_over_model_input_output(model_input, model_output, ground_truth=Fals
         batch_coords14 = model_input["all_atom_positions"]
         batch_coords14 = atom37_to_atom14(batch_coords14, model_input, no_batch_dims=2)
     else:
-        batch_coords14 = model_output["sm"]["positions"][-1]  
+        batch_coords14 = model_output["sm"]["positions"][-1]
 
     for i in range(batch_size):
         # Create sequence variable from model input
@@ -107,11 +128,10 @@ def iterate_over_model_input_output(model_input, model_output, ground_truth=Fals
         seq = convert_openfold_aatype_to_str_seq(aatype)
 
         # Create sequence mask variable from model input
-        # seq_mask = model_input["seq_mask"][i]  # Should be str of +/-
-        # seq_mask = seq_mask[:seq_length]
-        # seq_mask = convert_openfold_seq_mask_to_str_seq_mask(seq_mask)
-        # Because we are using a prediction that has no missing pieces, the mask should be all +
-        seq_mask = "".join(["+" if char == 1 else "-" for char in model_input["seq_mask"][i, :seq_length]])
+        # Because we're using a prediction (no gaps), the mask should be all '+' !!
+        seq_mask = "".join([
+            "+" if char == 1 else "-" for char in model_input["seq_mask"][i, :seq_length]
+        ])
 
         # Create atom14 variable from model output
         coords14 = batch_coords14[i]
@@ -194,7 +214,7 @@ def get_openfold_to_sidechainnet_mapping():
 
     # For unknown residues (X), interpret as Glycine
     openfold_idx_to_scn_idx["X"] = openfold_idx_to_scn_idx["G"]
-    
+
 
     return openfold_idx_to_scn_idx
 
@@ -205,7 +225,7 @@ class OpenMMLR:
         self.lr = np.linspace(start, end, steps)
         self.steps = steps
         self.cur_step = cur_step
-    
+
     def step(self, new_step=None):
         if new_step is not None:
             self.cur_step = new_step
@@ -240,5 +260,3 @@ def atom37_to_atom14(atom37, batch, no_batch_dims=0):
 
 
 OPENFOLD_TO_SCN_MAP = get_openfold_to_sidechainnet_mapping()
-
-
