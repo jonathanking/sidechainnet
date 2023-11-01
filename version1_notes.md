@@ -67,6 +67,9 @@ computing energy.
 - default pad character is NaN, not 0
 - SCNProtein.build_coords_from_angles is no longer supported, use SCNProtein.fastbuild to build coordinates from angles instead.
 - NUM_COORDS_PER_RES is now 15, not 14. This is primarily to support terminal residue atoms (OXT, H2, and H3)
+- scn.load(dynamic_batching) defaults to False.
+- When iterating over dataloaders, we now yield ProteinBatch objects instead of tuples
+  - batch.int_seqs -> batch.seqs_int
 
 
 ## To Dos

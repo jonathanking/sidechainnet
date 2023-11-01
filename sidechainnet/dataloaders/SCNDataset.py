@@ -192,16 +192,19 @@ class SCNDataset(torch.utils.data.Dataset):
             split_str = ""
         return f"SCNDataset(n={len(self)}{split_str})"
 
-    def filter_ids(self, to_keep):
-        """Remove proteins whose IDs are not included in list to_keep."""
-        to_delete = []
-        for pnid in self.ids_to_SCNProtein.keys():
-            if pnid not in to_keep:
-                to_delete.append(pnid)
+    def __contains__(self, pnid):
+        """Return True if SidechainNet/ProteinNet pnid is in the dataset."""
+        return pnid in self.ids_to_SCNProtein
+
+    def delete_ids(self, to_delete):
+        """Remove proteins whose IDs are in list to_delete."""
         for pnid in to_delete:
-            p = self.ids_to_SCNProtein[pnid]
-            self.split_to_ids[p.split].remove(pnid)
-            del self.ids_to_SCNProtein[pnid]
+            try:
+                p = self.ids_to_SCNProtein[pnid]
+                self.split_to_ids[p.split].remove(pnid)
+                del self.ids_to_SCNProtein[pnid]
+            except KeyError:
+                continue  # If the protein is not in the dataset, do nothing
         self.idx_to_SCNProtein = {}
         for i, protein in enumerate(self.ids_to_SCNProtein.values()):
             self.idx_to_SCNProtein[i] = protein
@@ -224,7 +227,6 @@ class SCNDataset(torch.utils.data.Dataset):
     def _sort_by_length(self, reverse_sort):
         """Sorts all data entries by sequence length."""
         raise NotImplementedError
-
 
     def pickle(self, path, description=None):
         """Create and save a pickled Python dictionary representing the dataset.

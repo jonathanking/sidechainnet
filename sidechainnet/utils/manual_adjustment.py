@@ -4,6 +4,25 @@ from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 import copy
 
 
+NEEDS_MANUAL_ADJUSTMENT = [
+        "4PGI_1_A", "3CMG_1_A", "4ARW_1_A", "4Z08_1_A", "2PLV_1_1", "4PG7_1_A",
+        "2O24_1_A", "5I4N_1_A", "4RYK_1_A", "1CS4_3_C", "3SRY_1_A", "2AV4_1_A",
+        "3GW7_1_A", "1TQ5_1_A", "5DND_1_A", "4YCU_1_A", "1VRZ_1_A", "1RRX_1_A",
+        "2XUV_1_A", "2CFO_1_A", "5DNC_1_A", "2WTS_1_A", "4JQI_3_L", "2H9W_1_A",
+        "5DNE_1_A", "3RN8_1_A", "4RQF_2_A", "2FLQ_1_A", "3IPN_1_A", "3GP3_1_A",
+        "2Q6P_1_A", "4O2D_1_A", "2XXX_1_A", "3AB4_2_B", "2PLV_1_1", "4UQQ_1_A",
+        "2DTJ_1_A", "4ORN_1_A", "4PG7_1_A", "2XXR_1_A", "3IG5_1_A", "3FPH_1_A",
+        "2O24_1_A", "4RQE_1_A", "2LIG_1_A", "4XMR_1_A", "1CT9_1_A", "1KL1_1_A",
+        "3Q1X_1_A", "1II5_1_A", "2XII_1_A", "3SRY_1_A", "4YCW_1_A", "3ZDQ_1_A",
+        "1YJS_1_A", "4CVK_1_A", "2VSQ_1_A", "3P47_1_A", "4D57_1_A", "3WVN_1_A",
+        "2XXU_1_A", "3VSC_1_A", "3S1T_1_A", "2AV4_1_A", "3RNN_1_A", "1WNU_1_A",
+        "4BDL_1_A", "3J9M_79_AY",
+    ]
+
+# IDs that are inappropriate for training as of November 1, 2023.
+NEEDS_NEW_ADJUSTMENT = ["3JAJ_49_2", "2I2J_1_A",]
+
+
 def manually_correct_mask(pnid, pn_entry, mask):
     """Corrects a protein sequence mask for a given ProteinNet ID."""
     from sidechainnet.utils.align import binary_mask_to_str
@@ -18,20 +37,55 @@ def manually_correct_mask(pnid, pn_entry, mask):
 def needs_manual_adjustment(pnid):
     """Declares a list of pnids that should be handled manually due to eggregious
     differences between observed and expected seqeuences and masks."""
-    return pnid in [
-        "4PGI_1_A", "3CMG_1_A", "4ARW_1_A", "4Z08_1_A", "2PLV_1_1", "4PG7_1_A",
-        "2O24_1_A", "5I4N_1_A", "4RYK_1_A", "1CS4_3_C", "3SRY_1_A", "2AV4_1_A",
-        "3GW7_1_A", "1TQ5_1_A", "5DND_1_A", "4YCU_1_A", "1VRZ_1_A", "1RRX_1_A",
-        "2XUV_1_A", "2CFO_1_A", "5DNC_1_A", "2WTS_1_A", "4JQI_3_L", "2H9W_1_A",
-        "5DNE_1_A", "3RN8_1_A", "4RQF_2_A", "2FLQ_1_A", "3IPN_1_A", "3GP3_1_A",
-        "2Q6P_1_A", "4O2D_1_A", "2XXX_1_A", "3AB4_2_B", "2PLV_1_1", "4UQQ_1_A",
-        "2DTJ_1_A", "4ORN_1_A", "4PG7_1_A", "2XXR_1_A", "3IG5_1_A", "3FPH_1_A",
-        "2O24_1_A", "4RQE_1_A", "2LIG_1_A", "4XMR_1_A", "1CT9_1_A", "1KL1_1_A",
-        "3Q1X_1_A", "1II5_1_A", "2XII_1_A", "3SRY_1_A", "4YCW_1_A", "3ZDQ_1_A",
-        "1YJS_1_A", "4CVK_1_A", "2VSQ_1_A", "3P47_1_A", "4D57_1_A", "3WVN_1_A",
-        "2XXU_1_A", "3VSC_1_A", "3S1T_1_A", "2AV4_1_A", "3RNN_1_A", "1WNU_1_A",
-        "4BDL_1_A", "3J9M_79_AY"
-    ]
+    return pnid in NEEDS_MANUAL_ADJUSTMENT + NEEDS_NEW_ADJUSTMENT
+
+
+def remove_problematic_pnids_from_scndict(raw_data):
+    """Remove problematic pnids from a scndict.
+
+    Args:
+        raw_data (dict): SidechainNet dictionary.
+
+    Returns:
+        Filtered dictionary.
+    """
+    for split in raw_data.keys():
+        if "train" not in split or "valid" not in split or "test" not in split:
+            continue
+        new_split_data = {
+            "seq": [],
+            "ang": [],
+            "ids": [],
+            "evo": [],
+            "msk": [],
+            "crd": [],
+            "sec": [],
+            "res": [],
+            "ums": [],
+            "mod": []
+        }
+        this_split = raw_data[split]
+        for seq, ang, crd, msk, evo, _id, res, sec, ums, mod in zip(
+                this_split['seq'], this_split['ang'], this_split['crd'],
+                this_split['msk'], this_split['evo'], this_split['ids'],
+                this_split['res'], this_split['sec'], this_split['ums'],
+                this_split['mod']):
+            if needs_manual_adjustment(_id):
+                continue
+            else:
+                new_split_data["seq"].append(seq)
+                new_split_data["ang"].append(ang)
+                new_split_data["ids"].append(_id)
+                new_split_data["evo"].append(evo)
+                new_split_data["msk"].append(msk)
+                new_split_data["crd"].append(crd)
+                new_split_data["sec"].append(sec)
+                new_split_data["res"].append(res)
+                new_split_data["ums"].append(ums)
+                new_split_data["mod"].append(mod)
+
+        raw_data[split] = new_split_data
+    return raw_data
 
 
 def manually_adjust_data(pnid, sc_entry):

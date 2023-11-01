@@ -12,6 +12,7 @@ from sidechainnet.dataloaders.collate import prepare_dataloaders
 from sidechainnet.dataloaders.SCNDataset import SCNDataset
 from sidechainnet.dataloaders.SCNProtein import SCNProtein
 from sidechainnet.utils.download import get_resolution_from_pdbid
+from sidechainnet.utils.manual_adjustment import remove_problematic_pnids_from_scndict, NEEDS_NEW_ADJUSTMENT
 
 
 def _get_local_sidechainnet_path(casp_version, thinning, scn_dir):
@@ -99,7 +100,7 @@ def load(casp_version=12,
          collate_fn=None,
          batch_size=32,
          seq_as_onehot=None,
-         dynamic_batching=True,
+         dynamic_batching=False,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
          train_eval_downsample=.2,
@@ -169,7 +170,7 @@ def load(casp_version=12,
                 N = (batch_size * average_length_in_dataset)/max_length_in_bin.
             This means that, on average, each batch will have about the same number of
             amino acids. If False, uses a constant value (specified by batch_size) for
-            batch size.
+            batch size. Default False.
         num_workers (int, optional): Number of workers passed to DataLoaders. Defaults to
             2. See the description of workers in the PyTorch documentation:
             https://pytorch.org/docs/stable/data.html#single-and-multi-process-data-loading.
@@ -282,7 +283,7 @@ def load(casp_version=12,
         local_path = _get_local_sidechainnet_path(casp_version, casp_thinning, scn_dir)
         if not local_path:
             print(f"SidechainNet{(casp_version, casp_thinning)} was not found in "
-                  "{scn_dir}.")
+                  f"{scn_dir}.")
     if not local_path or force_download:
         # Download SidechainNet if it does not exist locally, or if requested
         local_path = _download_sidechainnet(casp_version, casp_thinning, scn_dir)
@@ -298,12 +299,15 @@ def load(casp_version=12,
 
     # By default, the load function returns a dictionary
     if not with_pytorch and not scn_dataset:
+        scn_dict = remove_problematic_pnids_from_scndict(scn_dict)
         return scn_dict
     elif not with_pytorch and scn_dataset:
-        return SCNDataset(scn_dict,
-                          complete_structures_only=complete_structures_only,
-                          trim_edges=trim_edges,
-                          sort_by_length=sort_by_length)
+        d = SCNDataset(scn_dict,
+                       complete_structures_only=complete_structures_only,
+                       trim_edges=trim_edges,
+                       sort_by_length=sort_by_length)
+        d.delete_ids(NEEDS_NEW_ADJUSTMENT)
+        return d
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
             scn_dict,

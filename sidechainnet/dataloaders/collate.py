@@ -7,6 +7,7 @@ from sidechainnet.dataloaders.ProteinBatch import ProteinBatch
 from sidechainnet.dataloaders.SCNDataset import SCNDataset
 
 from sidechainnet.dataloaders.SimilarLengthBatchSampler import SimilarLengthBatchSampler
+from sidechainnet.utils.manual_adjustment import NEEDS_NEW_ADJUSTMENT
 
 
 def protein_batch_collate_fn(protein_objects):
@@ -70,7 +71,7 @@ def prepare_dataloaders(data,
                                overfit_batches=overfit_batches,
                                overfit_batches_small=overfit_batches_small,
                                complete_structures_only=complete_structures_only)
-
+    train_dataset.delete_ids(NEEDS_NEW_ADJUSTMENT)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         num_workers=num_workers,
@@ -101,22 +102,24 @@ def prepare_dataloaders(data,
     valid_splits = [splitname for splitname in data.keys() if "valid" in splitname]
     for vsplit in valid_splits:
         try:
-            valid_loader = torch.utils.data.DataLoader(SCNDataset(
-                data[vsplit],
-                split_name=vsplit,
-                trim_edges=True,
-                sort_by_length='ascending'),
+            d = SCNDataset(data[vsplit],
+                           split_name=vsplit,
+                           trim_edges=True,
+                           sort_by_length='ascending')
+            d.delete_ids(NEEDS_NEW_ADJUSTMENT)
+            valid_loader = torch.utils.data.DataLoader(d,
                                                        num_workers=1,
                                                        batch_size=batch_size,
                                                        collate_fn=collate_fn)
             valid_loaders[vsplit] = valid_loader
         except KeyError:
             pass
-
-    test_loader = torch.utils.data.DataLoader(SCNDataset(data['test'],
-                                                         split_name='test',
-                                                         trim_edges=True,
-                                                         sort_by_length='ascending'),
+    d = SCNDataset(data['test'],
+                   split_name='test',
+                   trim_edges=True,
+                   sort_by_length='ascending')
+    d.delete_ids(NEEDS_NEW_ADJUSTMENT)
+    test_loader = torch.utils.data.DataLoader(d,
                                               num_workers=1,
                                               batch_size=batch_size,
                                               collate_fn=collate_fn)
