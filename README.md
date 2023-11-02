@@ -2,11 +2,11 @@ SidechainNet
 ==============================
 
 
-**NEW: SidechainNet v1.0 introduces new features (e.g., OpenMM interaction, hydrogen support) and several breaking changes.** Please see our [release notes](version1_notes.md) for more information. An updated walkthrough is available below.
+>**NEW: SidechainNet v1.0 introduces new features (e.g., OpenMM interaction, hydrogen support) and several breaking changes.** Please see our [release notes](version1_notes.md) for more information. An updated walkthrough is available below.
 
-**[Colab Walkthrough v1.0](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing), [Paper](https://doi.org/10.1002/prot.26169)**
+**[Colab Walkthrough v1.0](https://colab.research.google.com/drive/1-d2p_1G0o4W1DlegyUA6D7ErLUNEsakX?usp=sharing), [Paper](https://doi.org/10.1002/prot.26169)**
 
-SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
+SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>2</sup> by Mohammed AlQuraishi.
 
 Specifically, SidechainNet adds measurements for protein angles and coordinates that describe the complete, all-atom protein structure (backbone *and* sidechain, excluding hydrogens) instead of the protein [backbone](https://foldit.fandom.com/wiki/Protein_backbone) alone.
 
@@ -15,21 +15,36 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 2. Methods for loading and batching SidechainNet data efficiently in PyTorch. 
 3. Methods for generating protein structure visualizations (`.pdb`, [`3Dmol`](http://3dmol.csb.pitt.edu), `.gltf`) from model predictions.
 4. Methods for augmenting SidechainNet to include new proteins and specify dataset organization.
+5. Interfacing with OpenMM to compute protein energy and atomic forces.
+
+## Installation
+```
+conda install -c conda-forge openmm
+pip install sidechainnet
+```
 
  
 ## Summary of SidechainNet data
+
+These attributes can be accessed via `SCNProtein` or `ProteinBatch` objects.
  
-| Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
+| Entry | Dimensionality* | Attribute name | ProteinNet | SidechainNet | 
 | :---: | :---: |  :---: | :---: | :---: | 
 | Primary sequence<sup>§</sup> | *L* | `seq` | X | X | 
-| [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/DSSP_2.html) Secondary structure<sup>\*\*,§</sup> | *L* | `sec` | X | X |
-| [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evo` | X | X | 
-| Missing residue mask<sup>§</sup> | *L* |  `msk` | X | X | 
-| Backbone coordinates | *L x 4<sup>\*\*\*</sup> x 3* |  `crd`, subset `[0:4]` | X | X | 
-| Backbone torsion angles | *L x 3* |  `ang`, subset `[0:3]` |  | X | 
-| Backbone bond angles | *L x 3* |  `ang`, subset `[3:6]` |  | X | 
-| Sidechain torsion angles | *L x 6* |   `ang`, subset `[6:12]` |  | X | 
-| Sidechain coordinates | *L x 10 x 3* |  `crd`, subset `[4:14]` |  | X |
+| [DSSP](https://swift.cmbi.umcn.nl/gv/dssp/DSSP_2.html) Secondary structure<sup>\*\*,§</sup> | *L* | `secondary_structure` | X | X |
+| [PSSM](https://en.wikipedia.org/wiki/Position_weight_matrix) + Information content | *L x 21* |  `evolutionary` | X | X | 
+| Missing residue mask<sup>§</sup> | *L* |  `mask` | X | X | 
+| Backbone coordinates | *L x 4<sup>\*\*\*</sup> x 3* |  `coords`, subset `[0:5]` | X | X | 
+| Backbone torsion angles | *L x 3* |  `angles`, subset `[0:3]` |  | X | 
+| Backbone bond angles | *L x 3* |  `angles`, subset `[3:6]` |  | X | 
+| Sidechain torsion angles | *L x 6* |   `angles`, subset `[6:12]` |  | X | 
+| Sidechain coordinates | *L x 10 x 3* |  `coords`, subset `[5:15]` |  | X |
+||||
+| Experimental resolution | *1* |  `resolution` |  | X |
+| Unmodified (non-standardized) sequence | *L* |  `unmodified_seq` |  | X |
+
+
+---
 
 **L* reperesents the length of any given protein in the dataset.
 
@@ -39,59 +54,13 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 
 <sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
 
-### Other included data
 
-| Entry | Dimensionality* | Label in SidechainNet data | ProteinNet | SidechainNet | 
-| :---: | :---: |  :---: | :---: | :---: |
-| Structure resolution | *1* | `res` | | X |
-| Primary sequence (3-letter codes) before SidechainNet standardization (a.k.a. **U**n**M**odified **S**equence)<sup>§</sup> | *L*  | `ums` | | X |
-| Modified residue bit-vector<sup>†</sup> | *L x 1*  | `mod` | | X |
+## Quick-start Examples
 
-<sup>§</sup>Stored as string values in the underlying SidechainNet data dictionary.
+> For hands on learning to use SidechainNet, see our walkthrough above. Here are the basics:
 
+### Loading SidechainNet as a SCNDataset
 
-<sup>†</sup>Includes a `1` for each residue that has been modified to a standard residue according to the mapping in `sidechainnet.utils.measure.ALLOWED_NONSTD_RESIDUES` (e.g., selenomethionine -> methionine).
-
-## Installation
-```
-conda install -c conda-forge openmm
-pip install sidechainnet
-```
-
-## Usage Examples
-
-### Loading SidechainNet as a Python dictionary
-
-```python
->>> import sidechainnet as scn
->>> data = scn.load(casp_version=12, thinning=30)
-```
-In its most basic form, SidechainNet is stored as a Python dictionary organized by train, validation, and test splits. These splits are identical to those described in ProteinNet.
- 
- Within each train/validation/test split in SidechainNet is another dictionary mapping data entry types (`seq`, `ang`, etc.) to a list containing this data type for every protein. In the example below, `seq{i}`, `ang{i}`, ... all refer to the `i`<sup>th</sup> protein in the dataset.
-```python
-data = {"train": {"seq": [seq1, seq2, ...],  # Sequences, 1-letter codes
-                  "ang": [ang1, ang2, ...],  # Angles
-                  "crd": [crd1, crd2, ...],  # Coordinates
-                  "evo": [evo1, evo2, ...],  # PSSMs and Information Content
-                  "sec": [sec1, sec2, ...],  # Secondary structure labels (DSSP)
-                  "res": [res1, res2, ...],  # X-ray crystallographic resolution
-                  "ids": [id1, id2,   ...],  # Corresponding ProteinNet IDs
-                  "mod": [mod1, mod2, ...],  # Modified residue annotations
-                  "ums": [ums1, ums2, ...]   # Unmodified sequences, 3-letter codes
-                  },
-        "valid-10": {...},
-            ...
-        "valid-90": {...},
-        "test":     {...},
-        "settings": {...},
-        "description" : "SidechainNet for CASP 12."
-        "date": "January 20, 2020"
-        }
-```
-By default, the `load` function downloads the data from the web into the current directory and loads it as a Python dictionary. If the data already exists locally, it reads it from disk. Other than the requirement that the data must be loaded using Python, this method of data loading is agnostic to any downstream analysis.
-
-### Loading SidechainNet as an interactive SCNDataset object
 
 The easiest way to interact with SidechainNet is most likely by using the `SCNDataset` and
 `SCNProtein` objects. 
@@ -120,47 +89,44 @@ Additionally, all of the attributes below are available directly from the `SCNPr
 ### Loading SidechainNet with PyTorch DataLoaders
 The `load` function can also be used to load SidechainNet data as a dictionary of `torch.utils.data.DataLoader` objects. PyTorch `DataLoaders` make it simple to iterate over dataset items for training machine learning models. This method is recommended for using SidechainNet data with PyTorch.
 
+Iterating over our Dataloaders in this manner yields `ProteinBatch` objects that facilitate 
+training and data collation/padding.
+
 
 ```python
->>> dataloaders = scn.load(casp_version=12, with_pytorch="dataloaders")
+>>> dataloaders = scn.load(casp_version=12, casp_thinning=30, with_pytorch="dataloaders")
 >>> dataloaders.keys()
 ['train', 'train_eval', 'valid-10', ..., 'valid-90', 'test']
->>> dataloaders['train'].dataset
-ProteinDataset(casp_version=12, split='train', n_proteins=81454,
-               created='Sep 20, 2020')
->>> for batch in dataloaders['train']:
-....    predicted_angles = model(batch.seqs)
-....    sb = scn.BatchedStructureBuilder(batch.int_seqs, predicted_angles)
-....    predicted_coords = sb.build()
-....    loss = compute_loss(batch.angs, batch.crds,               # True values
-....                        predicted_angles, predicted_coords)   # Predicted values
+>>> for protein_batch in dataloaders['train']:
+....    pred_protein = model(protein_batch.seqs)
+....    loss = compute_loss(protein_batch.angles, protein_batch.coords,  # True values
+....                        pred_protein.angles, pred_protein.coords)    # Predicted values
 ....    ...
 
 ```
 
-For more information on the `batch` variable, see the section *Using SidechainNet to train an all-atom protein structure prediction model* below.
 
-By default, the provided `DataLoader`s use a custom batching method that randomly generates batches of proteins of similar length. For faster training, it generates larger batches when the average length of proteins in the batch is small, and smaller batches when the proteins are large. The probability of selecting small-length batches is decreased so that each protein in SidechainNet is included in a batch with equal probability. See `dynamic_batching` and `collate_fn` arguments for more information on modifying this behavior. In the example below, `model_input` is a collated Tensor containing sequence and PSSM information.
-
-
-### Converting Angle Representations into All-Atom Structures
+### Quickly build all-atom protein coordinates from torsional angles
 An important component of this work is the inclusion of both angular and 3D coordinate representations of each protein. Researchers who develop methods that rely on angular representations may be interested in converting this information into 3D coordinates. For this reason, SidechainNet provides a method to convert the angles it provides into Cartesian coordinates.
 
-In the below example, `angles` is a NumPy matrix or Torch Tensor following the same organization as the NumPy angle matrices provided in SidechainNet. `sequence` is a string representing the protein's amino acid sequence.
 
 ```python
->>> (len(batch.seqs), batch.angs.shape)  # 12 angles per residue
-(128, (128, 12))
->>> sb = scn.StructureBuilder(batch.seqs, batch.angs)
->>> coords = sb.build()
->>> coords.shape  # 14 atoms per residue (128*14 = 1792)
-(1792, 3)
+>>> d = scn.load(casp_version=12, casp_thinning=30)
+>>> p = d[100]
+>>> p.fastbuild(inplace=True)
 ```
 
-### Visualizing & Interacting with All-Atom Structures (`PDB`, `py3Dmol`, and `gLTF`)
-SidechainNet also makes it easy to visualize both existing and predicted all-atom protein structures. These visualizations are available as `PDB` files, `py3Dmol.view` objects, and Graphics Library Transmission Format (`gLTF`) files. Examples of each are included below.
+### Add hydrogens to structures
+Gradient-friendly methods for adding hydrogens to protein structures.
+```python
+>>> p.add_hydrogens()
+>>> # OR
+>>> p.fastbuild(add_hydrogens=True, inplace=True)  # builds atoms (including Hs) from angles
+```
 
-The PDB format is a typical format for representing protein structures and can be opened in software tools like PyMOL. `py3Dmol` (built on [3Dmol.js](http://3dmol.csb.pitt.edu)<sup>2</sup>) enables users to **visualize and interact** with protein structures on the web and in Jupyter Notebooks via an open-source, object-oriented, and hardware-accelerated Javascript library. Finally, `gLTF` files, despite their larger size, can be convenient for visualizing proteins on the web or in contexts where other protein visualization tools are not supported. 
+### Visualization
+SidechainNet also makes it easy to visualize both existing and predicted all-atom protein structures. These visualizations are available as `PDB` files, `py3Dmol.view` objects, and Graphics Library Transmission Format (`gLTF`) files.
+
 
 ![StructureBuilder.to_3Dmol() example](./docs/_static/structure_example.png)
 
@@ -169,68 +135,20 @@ The PDB format is a typical format for representing protein structures and can b
 >>> sb.to_gltf("example.gltf")
 ```
 
-### Using SidechainNet to train an all-atom protein structure prediction model 
-
-Below is an outline of how to use this repository for machine learning model training. Assuming you have a predictive model variable `model` and a loss function `loss_fn` used to evaluate your model, you can load SidechainNet using our DataLoaders and begin training.
-
+### Compute protein energy (if all-atom coordinates are available)
 ```python
-import sidechainnet as scn
-
-data = scn.load(casp_version=12,thinning=30, with_pytorch="dataloaders")
-
-for epoch in range(100):
-    # Training epoch
-    for batch in data['train']:
-        predictions = model(batch.seqs)
-        loss = loss_fn(predictions, batch.angs, batch.crds)
-        loss.backwards()
-        ...
-    
-    # Evaluate performance on down-sampled training set for efficiency
-    for batch in data['train-eval']:
-        predictions = model(batch.seqs)
-        loss = loss_fn(predictions, batch.angs, batch.crds)
-        loss.backwards()
-        ...
-
-    # Evaluate performance on each of the 7 validation sets
-    for valid_set in [data[f'valid-{split}'] for split in scn.utils.download.VALID_SPLITS]:
-        for batch in valid_set:
-            predictions = model(batch.seqs)
-            loss = loss_fn(predictions, batch.angs, batch.crds)
-            loss.backwards()
-            ...
-
-# Evaluate performance on test set
-for batch in data['test']:
-    predictions = model(batch.seqs)
-    loss = loss_fn(predictions, batch.angs, batch.crds)
-    ...
+>>> p.get_energy()
+>>> # OR
+>>> p.fastbuild(add_hydrogens=True, inplace=True)  # builds atoms (including Hs) from angles 
+Quantity(value=-3830.165405454086, unit=kilojoule/mole)
 ```
 
-The `batch` variable above is a `collections.namedtuple` that has the following attributes:
-
-| Attribute | Description |
-| :---: | :--- |
- | `batch.pids` | Tuple of ProteinNet/SidechainNet IDs for proteins in this batch |
- | `batch.seqs` | Tensor of sequences, either as integers or as one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
-  | `batch.int_seqs` | Tensor of sequences in integer sequence format |
-  | `batch.str_seqs` | Tuple of sequences as strings (unpadded) |
-| `batch.msks` | Tensor of missing residue masks, (redundant with padding in data) |
-| `batch.evos` | Tensor of Position Specific Scoring Matrix + Information Content |
-| `batch.secs` | Tensor of secondary structure, either as integers or one-hot vectors depending on value of `scn.load(... seq_as_onehot)` |
-| `batch.angs` | Tensor of angles |
-| `batch.crds` | Tensor of coordinates |
-| `batch.resolutions` | Tuple of X-ray crystallographic resolutions, when available. |
-| `batch.seq_evo_sec` | Tensor that concatenates values of `seqs`, `evos`, and `secs`. Returned when `scn.load(... aggregate_model_input=True)` |
-| `batch.is_modified` | Tensor of modified residue bit-vectors. Each entry is a bit-vector where a 1 signifies that the residue at that position has been modified to match a standard residue supported by SidechainNet (e.g., selenomethionine -> methionine). |
-| `batch.lengths` | Tuple of protein sequence length |
 
 
 ## Reproducing or Extending SidechainNet
 
 If you would like to reproduce our work or make modifications/additions to the dataset, please see 
-the example we provide in our **[Colab Walkthrough](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing)**. In simple terms, you will need to call `scn.create`
+the example we provide in our walkthrough (above). In simple terms, you will need to call `scn.create`
 with the desired CASP/ProteinNet information or provide a list of ProteinNet-formatted IDs to
  `scn.create_custom`. Please note that since some data is acquired from ProteinNet directly (e.g., Position Specific Scoring Matrices), protein entries will exclude this data if it was not previously available in ProteinNet.
 
@@ -255,15 +173,17 @@ scn.create_custom(pnids=custom_ids,
     - Biopython
     - numpy
     - scipy
+- OpenMM v8 or greater (`conda install -c conda-forge openmm`)
 - [PyTorch](https://pytorch.org/get-started/locally/)
 - tqdm
 - py3Dmol (`pip install py3Dmol`)
 - pymol (optional, for `gltf` support, [repo](https://pymolwiki.org/index.php/Linux_Install), [linux install](https://pymolwiki.org/index.php/Linux_Install) requires `libxml2`)
+- pytorch_lightning (optional, for model training examples)
 
 
 ## Acknowledgements
 
-Thanks to Mohammed AlQuraishi for his inspiring work on protein structure prediction. Thanks, also, to [Jeppe Hallgren](https://github.com/JeppeHallgren) for his development of a ProteinNet text record [parser](https://github.com/biolib/openprotein/blob/master/preprocessing.py), which I have used in part here.
+Thanks to Mohammed AlQuraishi for building ProteinNet, upon which our work is built. Thanks, also, to [Jeppe Hallgren](https://github.com/JeppeHallgren) for his development of a ProteinNet text record [parser](https://github.com/biolib/openprotein/blob/master/preprocessing.py), which I have used in part here.
 
  This work is supported by R01GM108340 from the National Institute of General Medical Sciences, is supported in part by the University of Pittsburgh Center for Research Computing through the resources provided, and by NIH T32 training grant T32 EB009403 as part of the HHMI-NIBIB Interfaces Initiative.
 
@@ -284,8 +204,8 @@ Computational Biology Skills Seminar, U.C. Berkeley, May 13, 2021
 * [Recording](https://youtu.be/1gZAYO7hl80)
 
 ## Citation
-Please cite our paper if you find SidechainNet useful in your work.
-```
+Please cite our paper(s) if you find SidechainNet useful in your work.
+```bibtex
 @article{https://doi.org/10.1002/prot.26169,
 	author = {King, Jonathan Edward and Koes, David Ryan},
 	title = {SidechainNet: An all-atom protein structure dataset for machine learning},
@@ -300,6 +220,20 @@ Please cite our paper if you find SidechainNet useful in your work.
 	abstract = {Abstract Despite recent advancements in deep learning methods for protein structure prediction and representation, little focus has been directed at the simultaneous inclusion and prediction of protein backbone and sidechain structure information. We present SidechainNet, a new dataset that directly extends the ProteinNet dataset. SidechainNet includes angle and atomic coordinate information capable of describing all heavy atoms of each protein structure and can be extended by users to include new protein structures as they are released. In this article, we provide background information on the availability of protein structure data and the significance of ProteinNet. Thereafter, we argue for the potentially beneficial inclusion of sidechain information through SidechainNet, describe the process by which we organize SidechainNet, and provide a software package (https://github.com/jonathanking/sidechainnet) for data manipulation and training with machine learning models.},
 	year = {2021}
 }
+```
+```bibtex
+@article {King2023.10.03.560775,
+	author = {Jonathan Edward King and David Ryan Koes},
+	title = {Interpreting Molecular Dynamics Forces as Deep Learning Gradients Improves Quality Of Predicted Protein Structures},
+	elocation-id = {2023.10.03.560775},
+	year = {2023},
+	doi = {10.1101/2023.10.03.560775},
+	publisher = {Cold Spring Harbor Laboratory},
+	URL = {https://www.biorxiv.org/content/early/2023/10/05/2023.10.03.560775},
+	eprint = {https://www.biorxiv.org/content/early/2023/10/05/2023.10.03.560775.full.pdf},
+	journal = {bioRxiv}
+}
+
 ```
 
 

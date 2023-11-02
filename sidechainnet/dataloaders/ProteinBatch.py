@@ -16,9 +16,9 @@ class ProteinBatch(object):
 
         self._angles = None
         self._coords = None
-        
+
         self._fillna = None
-    
+
     def fillna(self, value=0):
         """Fill nan values in the batch with a given value."""
         self._fillna = value
@@ -59,6 +59,14 @@ class ProteinBatch(object):
         return self.seqs_onehot
 
     @property
+    def unmodified_seq(self):
+        return self.unmodified_seq
+
+    @property
+    def unmodified_seqs(self):
+        return [p.unmodified_seq for p in self]
+
+    @property
     def secondary(self, one_hot=True):
         secs = (p.int_secondary for p in self)
         secs = self.pad_for_batch(secs,
@@ -68,6 +76,10 @@ class ProteinBatch(object):
         if self._fillna is not None:
             secs = torch.nan_to_num(secs, nan=self._fillna)
         return secs
+
+    @property
+    def seconday_structure(self, one_hot=True):
+        return self.secondary(one_hot=one_hot)
 
     @property
     def masks(self):
@@ -104,6 +116,10 @@ class ProteinBatch(object):
     @property
     def resolutions(self):
         return [p.resolution for p in self]
+
+    @property
+    def resolution(self):
+        return self.resolutions
 
     def __iter__(self):
         for p in self.proteins:
@@ -200,6 +216,5 @@ class ProteinBatch(object):
     def copy(self):
         """Create and return a copy of the ProteinBatch."""
         new_proteins = [p.copy() for p in self.proteins]
-        new_pb = ProteinBatch(new_proteins,
-                              device=self.device)
+        new_pb = ProteinBatch(new_proteins, device=self.device)
         return new_pb
