@@ -16,11 +16,11 @@ NEEDS_MANUAL_ADJUSTMENT = [
         "3Q1X_1_A", "1II5_1_A", "2XII_1_A", "3SRY_1_A", "4YCW_1_A", "3ZDQ_1_A",
         "1YJS_1_A", "4CVK_1_A", "2VSQ_1_A", "3P47_1_A", "4D57_1_A", "3WVN_1_A",
         "2XXU_1_A", "3VSC_1_A", "3S1T_1_A", "2AV4_1_A", "3RNN_1_A", "1WNU_1_A",
-        "4BDL_1_A", "3J9M_79_AY",
+        "4BDL_1_A", "3J9M_79_AY", "3JAJ_49_2", "2I2J_1_A"
     ]
 
-# IDs that are inappropriate for training as of November 1, 2023.
-NEEDS_NEW_ADJUSTMENT = ["3JAJ_49_2", "2I2J_1_A",]
+# IDs that are inappropriate for training as of November 2, 2023.
+NEEDS_NEW_ADJUSTMENT = []
 
 
 def manually_correct_mask(pnid, pn_entry, mask):
