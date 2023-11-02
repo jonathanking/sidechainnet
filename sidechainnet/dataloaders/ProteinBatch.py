@@ -9,9 +9,8 @@ import numpy as np
 class ProteinBatch(object):
     """Represents batch of Proteins for collation, construction, etc. Enforces max len."""
 
-    def __init__(self, proteins, batch_pad_char=0, device=torch.device('cpu')) -> None:
+    def __init__(self, proteins, device=torch.device('cpu')) -> None:
         self.proteins = proteins
-        self.batch_pad_char = batch_pad_char
         self.max_len = max((len(p) for p in self.proteins))
         self.device = device
 
@@ -184,6 +183,5 @@ class ProteinBatch(object):
         """Create and return a copy of the ProteinBatch."""
         new_proteins = [p.copy() for p in self.proteins]
         new_pb = ProteinBatch(new_proteins,
-                              batch_pad_char=self.batch_pad_char,
                               device=self.device)
         return new_pb

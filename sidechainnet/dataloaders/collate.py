@@ -33,11 +33,9 @@ def protein_batch_collate_fn(protein_objects):
 
 
 def prepare_dataloaders(data,
-                        aggregate_model_input,
                         collate_fn=None,
                         batch_size=32,
                         num_workers=None,
-                        seq_as_onehot=None,
                         dynamic_batching=True,
                         optimize_for_cpu_parallelism=False,
                         train_eval_downsample=0.1,

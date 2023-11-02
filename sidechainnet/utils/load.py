@@ -96,10 +96,8 @@ def load(casp_version=12,
          scn_dir="./sidechainnet_data",
          force_download=False,
          with_pytorch=None,
-         aggregate_model_input=True,
          collate_fn=None,
          batch_size=32,
-         seq_as_onehot=None,
          dynamic_batching=False,
          num_workers=2,
          optimize_for_cpu_parallelism=False,
@@ -120,7 +118,7 @@ def load(casp_version=12,
     to load, and whether or not they would like the data prepared as a PyTorch DataLoader
     (with_pytorch='dataloaders') for easy access for model training with PyTorch. Several
     arguments are also available to allow the user to specify how the data should be
-    loaded and batched when provided as DataLoaders (aggregate_model_input, collate_fn,
+    loaded and batched when provided as DataLoaders (collate_fn,
     batch_size, seq_as_one_hot, dynamic_batching, num_workers,
     optimize_for_cpu_parallelism, and train_eval_downsample.)
 
@@ -143,11 +141,6 @@ def load(casp_version=12,
         with_pytorch (str, optional): If equal to 'dataloaders', returns a dictionary
             mapping dataset splits (e.g. 'train', 'test', 'valid-X') to PyTorch
             DataLoaders for data batching and model training. Defaults to None.
-        aggregate_model_input (bool, optional): If True, the batches in the DataLoader
-            contain a single entry for all of the SidechainNet data that is favored for
-            use in a predictive model (sequences and PSSMs). This entry is a single
-            Tensor. However, if False, when batching these entries are returned
-            separately. See method description. Defaults to True.
         collate_fn (Callable, optional): A collating function. Defaults to None. See:
             https://pytorch.org/docs/stable/data.html#dataloader-collate-fn.
         batch_size (int, optional): Batch size to be used with PyTorch DataLoaders. Note
@@ -155,11 +148,6 @@ def load(casp_version=12,
             necessarily be equal to this number (though, on average, it will be close
             to this number). Only applicable when with_pytorch='dataloaders' is provided.
             Defaults to 32.
-        seq_as_onehot (bool, optional): By default, the None value of this argument causes
-            sequence data to be represented as one-hot vectors (L x 20) when batching and
-            aggregate_model_input=True or to be represented as integer sequences (shape L,
-            values 0 through 21 with 21 being a pad character). The user may override this
-            option with seq_as_onehot=False only when aggregate_model_input=False.
         dynamic_batching (bool, optional): If True, uses a dynamic batch size when
             training that increases when the proteins within a batch have short sequences
             or decreases when the proteins within a batch have long sequences. Behind the
@@ -311,11 +299,9 @@ def load(casp_version=12,
     if with_pytorch == "dataloaders":
         return prepare_dataloaders(
             scn_dict,
-            aggregate_model_input=aggregate_model_input,
             collate_fn=collate_fn,
             batch_size=batch_size,
             num_workers=num_workers,
-            seq_as_onehot=seq_as_onehot,
             dynamic_batching=dynamic_batching,
             optimize_for_cpu_parallelism=optimize_for_cpu_parallelism,
             train_eval_downsample=train_eval_downsample,

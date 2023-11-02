@@ -1,7 +1,8 @@
 SidechainNet
 ==============================
-[//]: # (Badges)
-[![Travis Build Status](https://travis-ci.com/jonathanking/sidechainnet.svg?branch=master)](https://travis-ci.com/jonathanking/sidechainnet)
+
+
+**NEW: SidechainNet v1.0 introduces new features (e.g., OpenMM interaction, hydrogen support) and several breaking changes.** Please see our [release notes](version1_notes.md) for more information.
 
 **[Colab Walkthrough](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing), [Paper](https://doi.org/10.1002/prot.26169)**
 
