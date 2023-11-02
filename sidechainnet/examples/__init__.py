@@ -1,0 +1,1 @@
+from .alphabet_protein import get_alphabet_protein

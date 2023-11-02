@@ -5,7 +5,7 @@ from Bio import Align
 
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES, PRODY_CA_DIST
 from sidechainnet.utils.download import ASTRAL_ID_MAPPING, determine_pnid_type
-from sidechainnet.utils.measure import GLOBAL_PAD_CHAR
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
 
 
 def init_basic_aligner(allow_mismatches=False):
@@ -61,6 +61,12 @@ def get_mask_from_alignment(al):
 def get_padded_second_seq_from_alignment(al):
     """For a single alignment, return the second padded string."""
     alignment_str = str(al).split("\n")[2]
+    return alignment_str
+
+
+def get_padded_first_seq_from_alignment(al):
+    """For a single alignment, return the first padded string."""
+    alignment_str = str(al).split("\n")[0]
     return alignment_str
 
 
@@ -292,7 +298,7 @@ def binary_mask_to_str(m):
     m = list(map(lambda x: "-" if x == 0 else "+", m))
     return "".join(m)
 
-
+# TODO update coordinate measurement and iteration to bake in residue size into coord dim
 def coordinate_iterator(coords, atoms_per_res):
     """Iterates over coordinates in a numpy array grouped by residue.
 

@@ -14,9 +14,10 @@ from .structure.StructureBuilder import StructureBuilder
 from .structure.BatchedStructureBuilder import BatchedStructureBuilder
 from .utils.load import load
 from .utils.download import VALID_SPLITS, DATA_SPLITS
-from .utils.measure import GLOBAL_PAD_CHAR
+from .structure.build_info import GLOBAL_PAD_CHAR
 from .create import create, create_custom, get_proteinnet_ids, generate_all
 from . import utils
+from .dataloaders.SCNProtein import SCNProtein, OPENMM_FORCEFIELDS
 
 
 versions = get_versions()

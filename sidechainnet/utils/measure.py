@@ -2,12 +2,12 @@
 
 import numpy as np
 import prody as pr
+import torch
 
 import sidechainnet as scn
-from sidechainnet.structure.build_info import NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_BUILD_INFO
+from sidechainnet.structure.build_info import BB_BUILD_INFO, GLOBAL_PAD_CHAR, NUM_ANGLES, NUM_BB_OTHER_ANGLES, NUM_BB_TORSION_ANGLES, NUM_COORDS_PER_RES, SC_HBUILD_INFO
 from sidechainnet.utils.errors import IncompleteStructureError, MissingAtomsError, NonStandardAminoAcidError, NoneStructureError, SequenceError
 
-GLOBAL_PAD_CHAR = 0
 ALLOWED_NONSTD_RESIDUES = {
     "ASX": "ASP",
     "GLX": "GLU",
@@ -24,13 +24,16 @@ ALLOWED_NONSTD_RESIDUES = {
     "XLE": "LEU",
     "4FB": "PRO",
     "MLY": "LYS",  # N-dimethyl-lysine
-    "AIB": "ALA",  # alpha-methyl-alanine, not included during generation on 1/23/22
-    "MK8": "MET"   # 2-methyl-L-norleucine, added 3/16/21
+    "MK8": "MET",  # 2-methyl-L-norleucine, added 3/16/21
+    "CME": "CYS",  # S,S-(2-HYDROXYETHYL)THIOCYSTEINE, see PDB 1A1V, added 2/7/22
+    # "AIB": "ALA",  # alpha-methyl-alanine,removed due to poor rep for 1AMT structure
 }
 
 
 def angle_list_to_sin_cos(angs, reshape=True):
-    """Given a list of angles, returns a new list where those angles have been turned into
+    """Turn list of angles from radians into sin/cos values, increasing dimensionality.
+
+    Given a list of angles, returns a new list where those angles have been turned into
     their sines and cosines. If reshape is False, a new dim. is added that can hold the
     sine and cosine of each angle, i.e. (len x #angs)
 
@@ -50,7 +53,7 @@ def angle_list_to_sin_cos(angs, reshape=True):
 
 
 def check_standard_continuous(residue, prev_res_num):
-    """Asserts that the residue is standard and that the chain is continuous."""
+    """Assert that the residue is standard and that the chain is continuous."""
     if not residue.isstdaa:
         raise NonStandardAminoAcidError("Found a non-std AA.")
     if residue.getResnum() != prev_res_num:
@@ -58,17 +61,18 @@ def check_standard_continuous(residue, prev_res_num):
     return True
 
 
-def determine_sidechain_atomnames(_res):
-    """Given a residue from ProDy, returns a list of sidechain atom names that must be
-    recorded."""
-    if _res.getResname() in SC_BUILD_INFO.keys():
-        return SC_BUILD_INFO[_res.getResname()]["atom-names"]
+def determine_sidechain_atomnames(_res, include_h=False):
+    """Given a ProDy residue, return a list of sidechain atom names to be recorded."""
+    if _res.getResname() in SC_HBUILD_INFO.keys():
+        return list(
+            filter(lambda an: not an.startswith("H"),
+                   SC_HBUILD_INFO[_res.getResname()]["atom-names"]))
     else:
         raise NonStandardAminoAcidError
 
 
-def compute_sidechain_dihedrals(residue, prev_residue, next_res):
-    """Computes all angles to predict for a given residue.
+def compute_sidechain_dihedrals(residue, prev_residue, allow_nan=False):
+    """Compute all angles to predict for a given residue.
 
     If the residue is the first in the protein chain, a fictitious C atom is
     placed before the first N. This is used to compute a [ C-1, N, CA, CB]
@@ -77,45 +81,81 @@ def compute_sidechain_dihedrals(residue, prev_residue, next_res):
     used to generate a list of dihedral angles for this residue.
     """
     try:
-        torsion_names = SC_BUILD_INFO[residue.getResname()]["torsion-names"]
+        torsion_names = SC_HBUILD_INFO[residue.getResname()]["torsion-names"]
     except KeyError as e:
         raise NonStandardAminoAcidError from e
     if len(torsion_names) == 0:
         return (NUM_ANGLES -
                 (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES)) * [GLOBAL_PAD_CHAR]
 
-    # Compute CB dihedral, which may depend on the previous or next residue for placement
+    # Compute CB dihedral, which may depend on a fictitious atom for placement
     try:
         if prev_residue:
             cb_dihedral = compute_single_dihedral(
                 (prev_residue.select("name C"),
-                 *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])))
+                 *(residue.select(f"name {an}") for an in ["N", "CA", "CB"])), allow_nan=allow_nan)
         else:
-            cb_dihedral = compute_single_dihedral(
-                (next_res.select("name N"),
-                 *(residue.select(f"name {an}") for an in ["C", "CA", "CB"])))
+            atoms = [residue.select(f"name {an}") for an in ["N", "N", "CA", "CB"]]
+            # Make a ficticious atom, X, that is extended from N.
+            atoms[0] = atoms[0].copy()
+            atoms[0].setNames(['X'])
+            # Compute the coordinates of the fictitious atom
+            fict_coords = compute_fictious_atom_for_res1(
+                n=atoms[1].getCoords(),
+                ca=atoms[2].getCoords(),
+                c=residue.select("name C").getCoords())
+            atoms[0].setCoords(fict_coords)
+            cb_dihedral = compute_single_dihedral(atoms, allow_nan=allow_nan)
+
     except AttributeError:
         cb_dihedral = GLOBAL_PAD_CHAR
 
     res_dihedrals = [cb_dihedral]
 
     for t_name, t_val in zip(torsion_names[1:],
-                             SC_BUILD_INFO[residue.getResname()]["torsion-vals"][1:]):
+                             SC_HBUILD_INFO[residue.getResname()]["torsion-vals"][1:]):
         # Only record torsional angles that are relevant (i.e. not planar).
-        # All torsion values that vary are marked with 'p' in SC_BUILD_INFO
+        # All torsion values that vary are marked with 'p' in SC_HBUILD_INFO
         if t_val != "p":
             break
         atom_names = t_name.split("-")
         res_dihedrals.append(
-            compute_single_dihedral([residue.select("name " + an) for an in atom_names]))
+            compute_single_dihedral([residue.select("name " + an) for an in atom_names],  allow_nan=allow_nan))
 
     return res_dihedrals + (NUM_ANGLES - (NUM_BB_TORSION_ANGLES + NUM_BB_OTHER_ANGLES) -
                             len(res_dihedrals)) * [GLOBAL_PAD_CHAR]
 
 
+def compute_fictious_atom_for_res1(n, ca, c):
+    """Compute the coords of a fictitious atom laying in the plane of N, Ca, C.
+
+                          Cb
+                           |
+                           |
+                          Ca
+                         /  `
+                       /     `
+              X <--- N        `C
+
+    X = (-1 * (NCa + NC)),
+    X = X / ||X||,
+    X = N + X,               where Nca and NC are vectors.
+
+    """
+    with torch.no_grad():
+        # Define NCA and NC vectors
+        nca_vec = ca - n
+        nc_vec = c - n
+        # Compute the consistent but arbitrarily defined vector from NCa and NC
+        fict_vec = -1 * (nca_vec + nc_vec)
+        fict_vec = fict_vec * BB_BUILD_INFO['BONDLENS']['c-n'] / np.linalg.norm(fict_vec)
+        # Compute the coorindates of the fictitious atom
+        fict_coords = n + fict_vec
+        return fict_coords
+
+
 def get_atom_coords_by_names(residue, atom_names):
-    """Given a ProDy Residue and a list of atom names, this attempts to select and return
-    all the atoms.
+    """Given a ProDy Residue and a list of atom names, select and return all the atoms.
 
     If atoms are not present, it substitutes the pad character in lieu of their
     coordinates.
@@ -133,8 +173,8 @@ def get_atom_coords_by_names(residue, atom_names):
 
 def measure_res_coordinates(_res):
     """Given a ProDy residue, measure all relevant coordinates."""
-    sc_atom_names = determine_sidechain_atomnames(_res)
-    bbcoords = get_atom_coords_by_names(_res, ["N", "CA", "C", "O"])
+    sc_atom_names = determine_sidechain_atomnames(_res, include_h=False)
+    bbcoords = get_atom_coords_by_names(_res, ["N", "CA", "C", "O", "OXT"])
     sccoords = get_atom_coords_by_names(_res, sc_atom_names)
     coord_padding = np.zeros((NUM_COORDS_PER_RES - len(bbcoords) - len(sccoords), 3))
     coord_padding[:] = GLOBAL_PAD_CHAR
@@ -170,8 +210,8 @@ def replace_nonstdaas(residues):
     return residues, resnames, np.asarray(is_nonstd)
 
 
-def get_seq_coords_and_angles(chain, replace_nonstd=True):
-    """Extracts protein sequence, coordinates, and angles from a ProDy chain.
+def get_seq_coords_and_angles(chain, replace_nonstd=True, allow_nan=False):
+    """Extract protein sequence, coordinates, and angles from a ProDy chain.
 
     Args:
         chain: ProDy chain object
@@ -196,7 +236,6 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
     if chain.nonstdaa and replace_nonstd:
         all_residues, unmodified_sequence, is_nonstd = replace_nonstdaas(all_residues)
     prev_res = None
-    next_res = all_residues[1]
 
     for res_id, (res, is_modified) in enumerate(zip(all_residues, is_nonstd)):
         if res.getResname() == "XAA":  # Treat unknown amino acid as missing
@@ -210,7 +249,7 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
 
         # Measure sidechain angles
         all_res_angles = bb_angles + bond_angles + compute_sidechain_dihedrals(
-            res, prev_res, next_res)
+            res, prev_res, allow_nan=allow_nan)
 
         # Measure coordinates
         rescoords = measure_res_coordinates(res)
@@ -227,8 +266,11 @@ def get_seq_coords_and_angles(chain, replace_nonstd=True):
             prev_coords = coords[res_id - 1] if res_id > 0 else None
             next_coords = coords[res_id + 1] if res_id + 1 < len(coords) else None
             prev_ang = dihedrals[res_id - 1] if res_id > 0 else None
-            res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
-                                      prev_ang)
+            try:
+                res = standardize_residue(res, all_res_angles, prev_coords, next_coords,
+                                          prev_ang)
+            except ValueError as e:
+                pass
 
     dihedrals_np = np.asarray(dihedrals)
     coords_np = np.concatenate(coords)
@@ -368,7 +410,7 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
     """
     try:
         phi = pr.calcPhi(residue, radian=True)
-    except ValueError:
+    except (ValueError, ArithmeticError):
         phi = GLOBAL_PAD_CHAR
     try:
         if last_res:
@@ -376,7 +418,7 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
                 [residue.select("name " + an) for an in "N CA C O".split()])
         else:
             psi = pr.calcPsi(residue, radian=True)
-    except (ValueError, IndexError):
+    except (ValueError, IndexError, ArithmeticError):
         # For the last residue, we can measure a "psi" angle that is actually
         # the placement of the terminal oxygen. Currently, this is not utilized
         # in the building of structures, but it is included in case the need
@@ -394,21 +436,21 @@ def measure_phi_psi_omega(residue, include_OXT=False, last_res=False):
             psi = GLOBAL_PAD_CHAR
     try:
         omega = pr.calcOmega(residue, radian=True)
-    except ValueError:
+    except (ValueError, ArithmeticError):
         omega = GLOBAL_PAD_CHAR
     return [phi, psi, omega]
 
 
-def compute_single_dihedral(atoms):
+def compute_single_dihedral(atoms, allow_nan=False):
     """Given 4 Atoms, calculate the dihedral angle between them in radians."""
     if None in atoms:
         return GLOBAL_PAD_CHAR
     else:
         atoms = [a.getCoords()[0] for a in atoms]
-        return get_dihedral(atoms[0], atoms[1], atoms[2], atoms[3], radian=True)
+        return get_dihedral(atoms[0], atoms[1], atoms[2], atoms[3], radian=True, allow_nan=allow_nan)
 
 
-def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
+def get_dihedral(coords1, coords2, coords3, coords4, radian=False, allow_nan=False):
     """Returns the dihedral angle between four coordinates in degrees.
 
     Modified from prody.measure.measure to use a numerically safe normalization
@@ -433,9 +475,11 @@ def get_dihedral(coords1, coords2, coords3, coords4, radian=False):
         arccos_input = 1
     elif arccos_input_raw < -1 and np.abs(arccos_input_raw) - 1 < eps:
         arccos_input = -1
-    else:
+    elif not allow_nan:
         raise ArithmeticError(
-            "Input to arccos is outside of acceptable [-1, 1] domain +/- 1e-6.")
+            "Input to arccos is outside of acceptable [-1, 1] domain +/- 1e-6.", arccos_input_raw)
+    else:
+        return GLOBAL_PAD_CHAR
     rad = np.arccos(arccos_input)
     if not porm == 0:
         rad = rad * porm

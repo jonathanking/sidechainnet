@@ -1,11 +1,15 @@
 """A class for generating/visualizing protein atomic coordinates from measured angles."""
 
+import copy
 from io import UnsupportedOperation
 import numpy as np
+import prody as pr
 import torch
+from sidechainnet.structure.build_info import GLOBAL_PAD_CHAR
+from sidechainnet.utils.measure import compute_fictious_atom_for_res1
 
 from sidechainnet.utils.sequence import ONE_TO_THREE_LETTER_MAP, VOCAB
-from sidechainnet.structure.build_info import SC_BUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
+from sidechainnet.structure.build_info import SC_HBUILD_INFO, BB_BUILD_INFO, NUM_COORDS_PER_RES, SC_ANGLES_START_POS, NUM_ANGLES
 from sidechainnet.structure.structure import nerf
 from sidechainnet.structure.HydrogenBuilder import HydrogenBuilder, NUM_COORDS_PER_RES_W_HYDROGENS
 
@@ -23,8 +27,9 @@ class StructureBuilder(object):
                  seq,
                  ang=None,
                  crd=None,
-                 device=torch.device("cpu"),
-                 nerf_method="standard"):
+                 device='cpu',
+                 nerf_method="standard",
+                 has_hydrogens=None):
         """Initialize a StructureBuilder for a single protein. Does not build coordinates.
 
         To generate coordinates after initialization, see build().
@@ -44,6 +49,8 @@ class StructureBuilder(object):
                 the standard NeRF formulation described in many papers. "sn_nerf" uses an
                 optimized version with less vector normalizations. Defaults to
                 "standard".
+            has_hydrogens(bool, optional): True if the coordinate matrix uses a hydrogen
+                representation. If not provided, attempts to infer.
         """
         # TODO support one-hot sequences
         # Perhaps the user mistakenly passed coordinates for the angle arguments
@@ -72,9 +79,10 @@ class StructureBuilder(object):
 
         # Validate input data
         if self.coords is not None:
-            self.data_type = "torch" if isinstance(self.coords, torch.Tensor) else "numpy"
+            self.is_numpy = False if isinstance(self.coords, torch.Tensor) else True
         else:
-            self.data_type = "torch" if isinstance(self.ang, torch.Tensor) else "numpy"
+            self.is_numpy = False if isinstance(self.ang, torch.Tensor) else True
+        self.array_lib = np if self.is_numpy else torch
 
         if self.ang is not None and self.ang.shape[-1] != NUM_ANGLES:
             raise ValueError(f"Angle matrix dimensions must match (L x {NUM_ANGLES}). "
@@ -82,14 +90,14 @@ class StructureBuilder(object):
         if (self.coords is not None and self.coords.shape[-1] != 3):
             raise ValueError(f"Coordinate matrix dimensions must match (L x 3). "
                              f"You have provided {tuple(self.coords.shape)}.")
-        if (self.coords is not None and
-            (self.coords.shape[0] // NUM_COORDS_PER_RES) != len(self.seq_as_str)):
+        if (self.coords is not None and (self.coords.shape[0]) != len(self.seq_as_str) and
+            (self.coords.shape[0]) != len(self.seq_as_str)):
             raise ValueError(
-                f"The length of the coordinate matrix must match the sequence length "
-                f"times {NUM_COORDS_PER_RES}. You have provided {self.coords.shape[0]} //"
-                f" {NUM_COORDS_PER_RES} = {self.coords.shape[0] // NUM_COORDS_PER_RES}.")
-        if self.ang is not None and (self.ang == 0).all(axis=1).any():
-            missing_loc = np.where((self.ang == 0).all(axis=1))
+                f"The length of the coordinate matrix must match the sequence length. "
+                f"You have provided coords.shape[0] = {self.coords.shape[0]}.")
+        if self.ang is not None and (self.array_lib.isnan(self.ang)).all(axis=1).any():
+            missing_loc = self.array_lib.where(
+                (self.array_lib.isnan(self.ang)).all(axis=1))
             raise ValueError(f"Building atomic coordinates from angles is not supported "
                              f"for structures with missing residues. Missing residues = "
                              f"{list(missing_loc[0])}. Protein structures with missing "
@@ -101,8 +109,19 @@ class StructureBuilder(object):
         self.next_bb = None
         self.pdb_creator = None
         self.nerf_method = nerf_method
-        self.has_hydrogens = False
-        self.atoms_per_res = NUM_COORDS_PER_RES
+        if has_hydrogens is not None:
+            self.has_hydrogens = has_hydrogens
+        else:
+            try:
+                assert not (
+                    self.coords.shape[0] % NUM_COORDS_PER_RES == 0 and
+                    self.coords.shape[0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
+                ), ("Coordinate tensor for protein has an ambiguous shape. Please pass a "
+                    "value to has_hydrogens for clarification.")
+                self.has_hydrogens = self.coords.shape[
+                    0] % NUM_COORDS_PER_RES_W_HYDROGENS == 0
+            except AttributeError:
+                self.has_hydrogens = False
         self.terminal_atoms = None
 
     def __len__(self):
@@ -122,17 +141,19 @@ class StructureBuilder(object):
         resname_ang_iter = self._iter_resname_angs()
         first_resname, first_ang = next(resname_ang_iter)
         second_resname, second_ang = next(resname_ang_iter)
-        first_res = ResidueBuilder(first_resname, first_ang, prev_res=None, next_res=None)
+        first_res = ResidueBuilder(first_resname,
+                                   first_ang,
+                                   prev_res=None,
+                                   nerf_method=self.nerf_method,
+                                   device=self.device)
         second_res = ResidueBuilder(second_resname,
                                     second_ang,
                                     prev_res=first_res,
-                                    next_res=None)
+                                    nerf_method=self.nerf_method,
+                                    device=self.device)
 
-        # After building both backbones use the second residue's N to build the first's CB
-        first_res.build_bb()
+        first_res.build()
         second_res.build()
-        first_res.next_res = second_res
-        first_res.build_sc()
 
         return first_res, second_res
 
@@ -146,6 +167,8 @@ class StructureBuilder(object):
             (numpy.ndarray, torch.Tensor): An array or tensor of the generated coordinates
             with shape ((L X NUM_COORDS_PER_RES) X 3).
         """
+        raise ValueError(
+            "This method is deprecated. Please use the SCNProtein.fastbuild().")
         # If a StructureBuilder does not have angles, build returns its coordinates
         if self.ang is None:
             return self.coords
@@ -162,8 +185,9 @@ class StructureBuilder(object):
             res = ResidueBuilder(resname,
                                  ang,
                                  prev_res=prev_res,
-                                 next_res=None,
-                                 is_last_res=i + 2 == len(self.seq_as_str) - 1)
+                                 is_last_res=i + 2 == len(self.seq_as_str) - 1,
+                                 nerf_method=self.nerf_method,
+                                 device=self.device)
             self.coords += res.build()
             prev_res = res
 
@@ -184,25 +208,27 @@ class StructureBuilder(object):
 
         if not self.pdb_creator:
             from sidechainnet.structure.PdbBuilder import PdbBuilder
-            if self.data_type == 'numpy':
-                self.pdb_creator = PdbBuilder(self.seq_as_str, self.coords,
-                                              self.atoms_per_res,
-                                              terminal_atoms=self.terminal_atoms)
+            if self.is_numpy:
+                self.pdb_creator = PdbBuilder(self.seq_as_str,
+                                              self.coords,
+                                              terminal_atoms=self.terminal_atoms,
+                                              has_hydrogens=self.has_hydrogens)
             else:
                 self.pdb_creator = PdbBuilder(self.seq_as_str,
-                                              self.coords.detach().numpy(),
-                                              self.atoms_per_res,
-                                              terminal_atoms=self.terminal_atoms)
+                                              self.coords.cpu().detach().numpy(),
+                                              terminal_atoms=self.terminal_atoms,
+                                              has_hydrogens=self.has_hydrogens)
 
     def add_hydrogens(self):
         """Add Hydrogen atom coordinates to coordinate representation (re-apply PADs)."""
+        raise ValueError(
+            "This method is deprecated. Please use the SCNProtein.fastbuild().")
         if self.coords is None or not len(self.coords):
             raise ValueError("Cannot add hydrogens to a structure whose heavy atoms have"
                              " not yet been built.")
-        self.hb = HydrogenBuilder(self.seq_as_str, self.coords)
+        self.hb = HydrogenBuilder(self.seq_as_str, self.coords, self.device)
         self.coords = self.hb.build_hydrogens()
         self.has_hydrogens = True
-        self.atoms_per_res = NUM_COORDS_PER_RES_W_HYDROGENS
         self.terminal_atoms = self.hb.terminal_atoms
 
     def to_pdb(self, path, title="pred"):
@@ -234,25 +260,94 @@ class StructureBuilder(object):
         self._initialize_coordinates_and_PdbCreator()
         self.pdb_creator.save_gltf(path, title)
 
-    def to_3Dmol(self, style=None, **kwargs):
+    def to_png(self, path):
+        """Save protein structure as PNG, showing sidechains if available. Requires pdb.
+
+        Args:
+            path (str): Path to save file. 
+        """
+        import pymol
+        assert ".png" in path, "requested filepath must end with '.png'."
+        pymol.cmd.load(path.replace(".png", ".pdb"))
+        pymol.cmd.select("sidechain")
+        pymol.cmd.show("lines")
+        pymol.cmd.png(path, width=800, height=800, quiet=0, dpi=200, ray=0)
+        pymol.cmd.delete("all")
+
+    def to_3Dmol(self, style=None, other_protein=None, **kwargs):
         """Generate protein structure & return interactive py3Dmol.view for visualization.
 
         Args:
             style (str, optional): Style string to be passed to py3Dmol for
                 visualization. Defaults to None.
+            other_protein (SCNProtein, optional): Another SCNProtein object to be
+                visualized alongside this one. Defaults to None. Other protein will be
+                colored red and the first protein will be colored blue. The other protein
+                must have the same number of atoms as this one and thus alignable.
+            **kwargs: Additional arguments to be passed to py3Dmol.view.
 
         Returns:
             py3Dmol.view object: A view object that is interactive in iPython notebook
                 settings.
         """
         import py3Dmol
-        if not style:
-            style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
 
         view = py3Dmol.view(**kwargs)
         view.addModel(self.to_pdbstr(), 'pdb', {'keepH': True})
-        if style:
+
+        # If we have another protein to compare, align the other protein and add to viz
+        if other_protein is not None:
+            # Create copies and nan-masks of coordinate data
+            other_protein.numpy()
+            other_protein_copy = other_protein.copy()
+            # Remove rows with nans
+            if torch.is_tensor(self.coords):
+                self.coords = self.coords.detach().cpu().numpy()
+            coords_copy = copy.deepcopy(self.coords).reshape(-1, 3)
+            coords_copy_nonans = coords_copy[~np.isnan(coords_copy).any(axis=-1)]
+            other_protein_copy_coords = other_protein_copy.coords.reshape(-1, 3)
+            other_protein_copy_coords_nonans = other_protein_copy_coords[
+                ~np.isnan(coords_copy).any(axis=-1)]
+            
+            # Perform alignment between non-nan coords
+            t = pr.calcTransformation(other_protein_copy_coords_nonans,
+                                      coords_copy_nonans)
+            aligned_coords = t.apply(other_protein_copy_coords)
+            # Update coords in other protein
+            other_protein_copy.coords = aligned_coords.reshape(len(other_protein_copy),
+                                                               -1, 3)
+            if other_protein_copy.has_hydrogens:
+                other_protein_copy.hcoords = t.apply(
+                    other_protein_copy.hcoords.reshape(-1, 3)).reshape(
+                        len(other_protein_copy), -1, 3)
+                other_protein_copy.coords = other_protein_copy.hcoords
+            # Add viz to model
+            other_protein_copy.sb = None
+            view.addModel(other_protein_copy.to_pdbstr(), 'pdb', {'keepH': True})
+
+        # Set visualization style
+        if not style:
+            style = {'cartoon': {'color': 'spectrum'}, 'stick': {'radius': .15}}
+        if other_protein is None:
             view.setStyle(style)
+        elif other_protein is not None:
+            style0 = {
+                'stick': {
+                    'radius': .13,
+                    'color': '#599BFB'  # Blue
+                },
+                'cartoon': {'color': '#599BFB'}
+            }
+            style1 = {
+                'stick': {
+                    'radius': .065,
+                    'color': '#FB5960'  # Red, other
+                },
+                'cartoon': {'color': '#FB5960'}
+            }
+            view.setStyle({"model": 0}, style0)
+            view.setStyle({"model": 1}, style1)
+
         view.zoomTo()
         return view
 
@@ -264,7 +359,6 @@ class ResidueBuilder(object):
                  name,
                  angles,
                  prev_res,
-                 next_res,
                  is_last_res=False,
                  device=torch.device("cpu"),
                  nerf_method="standard"):
@@ -289,11 +383,10 @@ class ResidueBuilder(object):
             raise ValueError("Expected integer AA code." + str(name.shape) +
                              str(type(name)))
         if isinstance(angles, np.ndarray):
-            angles = torch.tensor(angles, dtype=torch.float32)
+            angles = torch.tensor(angles, dtype=torch.float32, device=device)
         self.name = name
         self.ang = angles.squeeze()
         self.prev_res = prev_res
-        self.next_res = next_res
         self.device = device
         self.is_last_res = is_last_res
         self.nerf_method = nerf_method
@@ -301,7 +394,8 @@ class ResidueBuilder(object):
         self.bb = []
         self.sc = []
         self.coords = []
-        self.coordinate_padding = torch.zeros(3, requires_grad=True)
+        self.coordinate_padding = torch.ones(3, requires_grad=True,
+                                             device=self.device) * GLOBAL_PAD_CHAR
 
     @property
     def AA(self):
@@ -341,7 +435,8 @@ class ResidueBuilder(object):
                     dihedral = self.ang[0]  # phi of current residue
                 else:
                     # Placing O (carbonyl)
-                    t = torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"])
+                    t = torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"],
+                                     device=self.device)
                     b = BB_BUILD_INFO["BONDLENS"]["c-o"]
                     pb = BB_BUILD_INFO["BONDLENS"]["ca-c"]
                     if self.is_last_res:
@@ -351,14 +446,13 @@ class ResidueBuilder(object):
                     else:
                         # the angle for placing oxygen is opposite to psi of current res
                         dihedral = self.ang[1] - np.pi
-
                 next_pt = nerf(pts[-3],
                                pts[-2],
                                pts[-1],
-                               b,
+                               torch.tensor(b, device=self.device),
                                t,
                                dihedral,
-                               l_bc=pb,
+                               l_bc=torch.tensor(pb, device=self.device),
                                nerf_method=self.nerf_method)
                 pts.append(next_pt)
             self.bb = pts[3:]
@@ -370,20 +464,23 @@ class ResidueBuilder(object):
 
         Placed in an arbitrary plane (z = .001).
         """
-        n = torch.tensor([0, 0, 0.001], device=self.device, requires_grad=True)
-        ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0, 0],
-                              device=self.device, requires_grad=True)
+        n = torch.tensor([0.0, 0.0, 0.001], device=self.device, requires_grad=True)
+        ca = n + torch.tensor([BB_BUILD_INFO["BONDLENS"]["n-ca"], 0.0, 0.0],
+                              device=self.device,
+                              requires_grad=True)
         cx = torch.cos(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]["ca-c"]
         cy = torch.sin(np.pi - self.ang[3]) * BB_BUILD_INFO["BONDLENS"]['ca-c']
-        c = ca + torch.tensor([cx, cy, 0], device=self.device, dtype=torch.float32, requires_grad=True)
+        c = ca + torch.tensor(
+            [cx, cy, 0.0], device=self.device, dtype=torch.float32, requires_grad=True)
         o = nerf(
             n,
             ca,
             c,
-            torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"]),
-            torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"]),
+            torch.tensor(BB_BUILD_INFO["BONDLENS"]["c-o"], device=self.device),
+            torch.tensor(BB_BUILD_INFO["BONDANGS"]["ca-c-o"], device=self.device),
             self.ang[1] - np.pi,  # opposite to current residue's psi
-            l_bc=torch.tensor(BB_BUILD_INFO["BONDLENS"]["ca-c"]),  # Previous bond length
+            l_bc=torch.tensor(BB_BUILD_INFO["BONDLENS"]["ca-c"],
+                              device=self.device),  # Previous bond length
             nerf_method=self.nerf_method)
         return [n, ca, c, o]
 
@@ -397,18 +494,17 @@ class ResidueBuilder(object):
         assert len(self.bb) > 0, "Backbone must be built first."
         self.atom_names = ["N", "CA", "C", "O"]
         self.pts = {"N": self.bb[0], "CA": self.bb[1], "C": self.bb[2]}
-        if self.next_res:
-            self.pts["N+"] = self.next_res.bb[0]
-        else:
+        if self.prev_res:
             self.pts["C-"] = self.prev_res.bb[2]
+        else:
+            self.pts["C-"] = compute_fictious_atom_for_res1(self.pts["N"], self.pts["CA"],
+                                                            self.pts["C"])
 
         last_torsion = None
-        for i, (pbond_len, bond_len, angle, torsion, atom_names) in enumerate(
-                _get_residue_build_iter(self.name, SC_BUILD_INFO)):
+        for i, (bond_len, angle, torsion, atom_names) in enumerate(
+                _get_residue_build_iter(self.name, SC_HBUILD_INFO, self.device)):
             # Select appropriate 3 points to build from
-            if self.next_res and i == 0:
-                a, b, c = self.pts["N+"], self.pts["C"], self.pts["CA"]
-            elif i == 0:
+            if i == 0:
                 a, b, c = self.pts["C-"], self.pts["N"], self.pts["CA"]
             else:
                 a, b, c = (self.pts[an] for an in atom_names[:-1])
@@ -419,14 +515,7 @@ class ResidueBuilder(object):
             elif type(torsion) is str and torsion == "i" and last_torsion is not None:
                 torsion = last_torsion - np.pi
 
-            new_pt = nerf(a,
-                          b,
-                          c,
-                          bond_len,
-                          angle,
-                          torsion,
-                          l_bc=pbond_len,
-                          nerf_method=self.nerf_method)
+            new_pt = nerf(a, b, c, bond_len, angle, torsion)
             self.pts[atom_names[-1]] = new_pt
             self.sc.append(new_pt)
             last_torsion = torsion
@@ -454,11 +543,11 @@ class ResidueBuilder(object):
         return f"ResidueBuilder({self.AA})"
 
 
-def _get_residue_build_iter(res, build_dictionary):
+def _get_residue_build_iter(res, build_dictionary, device):
     """Return an iterator over (bond-lens, angles, torsions, atom names) for a residue.
 
     This function makes it easy to iterate over the huge amount of data contained in
-    the dictionary sidechainnet.structure.build_info.SC_BUILD_INFO. This dictionary
+    the dictionary sidechainnet.structure.build_info.SC_HBUILD_INFO. This dictionary
     contains all of the various standard bond and angle values that are used during atomic
     reconstruction of a residue from its angles.
 
@@ -468,7 +557,7 @@ def _get_residue_build_iter(res, build_dictionary):
         build_dictionary (dict): A dictionary mapping 3-letter amino acid codes to
             dictionaries of information relevant to the construction of this amino acid
             from angles (i.e. angle names, atom types, bond lengths, bond types, torsion
-            types, etc.). See sidechainnet.structure.build_info.SC_BUILD_INFO.
+            types, etc.). See sidechainnet.structure.build_info.SC_HBUILD_INFO.
 
     Returns:
         iterator: An iterator that yields 4-tuples of (bond-value, angle-value,
@@ -477,17 +566,25 @@ def _get_residue_build_iter(res, build_dictionary):
         (sidechainnet.structure.structure.nerf).
     """
     r = build_dictionary[VOCAB.int2chars(int(res))]
-    bond_vals = [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]]
-    pbond_vals = [torch.tensor(BB_BUILD_INFO['BONDLENS']['n-ca'], dtype=torch.float32)
-                 ] + [torch.tensor(b, dtype=torch.float32) for b in r["bonds-vals"]][:-1]
-    angle_vals = [torch.tensor(a, dtype=torch.float32) for a in r["angles-vals"]]
-    torsion_vals = [
-        torch.tensor(t, dtype=torch.float32) if t not in ["p", "i"] else t
-        for t in r["torsion-vals"]
-    ]
-    return iter(
-        zip(pbond_vals, bond_vals, angle_vals, torsion_vals,
-            [t.split("-") for t in r["torsion-names"]]))
+    bond_vals = []
+    angle_vals = []
+    torsion_vals = []
+    atom_names = []
+
+    for i in range(len(r['bond-vals'])):
+        if r['torsion-names'][i].split("-")[-1].startswith("H"):
+            # We have reached the end of the heavy atoms
+            break
+        bond_vals.append(
+            torch.tensor(r['bond-vals'][i], dtype=torch.float32, device=device))
+        angle_vals.append(
+            torch.tensor(r['angle-vals'][i], dtype=torch.float32, device=device))
+        torsion_vals.append(
+            torch.tensor(r['torsion-vals'][i], dtype=torch.float32, device=device)
+            if r['torsion-vals'][i] not in ["p", "i"] else r['torsion-vals'][i])
+        atom_names.append(r["torsion-names"][i].split("-"))
+
+    return iter(zip(bond_vals, angle_vals, torsion_vals, atom_names))
 
 
 def _convert_seq_to_str(seq):
@@ -509,6 +606,20 @@ def _convert_seq_to_str(seq):
         raise UnsupportedOperation(f"Seq shape {seq.shape} is not supported.")
 
     return seq_as_str
+
+
+# @torch.jit.script
+def _init_bb_helper(BB_n_ca: float, ang3: torch.Tensor, BB_ca_c: float, device: str):
+    """Torchscript friendly helper for _init_bb. Currently unused."""
+    n = torch.tensor([0.0, 0.0, 0.001], requires_grad=True, device=device)
+    ca = n + torch.tensor([BB_n_ca, 0.0, 0.0], requires_grad=True, device=device)
+    pi_minus_ang3 = np.pi - ang3
+    c = ca + (torch.stack([
+        torch.cos(np.pi - ang3),
+        torch.sin(pi_minus_ang3),
+        torch.tensor(0.0, device=device)
+    ]) * BB_ca_c).float()
+    return n, ca, c
 
 
 if __name__ == '__main__':
