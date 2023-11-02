@@ -16,6 +16,15 @@ class ProteinBatch(object):
 
         self._angles = None
         self._coords = None
+        
+        self.fillna = None
+    
+    def fillna(self, value=0):
+        """Fill nan values in the batch with a given value."""
+        self.fillna = value
+        for p in self:
+            # Sets nans in coords and angles to value, others should be done on the fly
+            p.fillna(value=value)
 
     def __getitem__(self, idx):
         return self.proteins[idx]
@@ -51,10 +60,13 @@ class ProteinBatch(object):
     @property
     def secondary(self, one_hot=True):
         secs = (p.int_secondary for p in self)
-        return self.pad_for_batch(secs,
+        secs = self.pad_for_batch(secs,
                                   dtype='seq',
                                   seqs_as_onehot=one_hot,
                                   vocab=DSSPVocabulary())
+        if self.fillna is not None:
+            secs = torch.nan_to_num(secs, nan=self.fillna)
+        return secs
 
     @property
     def masks(self):
@@ -62,7 +74,10 @@ class ProteinBatch(object):
 
     @property
     def evolutionary(self):
-        return self.pad_for_batch((p.evolutionary for p in self), 'pssm')
+        evo = self.pad_for_batch((p.evolutionary for p in self), 'pssm')
+        if self.fillna is not None:
+            evo = torch.nan_to_num(evo, nan=self.fillna)
+        return evo
 
     @property
     def pssm(self):
