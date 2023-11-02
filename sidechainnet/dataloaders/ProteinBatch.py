@@ -17,14 +17,16 @@ class ProteinBatch(object):
         self._angles = None
         self._coords = None
         
-        self.fillna = None
+        self._fillna = None
     
     def fillna(self, value=0):
         """Fill nan values in the batch with a given value."""
-        self.fillna = value
+        self._fillna = value
         for p in self:
             # Sets nans in coords and angles to value, others should be done on the fly
             p.fillna(value=value)
+        self._angles = None
+        self._coords = None
 
     def __getitem__(self, idx):
         return self.proteins[idx]
@@ -39,6 +41,8 @@ class ProteinBatch(object):
 
         angles = (p.angles for p in self)
         self._angles = self.pad_for_batch(angles, dtype='ang')
+        if self._fillna is not None:
+            self._angles = torch.nan_to_num(self._angles, nan=self.fillna)
         return self._angles
 
     def _get_seqs(self, one_hot=True):
@@ -64,7 +68,7 @@ class ProteinBatch(object):
                                   dtype='seq',
                                   seqs_as_onehot=one_hot,
                                   vocab=DSSPVocabulary())
-        if self.fillna is not None:
+        if self._fillna is not None:
             secs = torch.nan_to_num(secs, nan=self.fillna)
         return secs
 
@@ -75,7 +79,7 @@ class ProteinBatch(object):
     @property
     def evolutionary(self):
         evo = self.pad_for_batch((p.evolutionary for p in self), 'pssm')
-        if self.fillna is not None:
+        if self._fillna is not None:
             evo = torch.nan_to_num(evo, nan=self.fillna)
         return evo
 
@@ -88,6 +92,8 @@ class ProteinBatch(object):
         if self._coords is not None:
             return self._coords
         self._coords = self.pad_for_batch((p.coords for p in self), 'crd')
+        if self._fillna is not None:
+            self._coords = torch.nan_to_num(self._coords, nan=self.fillna)
         return self._coords
 
     @property

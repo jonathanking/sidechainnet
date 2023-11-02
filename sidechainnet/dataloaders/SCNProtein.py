@@ -1087,7 +1087,7 @@ class SCNProtein(object):
             self.angles = torch.tensor(self.angles)
         self.is_numpy = False
 
-    def fillna(self, value=0.0, suppress_warnings=True):
+    def fillna(self, value=0.0, suppress_warnings=False):
         """Replace nans in coordinate and angle matrices with the specified value.
 
         Args:
@@ -1099,7 +1099,6 @@ class SCNProtein(object):
             warnings.warn(
                 "Doing this will remove all nans from the object and may cause missing"
                 " residue information to be lost. To proceed, call with warn=False.")
-            return
         self.coords[np.isnan(self.coords)] = value
         self.angles[np.isnan(self.angles)] = value
 
