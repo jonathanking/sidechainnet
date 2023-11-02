@@ -355,6 +355,7 @@ def get_chain_from_trainid(pnid):
     use_pdb = True
     try:
         chain = pr.parsePDB(pdbid, chain=chid, model=chnum)
+        # chain = pr.parsePDB(f"/net/pulsar/home/koes/jok120/openfold/jk_research/data/val/data_dir/{pdbid.lower()}.pdb", chain=chid, model=chnum)
         if not chain:
             chain = pr.parseMMCIF(pdbid.lower(), chain=chid, model=chnum)
             use_pdb = False
@@ -507,24 +508,6 @@ def contains_d_amino_acids(chain):
     return any((d_aa in resnames for d_aa in D_AMINO_ACID_CODES))
 
 
-def get_resolution_from_pdbid(pdbid):
-    """Return RCSB-reported resolution for a PDB ID.
-
-    Args:
-        pdbid (string): RCSB PDB identifier.
-    """
-    sleep(np.random.randint(0, 8))
-    query_string = ("https://data.rcsb.org/graphql?query={entry(entry_id:\"" + pdbid +
-                    "\"){pdbx_vrpt_summary{PDB_resolution}}}")
-    r = requests.get(query_string, headers={"User-Agent": "Mozilla/5.0"})
-    if r.status_code != 200:
-        res = None
-    try:
-        res = float(r.json()['data']['entry']['pdbx_vrpt_summary']['PDB_resolution'])
-    except (KeyError, TypeError):
-        res = None
-
-    return res
 
 
 def get_sequence_from_pdbid(pdbid, chain):
@@ -555,6 +538,28 @@ def get_sequence_from_pdbid(pdbid, chain):
     sequence = entity_poly['pdbx_seq_one_letter_code_can']
 
     return sequence
+
+
+def get_resolution_from_pdbid(pdbid):
+    """Use RSCB PDB's API to download the sequence for a PDB ID and chain.
+
+    Args:
+        pdbid (str): 4-letter PDB ID.
+
+    Returns:
+        float: PDB resolution, if available.
+    """
+    query_string = (f"https://data.rcsb.org/rest/v1/core/entry/{pdbid}")
+    r = requests.get(query_string)
+    if r.status_code != 200:
+        resolution = None
+    rjson = r.json()
+    try:
+        resolution = float(rjson["rcsb_entry_info"]["resolution_combined"][0])
+    except:
+        resolution = None
+
+    return resolution
 
 
 def get_sequence_from_pnid(pnid):
