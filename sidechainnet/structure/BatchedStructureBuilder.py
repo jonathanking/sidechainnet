@@ -2,7 +2,6 @@
 
 import numpy as np
 import sidechainnet as scn
-from sidechainnet.dataloaders.collate import pad_for_batch
 from sidechainnet.structure.build_info import NUM_COORDS_PER_RES
 from sidechainnet.utils.sequence import VOCAB
 
@@ -35,6 +34,8 @@ class BatchedStructureBuilder(object):
             ValueError: May raise ValueError when asked to generate structures from angles
             for structures that have missing angles.
         """
+        raise NotImplementedError(
+            "BatchedStructureBuilder is deprecated. Please see ProteinBatch.")
         # Validate input data
         if (ang_batch is None and crd_batch is None) or (ang_batch is not None and
                                                          crd_batch is not None):
@@ -138,7 +139,8 @@ class BatchedStructureBuilder(object):
 
     def _missing_residue_error(self, structure_idx):
         """Raise a ValueError describing missing residues."""
-        missing_loc = np.where((self.ang_or_crd_batch[structure_idx] == 0).all(axis=-1))
+        missing_loc = np.where(
+            (np.isnan(self.ang_or_crd_batch[structure_idx])).all(axis=-1))
         raise ValueError(f"Building atomic coordinates from angles is not supported "
                          f"for structures with missing residues. Missing residues = "
                          f"{list(missing_loc[0])}. Protein structures with missing "
@@ -169,6 +171,7 @@ def unpad_tensors(sequence, other):
     Returns:
         Sequence and other tensors with the batch-level padding removed.
     """
+    raise NotImplementedError("Unpadding tensors via this function is not supported.")
     batch_mask = sequence.ne(VOCAB.pad_id)
     sequence = sequence[batch_mask]
 

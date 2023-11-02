@@ -36,8 +36,9 @@ setup(
     package_data={
         "astral_data": ["resources/astral_data.txt"],
         "full_protein_dssp": ["resources/full_protein_dssp_annotations.json"],
-        "single_domain_dssp": ["resources/single_domain_dssp_annotations.json"]
-        },
+        "single_domain_dssp": ["resources/single_domain_dssp_annotations.json"],
+        "amber_build_params": ["resources/build_params.pkl"]
+    },
 
     # Allows `setup.py test` to work correctly with pytest
     setup_requires=[] + pytest_runner,
