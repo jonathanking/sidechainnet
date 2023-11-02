@@ -86,19 +86,23 @@ def openmm_loss(
     return total_energy, scn_proteins_no_hy, scn_proteins_gt, total_energy_raw
 
 
-# IF YOU ARE INTERESTED IN APPLYING OPENMM-LOSS TO MODELS OTHER THAN OPENFOLD, YOU'LL
-# NEED TO REIMPLEMENT THE FUNCTION BELOW (& POTENTIALLY THE ONE ABOVE IF YOU DON'T HAVE
-# MODEL INPUT/OUTPUT DICTIONARIES). THIS ASSUMES THAT MODEL_INPUT AND MODEL_OUTPUT ARE
-# DICTIONARIES CONTAINING YOUR MODEL'S INPUT AND OUTPUT DATA, RESPECTIVELY.
+# If you are interested in applying the OpenMM-loss module to models other than
+# OpenFold, you will need to re-implement the function below. You may also need to
+# modify the one above if you do not have model input/output dictionaries. This
+# assumes that 'model_input' and 'model_output' are dictionaries that contain the
+# input and output data of your specific model.
 #
-# ESSENTIALLY, YOU MUST CREATE A SCNPROTEIN GENERATOR FROM YOUR MODEL'S INPUT AND OUTPUT.
-# SEE BELOW FOR AN EXAMPLE OF HOW TO DO THIS. A BIT OF TRICKY CONVERSION MAY BE REQUIRED
-# TO GET THE SHAPES JUST RIGHT, SINCE SCNPROTEIN REQUIRES COORDINATES IN THE SHAPE
-# (L x 15 x 3), with 15 being sidechainnet.build_info.NUM_COORDS_PER_RES, AND ATOM
-# NAMES/POSITIONS AS DEFINED IN sidechainnet.build_info.ATOM_MAP_HEAVY. NOTE THAT
-# IT'S ALSO POSSIBLE TO USE SCNPROTEIN.fastbuild TO CONVERT AN INTERNAL COORDINATE (ANGLE)
-# PROTEIN REPRESENTATION INTO A CARTESIAN COORDINATE REPRESENTATION, IF YOU HAVE A MODEL
-# THAT PREDICTS INTERNAL COORDINATES.
+# Essentially, what you need to do is create a SCNProtein generator using your
+# model's input and output. Below, you'll find an example of how to achieve this.
+# You might need to perform some careful data conversion to ensure that the data
+# has the correct shapes. SCNProtein requires coordinates in the shape of (L x 15 x
+# 3), where '15' corresponds to 'SidechainNet.build_info.NUM_COORDS_PER_RES,' and
+# the atom names and positions should follow the definitions in
+# 'sidechainnnet.build_info.ATOM_MAP_HEAVY.' It's worth noting that you can also
+# utilize 'SCNProtein.fastbuild' to convert an internal coordinate (angle) protein
+# representation into a Cartesian coordinate representation if your model predicts
+# internal coordinates.
+
 
 def generate_scnproteins_from_model_reps(model_input, model_output, ground_truth=False):
     """Iterate over OpenFold input/output, generating SCNProteins for each in/out pair.
