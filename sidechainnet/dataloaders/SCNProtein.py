@@ -620,20 +620,41 @@ class SCNProtein(object):
         else:
             return self.starting_energy
 
-    def get_openmm_loss(self, nonbonded_interactions=True):
+    def get_openmm_loss(
+            self,
+            nonbonded_interactions=True,
+            add_relu=True,
+            modified_sigmoid=True,
+            modified_sigmoid_params=(5, 1000000, 300000, 5),
+    ):
         """Return OpenMMLoss (i.e., energy) of the system given current positions.
 
         Args:
             nonbonded_interactions (bool, default=True): If True, compute nonbonded
                 interactions. If False, only compute bonded interactions.
-        
+            add_relu (bool, default=True): If True, add a ReLU activation to the
+                loss function.
+            modified_sigmoid (bool, default=True): If True, add a modified sigmoid
+                activation to the loss function.
+            modified_sigmoid_params (tuple, default=(5, 1000000, 300000, 5)): If
+                modified_sigmoid is True, use these parameters for the modified
+                sigmoid activation.
+
         Returns:
-            The value of the OpenMMLoss function for this protein as a float tensor
+            The value of the OpenMMLoss function for this protein as a float tensor,
+            augmented or smoothed with a modified sigmoid and/or ReLU component.
         """
         if not self.openmm_initialized or not nonbonded_interactions:
             self._initialize_openmm(nonbonded_interactions=nonbonded_interactions)
         eloss_fn = OpenMMEnergyH()
         eloss = eloss_fn.apply(self, self.hcoords)
+        if add_relu:
+            relu_component = eloss * 10**-12  # if protein_energy > 0 else 0
+        if modified_sigmoid:
+            a, b, c, d = modified_sigmoid_params
+            eloss = (1/a + torch.exp(-(d*eloss+b)/c))**(-1) - (a-1)
+        if add_relu:
+            eloss += relu_component
         return eloss
 
     def get_forces(self, pprint=False):
