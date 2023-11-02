@@ -493,14 +493,14 @@ def build_coords_from_source(backbone_mats,
     coss = torch.cos(ang)
 
     # Select out necessary build info for all atoms (up to 10) in all residues (up to L)
-    bond_lengths = build_info['bond_lengths'][seq_aa_index].to(device).type(dtype)  # Lx10
-    cthetas = build_info['cthetas'][seq_aa_index].to(device).type(dtype)
-    sthetas = build_info['sthetas'][seq_aa_index].to(device).type(dtype)
-    cchis = build_info['cchis'][seq_aa_index].to(device).type(dtype)
-    schis = build_info['schis'][seq_aa_index].to(device).type(dtype)
-    offsets = build_info['offsets'][seq_aa_index].to(device).type(dtype)
-    types = build_info['types'][seq_aa_index].to(device)
-    sources = build_info['sources'][seq_aa_index].to(device).long()
+    bond_lengths = build_info['bond_lengths'].to(device)[seq_aa_index].to(device).type(dtype)  # Lx10
+    cthetas = build_info['cthetas'].to(device)[seq_aa_index].to(device).type(dtype)
+    sthetas = build_info['sthetas'].to(device)[seq_aa_index].to(device).type(dtype)
+    cchis = build_info['cchis'].to(device)[seq_aa_index].to(device).type(dtype)
+    schis = build_info['schis'].to(device)[seq_aa_index].to(device).type(dtype)
+    offsets = build_info['offsets'].to(device)[seq_aa_index].to(device).type(dtype)
+    types = build_info['types'].to(device)[seq_aa_index].to(device)
+    sources = build_info['sources'].to(device)[seq_aa_index].to(device).long()
     names = [build_info['names'][idx] for idx in seq_aa_index
             ] if 'names' in build_info else None
 

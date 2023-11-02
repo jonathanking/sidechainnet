@@ -2,9 +2,9 @@ SidechainNet
 ==============================
 
 
-**NEW: SidechainNet v1.0 introduces new features (e.g., OpenMM interaction, hydrogen support) and several breaking changes.** Please see our [release notes](version1_notes.md) for more information.
+**NEW: SidechainNet v1.0 introduces new features (e.g., OpenMM interaction, hydrogen support) and several breaking changes.** Please see our [release notes](version1_notes.md) for more information. An updated walkthrough is available below.
 
-**[Colab Walkthrough](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing), [Paper](https://doi.org/10.1002/prot.26169)**
+**[Colab Walkthrough v1.0](https://colab.research.google.com/drive/178vGN5aMD_gmS0Z4XbFWMbUZu3xHAWmD?usp=sharing), [Paper](https://doi.org/10.1002/prot.26169)**
 
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>1</sup> by Mohammed AlQuraishi.
 
@@ -53,7 +53,10 @@ Specifically, SidechainNet adds measurements for protein angles and coordinates 
 <sup>†</sup>Includes a `1` for each residue that has been modified to a standard residue according to the mapping in `sidechainnet.utils.measure.ALLOWED_NONSTD_RESIDUES` (e.g., selenomethionine -> methionine).
 
 ## Installation
-`pip install sidechainnet`
+```
+conda install -c conda-forge openmm
+pip install sidechainnet
+```
 
 ## Usage Examples
 

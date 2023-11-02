@@ -43,6 +43,7 @@ from sidechainnet.utils.manual_adjustment import (manually_adjust_data,
                                                   needs_manual_adjustment)
 from sidechainnet.utils.organize import get_validation_split_identifiers_from_pnid_list, load_data, organize_data, save_data
 from sidechainnet.utils.parse import parse_raw_proteinnet
+from sidechainnet.dataloaders.SCNDataset import SCNDataset
 
 PNID_CSV_FILE = None
 
@@ -399,7 +400,7 @@ def create_custom(pnids,
         "To load the data in a different format, use sidechainnet.load with the desired\n"
         f"options and set 'local_scn_path={sidechainnet_outfile}'.")
 
-    return sidechainnet_dict
+    return SCNDataset(sidechainnet_dict)
 
 
 def get_proteinnet_ids(casp_version, split, thinning=None):
