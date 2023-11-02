@@ -239,4 +239,4 @@ Please cite our paper(s) if you find SidechainNet useful in your work.
 
 ## Copyright
 
-Copyright (c) 2023, Jonathan King
+Copyright (c) 2023 Jonathan King and the University of Pittsburgh
