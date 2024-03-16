@@ -4,7 +4,7 @@ SidechainNet
 
 >**NEW: SidechainNet v1.0 introduces new features (e.g., OpenMM interaction, hydrogen support) and several breaking changes.** Please see our [release notes](version1_notes.md) for more information. An updated walkthrough is available below.
 
-**[Colab Walkthrough v1.0](https://colab.research.google.com/drive/1-d2p_1G0o4W1DlegyUA6D7ErLUNEsakX?usp=sharing), [SidechainNet Paper](https://doi.org/10.1002/prot.26169), [OpenMM-Loss Paper](https://doi.org/10.1101/2023.10.03.560775)**
+**[Colab Walkthrough v1.0.1](https://colab.research.google.com/drive/1xgvlpf6XhkonTF9Y8hfZWDn0kwrH_w_A?usp=sharing), [SidechainNet Paper](https://doi.org/10.1002/prot.26169), [OpenMM-Loss Paper](https://doi.org/10.1101/2023.10.03.560775)**
 
 SidechainNet is a protein structure prediction dataset that directly extends [ProteinNet](https://github.com/aqlaboratory/proteinnet)<sup>2</sup> by Mohammed AlQuraishi.
 

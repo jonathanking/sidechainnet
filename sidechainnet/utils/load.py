@@ -127,7 +127,7 @@ def load(casp_version=12,
     Args:
         casp_version (int, optional): CASP version to load (7-12). Defaults to 12. Users
             may also specify 'debug' to load a small, debug dataset.
-        thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A thinning
+        casp_thinning (int, optional): ProteinNet/SidechainNet "thinning" to load. A thinning
             represents the minimum sequence similarity each protein sequence must have to
             all other sequences in the same thinning. The 100 thinning contains all of the
             protein entries in SidechainNet, while the 30 thinning has a much smaller
